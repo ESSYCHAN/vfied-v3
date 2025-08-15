@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#2C3E50">
+    
+    <title>VFIED - Your Food Friend</title>
+    
+    <!-- iOS Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/assets/icon-180.png">
+    <link rel="apple-touch-icon" sizes="152x152" href="/assets/icon-152.png">
+    <link rel="apple-touch-icon" sizes="120x120" href="/assets/icon-120.png">
+    
+    <!-- Android Icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="/assets/icon-512.png">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json">
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="/src/style.css" as="style">
+    <link rel="preload" href="/src/main.js" as="script">
+    
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Loading Screen -->
+        <div id="loading-screen" class="loading-screen">
+            <div class="loading-content">
+                <div class="logo">VFIED</div>
+                <div class="loading-text">Your food friend is waking up...</div>
+                <div class="loading-dots">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main App Container -->
+        <div id="main-app" class="main-app hidden">
+            <!-- Status Bar Spacer -->
+            <div class="status-bar-spacer"></div>
+            
+            <!-- Header -->
+            <header class="app-header">
+                <div class="header-content">
+                    <div class="time" id="current-time">Friday, 8:30 PM</div>
+                    <h1 class="app-title">VFIED</h1>
+                    <p class="app-subtitle">Your food friend who gets it</p>
+                </div>
+                <div class="context-banner" id="context-banner">
+                    📊 Ready to help you decide what to eat
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="app-content">
+                <!-- Tab Navigation -->
+                <nav class="tab-nav" id="tab-nav">
+                    <button class="tab-btn active" data-tab="decide">🤔 Decide</button>
+                    <button class="tab-btn" data-tab="celebrate">🎉 Celebrate</button>
+                    <button class="tab-btn" data-tab="recover">🔄 Recover</button>
+                    <button class="tab-btn" data-tab="healthy">🥗 Healthy</button>
+                </nav>
+
+                <!-- Tab Content -->
+                <div class="tab-content">
+                    <!-- Decide Tab -->
+                    <div id="decide-tab" class="tab-pane active">
+                        <div class="decide-section">
+                            <!-- Quick Decide Button -->
+                            <div class="quick-decide">
+                                <button id="decide-for-me-btn" class="decide-btn">
+                                    <span class="btn-icon">🎯</span>
+                                    <span class="btn-text">DECIDE FOR ME</span>
+                                </button>
+                                <p class="decide-subtitle">Stuck choosing? Let me help!</p>
+                            </div>
+
+                            <!-- Or Mood Section -->
+                            <div class="mood-section">
+                                <h3 class="section-title">Or tell me your vibe:</h3>
+                                <div class="mood-grid" id="mood-selector">
+                                    <!-- Mood buttons will be populated by JS -->
+                                </div>
+                            </div>
+
+                            <!-- Friend Response -->
+                            <div id="friend-response" class="friend-response hidden">
+                                <!-- Response content will be populated by JS -->
+                            </div>
+
+                            <!-- Food Suggestions -->
+                            <div id="food-suggestions" class="food-suggestions hidden">
+                                <!-- Suggestions will be populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Other tabs will be populated by JS -->
+                    <div id="celebrate-tab" class="tab-pane">
+                        <div class="celebration-content">
+                            <h2>🎉 Celebration Mode!</h2>
+                            <p>You're celebrating! Get the good stuff.</p>
+                        </div>
+                    </div>
+
+                    <div id="recover-tab" class="tab-pane">
+                        <div class="recovery-content">
+                            <h2>🔄 Recovery Mode</h2>
+                            <p>Need to reset? Here's how to feel better.</p>
+                        </div>
+                    </div>
+
+                    <div id="healthy-tab" class="tab-pane">
+                        <div class="healthy-content">
+                            <h2>🥗 Healthy Streak</h2>
+                            <p>Keep the momentum going!</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Footer Stats -->
+            <footer class="app-footer">
+                <div class="stats" id="user-stats">
+                    <div class="stat-item">
+                        <span class="stat-label">Decisions made:</span>
+                        <span class="stat-value" id="decisions-count">0</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Time saved:</span>
+                        <span class="stat-value" id="time-saved">0 min</span>
+                    </div>
+                </div>
+            </footer>
+
+            <!-- Bottom Safe Area -->
+            <div class="bottom-safe-area"></div>
+        </div>
+
+        <!-- Decision Result Modal -->
+        <div id="decision-modal" class="decision-modal hidden">
+            <div class="modal-content">
+                <div class="result-emoji" id="result-emoji">🍕</div>
+                <h2 class="result-title" id="result-title">Pizza Night!</h2>
+                <p class="result-message" id="result-message">You know you want it. Stop thinking and just get it.</p>
+                
+                <div class="result-actions">
+                    <button id="accept-btn" class="action-btn primary">YES, GET IT!</button>
+                    <button id="try-again-btn" class="action-btn secondary">TRY AGAIN</button>
+                </div>
+                
+                <button id="close-modal-btn" class="close-btn">×</button>
+            </div>
+        </div>
+
+        <!-- Settings Menu (Future) -->
+        <div id="settings-menu" class="settings-menu hidden">
+            <!-- Settings content -->
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
