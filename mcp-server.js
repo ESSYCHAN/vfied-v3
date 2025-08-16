@@ -1,6 +1,8 @@
 // VFIED MCP Server - Complete with Weather + Dietary Intelligence + MCP Protocol
 import express from 'express';
 import cors from 'cors';
+import 'dotenv/config';
+// import express from 'express';
 
 const app = express();
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
@@ -9,7 +11,8 @@ const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
 app.use(cors({
   origin: [
     'http://localhost:5166',
-    'http://localhost:3000', 
+    'http://localhost:3000',
+    'http://localhost:5167',  
     'http://localhost:5173',
     'https://vfied.vercel.app',
     'https://vfied-v3.vercel.app',
