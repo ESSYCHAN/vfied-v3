@@ -2,7 +2,7 @@
 import express from 'express';
 import cors from 'cors';
 import { aiFoodService, getAIFoodSuggestion, getAIQuickDecision, updateAIFeedback } from './src/services/aiFoodService.js';
-
+// import { aiFoodService, getAIFoodSuggestion, getAIQuickDecision, updateAIFeedback } from './src/services/aiFoodService.js';
 const app = express();
 const PORT = process.env.MCP_PORT || 3001;
 
