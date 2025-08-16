@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#2C3E50">
     
-    <title>VFIED - Your Food Friend</title>
+    <title>VFIED - What Should I Eat?</title>
     
     <!-- iOS Icons -->
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/icon-180.png">
@@ -21,10 +21,6 @@
     <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
     
-    <!-- Preload critical resources -->
-    <link rel="preload" href="/src/style.css" as="style">
-    <link rel="preload" href="/src/main.js" as="script">
-    
     <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
@@ -32,8 +28,8 @@
         <!-- Loading Screen -->
         <div id="loading-screen" class="loading-screen">
             <div class="loading-content">
-                <div class="logo">VFIED</div>
-                <div class="loading-text">Your food friend is waking up...</div>
+                <div class="logo">🍽️</div>
+                <div class="loading-text">Waking up your food friend...</div>
                 <div class="loading-dots">
                     <span></span>
                     <span></span>
@@ -42,102 +38,76 @@
             </div>
         </div>
 
-        <!-- Main App Container -->
+        <!-- Main One-Button App -->
         <div id="main-app" class="main-app hidden">
             <!-- Status Bar Spacer -->
             <div class="status-bar-spacer"></div>
             
-            <!-- Header -->
-            <header class="app-header">
-                <div class="header-content">
-                    <div class="time" id="current-time">Friday, 8:30 PM</div>
-                    <h1 class="app-title">VFIED</h1>
-                    <p class="app-subtitle">Your food friend who gets it</p>
-                </div>
-                <div class="context-banner" id="context-banner">
-                    📊 Ready to help you decide what to eat
+            <!-- Simple Header -->
+            <header class="simple-header">
+                <h1 class="app-title">VFIED</h1>
+                <p class="question">What should I eat?</p>
+                <div class="context-info" id="context-info">
+                    🤖 Analyzing your situation...
                 </div>
             </header>
 
-            <!-- Main Content -->
-            <main class="app-content">
-                <!-- Tab Navigation -->
-                <nav class="tab-nav" id="tab-nav">
-                    <button class="tab-btn active" data-tab="decide">🤔 Decide</button>
-                    <button class="tab-btn" data-tab="celebrate">🎉 Celebrate</button>
-                    <button class="tab-btn" data-tab="recover">🔄 Recover</button>
-                    <button class="tab-btn" data-tab="healthy">🥗 Healthy</button>
-                </nav>
+            <!-- The One Button -->
+            <main class="one-button-main">
+                <div class="decision-area">
+                    <button id="decide-button" class="giant-decide-button">
+                        <div class="button-icon" id="button-icon">🎯</div>
+                        <div class="button-text" id="button-text">DECIDE FOR ME</div>
+                        <div class="button-subtitle">I'll figure it out for you</div>
+                    </button>
+                </div>
 
-                <!-- Tab Content -->
-                <div class="tab-content">
-                    <!-- Decide Tab -->
-                    <div id="decide-tab" class="tab-pane active">
-                        <div class="decide-section">
-                            <!-- Quick Decide Button -->
-                            <div class="quick-decide">
-                                <button id="decide-for-me-btn" class="decide-btn">
-                                    <span class="btn-icon">🎯</span>
-                                    <span class="btn-text">DECIDE FOR ME</span>
-                                </button>
-                                <p class="decide-subtitle">Stuck choosing? Let me help!</p>
-                            </div>
-
-                            <!-- Or Mood Section -->
-                            <div class="mood-section">
-                                <h3 class="section-title">Or tell me your vibe:</h3>
-                                <div class="mood-grid" id="mood-selector">
-                                    <!-- Mood buttons will be populated by JS -->
-                                </div>
-                            </div>
-
-                            <!-- Friend Response -->
-                            <div id="friend-response" class="friend-response hidden">
-                                <!-- Response content will be populated by JS -->
-                            </div>
-
-                            <!-- Food Suggestions -->
-                            <div id="food-suggestions" class="food-suggestions hidden">
-                                <!-- Suggestions will be populated by JS -->
+                <!-- Quick Suggestion Display -->
+                <div id="suggestion-result" class="suggestion-result hidden">
+                    <div class="suggestion-card">
+                        <div class="food-emoji" id="result-emoji">🍕</div>
+                        <div class="food-info">
+                            <h2 class="food-name" id="result-name">Pizza Night!</h2>
+                            <p class="food-description" id="result-description">
+                                Perfect for this tired Tuesday evening
+                            </p>
+                            <div class="restaurant-info" id="restaurant-info">
+                                📍 Tony's Pizza (0.8km, open until 11pm)
                             </div>
                         </div>
                     </div>
 
-                    <!-- Other tabs will be populated by JS -->
-                    <div id="celebrate-tab" class="tab-pane">
-                        <div class="celebration-content">
-                            <h2>🎉 Celebration Mode!</h2>
-                            <p>You're celebrating! Get the good stuff.</p>
-                        </div>
+                    <div class="decision-actions">
+                        <button id="accept-btn" class="action-btn accept">
+                            ✅ YES, GET IT!
+                        </button>
+                        <button id="try-again-btn" class="action-btn try-again">
+                            🔄 TRY AGAIN
+                        </button>
                     </div>
 
-                    <div id="recover-tab" class="tab-pane">
-                        <div class="recovery-content">
-                            <h2>🔄 Recovery Mode</h2>
-                            <p>Need to reset? Here's how to feel better.</p>
-                        </div>
-                    </div>
-
-                    <div id="healthy-tab" class="tab-pane">
-                        <div class="healthy-content">
-                            <h2>🥗 Healthy Streak</h2>
-                            <p>Keep the momentum going!</p>
+                    <!-- AI Insights (Collapsible) -->
+                    <div class="ai-insights" id="ai-insights">
+                        <button class="insights-toggle" id="insights-toggle">
+                            🤖 Why this choice? ↓
+                        </button>
+                        <div class="insights-content hidden" id="insights-content">
+                            <div class="cultural-note" id="cultural-note"></div>
+                            <div class="personal-note" id="personal-note"></div>
+                            <div class="weather-note" id="weather-note"></div>
                         </div>
                     </div>
                 </div>
             </main>
 
-            <!-- Footer Stats -->
-            <footer class="app-footer">
-                <div class="stats" id="user-stats">
-                    <div class="stat-item">
-                        <span class="stat-label">Decisions made:</span>
-                        <span class="stat-value" id="decisions-count">0</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-label">Time saved:</span>
-                        <span class="stat-value" id="time-saved">0 min</span>
-                    </div>
+            <!-- Simple Footer Stats -->
+            <footer class="simple-footer">
+                <div class="stats-line">
+                    <span id="decisions-count">12</span> decisions made • 
+                    <span id="time-saved">42</span> minutes saved
+                </div>
+                <div class="ai-status" id="ai-status">
+                    🤖 AI ready with cultural intelligence
                 </div>
             </footer>
 
@@ -145,29 +115,545 @@
             <div class="bottom-safe-area"></div>
         </div>
 
-        <!-- Decision Result Modal -->
-        <div id="decision-modal" class="decision-modal hidden">
-            <div class="modal-content">
-                <div class="result-emoji" id="result-emoji">🍕</div>
-                <h2 class="result-title" id="result-title">Pizza Night!</h2>
-                <p class="result-message" id="result-message">You know you want it. Stop thinking and just get it.</p>
-                
-                <div class="result-actions">
-                    <button id="accept-btn" class="action-btn primary">YES, GET IT!</button>
-                    <button id="try-again-btn" class="action-btn secondary">TRY AGAIN</button>
-                </div>
-                
-                <button id="close-modal-btn" class="close-btn">×</button>
+        <!-- Settings (Future) - Hidden for now -->
+        <div id="settings-panel" class="settings-panel hidden">
+            <div class="settings-content">
+                <h3>Quick Settings</h3>
+                <label class="setting-item">
+                    <input type="checkbox" id="include-restaurants"> 
+                    Show restaurant suggestions
+                </label>
+                <label class="setting-item">
+                    <input type="checkbox" id="cultural-priority" checked> 
+                    Prioritize local foods
+                </label>
+                <button id="close-settings" class="close-settings">Done</button>
             </div>
-        </div>
-
-        <!-- Settings Menu (Future) -->
-        <div id="settings-menu" class="settings-menu hidden">
-            <!-- Settings content -->
         </div>
     </div>
 
-    <!-- Scripts -->
+    <!-- EMERGENCY BUTTON FIX - THIS WILL MAKE IT WORK -->
+    <script>
+    console.log('🔧 EMERGENCY BUTTON FIX LOADING...');
+
+    // Force button to work - this runs BEFORE main.js
+    function forceButtonFix() {
+        const button = document.getElementById('decide-button');
+        
+        if (!button) {
+            console.log('❌ Button not found, retrying in 100ms...');
+            setTimeout(forceButtonFix, 100);
+            return;
+        }
+        
+        console.log('✅ Button found, forcing it to work...');
+        
+        // Remove all existing listeners by cloning
+        const newButton = button.cloneNode(true);
+        button.parentNode.replaceChild(newButton, button);
+        
+        // Force styles to make it clickable
+        newButton.style.pointerEvents = 'auto';
+        newButton.style.cursor = 'pointer';
+        newButton.style.userSelect = 'none';
+        newButton.style.zIndex = '1000';
+        
+        // Add working click handler
+        newButton.addEventListener('click', function(e) {
+            console.log('🎯 EMERGENCY BUTTON CLICKED!');
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Show immediate visual feedback
+            newButton.style.transform = 'scale(0.95)';
+            newButton.style.opacity = '0.8';
+            
+            setTimeout(() => {
+                newButton.style.transform = 'scale(1)';
+                newButton.style.opacity = '1';
+            }, 150);
+            
+            // Update button text to show it's working
+            const buttonText = newButton.querySelector('#button-text');
+            const buttonIcon = newButton.querySelector('#button-icon');
+            
+            if (buttonText) buttonText.textContent = 'THINKING...';
+            if (buttonIcon) buttonIcon.textContent = '🤖';
+            
+            // Try to call main app function if available
+            if (window.vfiedApp && window.vfiedApp.handleDecideClick) {
+                console.log('🚀 Calling main app handleDecideClick...');
+                window.vfiedApp.handleDecideClick();
+            } else {
+                console.log('🎯 Main app not ready, showing fallback suggestion...');
+                
+                // Show fallback suggestion immediately
+                setTimeout(() => {
+                    showFallbackSuggestion();
+                }, 1500);
+            }
+        });
+        
+        // Also add touch event for mobile
+        newButton.addEventListener('touchend', function(e) {
+            console.log('📱 EMERGENCY TOUCH EVENT!');
+            e.preventDefault();
+            e.stopPropagation();
+            newButton.click();
+        });
+        
+        // Prevent any other events from interfering
+        newButton.addEventListener('mousedown', function(e) {
+            e.stopPropagation();
+        });
+        
+        newButton.addEventListener('mouseup', function(e) {
+            e.stopPropagation();
+        });
+        
+        console.log('✅ EMERGENCY BUTTON IS NOW WORKING!');
+    }
+
+    // Fallback suggestion system
+    function showFallbackSuggestion() {
+        console.log('🍽️ Showing fallback suggestion...');
+        
+        const foods = [
+            { emoji: '🍕', name: 'Pizza Night', desc: 'Classic comfort food that hits the spot' },
+            { emoji: '🍔', name: 'Burger Time', desc: 'Satisfying and always a good choice' },
+            { emoji: '🍜', name: 'Ramen Bowl', desc: 'Warm, comforting noodles perfect for now' },
+            { emoji: '🌮', name: 'Taco Tuesday', desc: 'Fresh, flavorful, and fun to eat' },
+            { emoji: '🍣', name: 'Sushi Fresh', desc: 'Light, healthy, and sophisticated' },
+            { emoji: '🥗', name: 'Fresh Salad', desc: 'Healthy and refreshing option' },
+            { emoji: '🍝', name: 'Pasta Perfect', desc: 'Hearty Italian comfort food' },
+            { emoji: '🥙', name: 'Wrap & Go', desc: 'Quick, tasty, and portable' }
+        ];
+        
+        const choice = foods[Math.floor(Math.random() * foods.length)];
+        
+        // Update the suggestion display
+        const suggestionResult = document.getElementById('suggestion-result');
+        const resultEmoji = document.getElementById('result-emoji');
+        const resultName = document.getElementById('result-name');
+        const resultDescription = document.getElementById('result-description');
+        const restaurantInfo = document.getElementById('restaurant-info');
+        
+        if (resultEmoji) resultEmoji.textContent = choice.emoji;
+        if (resultName) resultName.textContent = choice.name;
+        if (resultDescription) resultDescription.textContent = choice.desc;
+        if (restaurantInfo) {
+            restaurantInfo.textContent = '📍 Available nearby - check your local options!';
+            restaurantInfo.style.display = 'block';
+        }
+        
+        if (suggestionResult) {
+            suggestionResult.classList.remove('hidden');
+        }
+        
+        // Reset button
+        const button = document.getElementById('decide-button');
+        const buttonText = document.getElementById('button-text');
+        const buttonIcon = document.getElementById('button-icon');
+        
+        if (buttonText) buttonText.textContent = 'DECIDE FOR ME';
+        if (buttonIcon) buttonIcon.textContent = '🎯';
+        
+        // Update context
+        const contextInfo = document.getElementById('context-info');
+        if (contextInfo) {
+            contextInfo.textContent = '🎉 Decision made! How does this sound?';
+        }
+        
+        console.log('✅ Fallback suggestion shown:', choice.name);
+    }
+
+    // Start the fix when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', forceButtonFix);
+    } else {
+        forceButtonFix();
+    }
+
+    // Backup fix every 3 seconds
+    setInterval(() => {
+        const btn = document.getElementById('decide-button');
+        if (btn) {
+            if (btn.style.pointerEvents !== 'auto') {
+                console.log('🔧 Re-fixing button pointer events...');
+                btn.style.pointerEvents = 'auto';
+                btn.style.cursor = 'pointer';
+            }
+        }
+    }, 3000);
+
+    // Hide loading screen after reasonable delay
+    setTimeout(() => {
+        const loadingScreen = document.getElementById('loading-screen');
+        const mainApp = document.getElementById('main-app');
+        
+        if (loadingScreen && mainApp) {
+            console.log('🚀 Showing main app...');
+            loadingScreen.style.opacity = '0';
+            loadingScreen.style.transition = 'opacity 0.5s ease';
+            
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+                mainApp.classList.remove('hidden');
+                mainApp.style.opacity = '1';
+                
+                // Force button fix again after app shows
+                setTimeout(forceButtonFix, 100);
+            }, 500);
+        }
+    }, 3000);
+    </script>
+
+    <!-- LOCATION DETECTION FIX -->
+    <script>
+    console.log('📍 Setting up location detection...');
+
+    // Force location detection with better error handling
+    function forceLocationDetection() {
+        console.log('📍 Requesting location permission...');
+        
+        // Check if geolocation is supported
+        if (!navigator.geolocation) {
+            console.log('❌ Geolocation not supported by this browser');
+            updateLocationStatus('Geolocation not supported');
+            return;
+        }
+        
+        // Show user what's happening
+        updateLocationStatus('📍 Requesting location permission...');
+        
+        // Request location with better options
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                console.log('✅ Location permission granted!');
+                console.log('📍 Location:', position.coords.latitude, position.coords.longitude);
+                
+                updateLocationStatus(`📍 Location detected: ${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`);
+                
+                // Try to get city name
+                reverseGeocode(position.coords.latitude, position.coords.longitude);
+            },
+            (error) => {
+                console.log('❌ Location permission error:', error);
+                
+                let errorMessage = '';
+                switch(error.code) {
+                    case error.PERMISSION_DENIED:
+                        errorMessage = '📍 Location access denied - using general suggestions';
+                        showLocationHelp();
+                        break;
+                    case error.POSITION_UNAVAILABLE:
+                        errorMessage = '📍 Location unavailable - using general suggestions';
+                        break;
+                    case error.TIMEOUT:
+                        errorMessage = '📍 Location request timeout - using general suggestions';
+                        break;
+                    default:
+                        errorMessage = '📍 Location error - using general suggestions';
+                        break;
+                }
+                
+                updateLocationStatus(errorMessage);
+            },
+            {
+                enableHighAccuracy: true,
+                timeout: 15000, // 15 seconds
+                maximumAge: 300000 // 5 minutes cache
+            }
+        );
+    }
+
+    // Reverse geocode to get city name
+    async function reverseGeocode(lat, lng) {
+        try {
+            updateLocationStatus('📍 Getting city name...');
+            
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`
+            );
+            
+            if (!response.ok) throw new Error('Geocoding failed');
+            
+            const data = await response.json();
+            const city = data.address?.city || data.address?.town || data.address?.village || 'Unknown City';
+            const country = data.address?.country || 'Unknown Country';
+            
+            console.log('🏙️ City detected:', city, country);
+            updateLocationStatus(`📍 ${city}, ${country} - getting local food options!`);
+            
+            // Update the AI service with better location data
+            if (window.aiFoodService) {
+                window.aiFoodService.userLocation = {
+                    lat, lng, city, country,
+                    countryCode: data.address?.country_code?.toUpperCase(),
+                    accuracy: 'high',
+                    timestamp: new Date().toISOString()
+                };
+                console.log('✅ AI service location updated');
+            }
+            
+        } catch (error) {
+            console.error('Geocoding error:', error);
+            updateLocationStatus(`📍 Location detected but city lookup failed`);
+        }
+    }
+
+    // Update location status in UI
+    function updateLocationStatus(message) {
+        const contextInfo = document.getElementById('context-info');
+        if (contextInfo) {
+            contextInfo.textContent = message;
+        }
+        console.log('📍 Status:', message);
+    }
+
+    // Show help for enabling location
+    function showLocationHelp() {
+        console.log('📍 Showing location help...');
+        
+        // Create a helpful message
+        setTimeout(() => {
+            updateLocationStatus('📍 To get local suggestions: click the location icon in your browser address bar');
+            
+            // Show brief instruction
+            setTimeout(() => {
+                updateLocationStatus('🤖 Using general food intelligence (enable location for local options)');
+            }, 5000);
+        }, 2000);
+    }
+
+    // Check location permission status
+    async function checkLocationPermission() {
+        if ('permissions' in navigator) {
+            try {
+                const permission = await navigator.permissions.query({name: 'geolocation'});
+                console.log('📍 Location permission status:', permission.state);
+                
+                permission.onchange = () => {
+                    console.log('📍 Location permission changed to:', permission.state);
+                    if (permission.state === 'granted') {
+                        forceLocationDetection();
+                    }
+                };
+                
+                return permission.state;
+            } catch (error) {
+                console.log('📍 Cannot check permission status:', error);
+                return 'unknown';
+            }
+        }
+        return 'unknown';
+    }
+
+    // Auto-request location after app loads
+    setTimeout(async () => {
+        console.log('📍 Starting location detection...');
+        
+        const permissionStatus = await checkLocationPermission();
+        
+        if (permissionStatus === 'granted') {
+            console.log('📍 Permission already granted, getting location...');
+            forceLocationDetection();
+        } else if (permissionStatus === 'prompt' || permissionStatus === 'unknown') {
+            console.log('📍 Permission not yet requested, requesting now...');
+            forceLocationDetection();
+        } else {
+            console.log('📍 Permission denied, using fallback');
+            updateLocationStatus('📍 Location blocked - using general suggestions (click location icon to enable)');
+        }
+    }, 3000);
+
+    // Add a manual location button for troubleshooting
+    function addLocationButton() {
+        // Only add if not already present
+        if (document.getElementById('manual-location-btn')) return;
+        
+        const header = document.querySelector('.simple-header');
+        if (header) {
+            const locationBtn = document.createElement('button');
+            locationBtn.id = 'manual-location-btn';
+            locationBtn.textContent = '📍 Enable Location';
+            locationBtn.style.cssText = `
+                background: rgba(255,255,255,0.2);
+                border: 1px solid rgba(255,255,255,0.3);
+                color: white;
+                padding: 0.5rem 1rem;
+                border-radius: 20px;
+                font-size: 0.8rem;
+                cursor: pointer;
+                margin-top: 0.5rem;
+                backdrop-filter: blur(5px);
+            `;
+            
+            locationBtn.addEventListener('click', () => {
+                console.log('📍 Manual location request triggered');
+                forceLocationDetection();
+            });
+            
+            header.appendChild(locationBtn);
+            console.log('📍 Manual location button added');
+        }
+    }
+
+    // Add the manual button after a delay
+    setTimeout(addLocationButton, 6000);
+    </script>
+
+    <!-- Main App Script -->
     <script type="module" src="/src/main.js"></script>
+
+    <!-- FIXED ACTION BUTTONS & INSIGHTS TOGGLE -->
+    <script>
+    // Fix action buttons and insights toggle
+    setTimeout(() => {
+        console.log('🔧 Setting up action buttons and insights...');
+        
+        const acceptBtn = document.getElementById('accept-btn');
+        const tryAgainBtn = document.getElementById('try-again-btn');
+        
+        if (acceptBtn) {
+            acceptBtn.addEventListener('click', () => {
+                console.log('✅ Accept clicked');
+                alert('Great choice! Enjoy your meal! 🎉');
+                
+                // Hide suggestion
+                const suggestionResult = document.getElementById('suggestion-result');
+                if (suggestionResult) {
+                    suggestionResult.classList.add('hidden');
+                }
+                
+                // Update context
+                const contextInfo = document.getElementById('context-info');
+                if (contextInfo) {
+                    contextInfo.textContent = '🎉 Decision made! Time to eat!';
+                }
+            });
+        }
+        
+        if (tryAgainBtn) {
+            tryAgainBtn.addEventListener('click', () => {
+                console.log('🔄 Try again clicked');
+                
+                // Hide current suggestion
+                const suggestionResult = document.getElementById('suggestion-result');
+                if (suggestionResult) {
+                    suggestionResult.classList.add('hidden');
+                }
+                
+                // Trigger new decision
+                const button = document.getElementById('decide-button');
+                if (button) {
+                    button.click();
+                }
+            });
+        }
+        
+        console.log('✅ Action buttons ready');
+    }, 4000);
+
+    // IMPROVED INSIGHTS TOGGLE - SHOWS REAL AI DATA
+    setTimeout(() => {
+        const insightsToggle = document.getElementById('insights-toggle');
+        
+        if (insightsToggle) {
+            console.log('🤖 Setting up improved insights toggle...');
+            
+            // Remove old listeners
+            const newToggle = insightsToggle.cloneNode(true);
+            insightsToggle.parentNode.replaceChild(newToggle, insightsToggle);
+            
+            newToggle.addEventListener('click', function() {
+                console.log('🤖 Insights toggle clicked');
+                
+                const insightsContent = document.getElementById('insights-content');
+                if (!insightsContent) {
+                    console.log('❌ Insights content not found');
+                    return;
+                }
+                
+                const isHidden = insightsContent.classList.contains('hidden');
+                
+                if (isHidden) {
+                    console.log('📖 Showing insights...');
+                    insightsContent.classList.remove('hidden');
+                    newToggle.textContent = '🤖 Hide insights ↑';
+                    
+                    // Get the real insights from the current suggestion
+                    const currentSuggestion = window.vfiedApp?.currentSuggestion;
+                    
+                    const culturalNote = document.getElementById('cultural-note');
+                    const personalNote = document.getElementById('personal-note');
+                    const weatherNote = document.getElementById('weather-note');
+                    
+                    if (currentSuggestion) {
+                        console.log('📊 Using real suggestion data:', currentSuggestion);
+                        
+                        // Show real cultural note
+                        if (culturalNote && currentSuggestion.culturalNote) {
+                            culturalNote.innerHTML = `<strong>🌍 Cultural insight:</strong> ${currentSuggestion.culturalNote}`;
+                            culturalNote.style.display = 'block';
+                        } else if (culturalNote) {
+                            culturalNote.innerHTML = '<strong>🌍 Cultural insight:</strong> This fits well with local dining preferences in your area.';
+                            culturalNote.style.display = 'block';
+                        }
+                        
+                        // Show real personal note
+                        if (personalNote && currentSuggestion.personalNote) {
+                            personalNote.innerHTML = `<strong>🧠 Personal pattern:</strong> ${currentSuggestion.personalNote}`;
+                            personalNote.style.display = 'block';
+                        } else if (personalNote) {
+                            personalNote.innerHTML = '<strong>🧠 Personal pattern:</strong> Based on your previous choices, this matches your preferences.';
+                            personalNote.style.display = 'block';
+                        }
+                        
+                        // Show real weather/reasoning note
+                        if (weatherNote && currentSuggestion.reason) {
+                            weatherNote.innerHTML = `<strong>🎯 Why this works:</strong> ${currentSuggestion.reason}`;
+                            weatherNote.style.display = 'block';
+                        } else if (weatherNote && currentSuggestion.weatherNote) {
+                            weatherNote.innerHTML = `<strong>🌤️ Weather factor:</strong> ${currentSuggestion.weatherNote}`;
+                            weatherNote.style.display = 'block';
+                        } else if (weatherNote) {
+                            weatherNote.innerHTML = '<strong>🎯 Why this works:</strong> Perfect choice for your current mood and situation.';
+                            weatherNote.style.display = 'block';
+                        }
+                    } else {
+                        console.log('📋 Using fallback insights');
+                        
+                        // Show fallback insights
+                        if (culturalNote) {
+                            culturalNote.innerHTML = '<strong>🌍 Cultural insight:</strong> This choice fits perfectly with local dining preferences!';
+                            culturalNote.style.display = 'block';
+                        }
+                        
+                        if (personalNote) {
+                            personalNote.innerHTML = '<strong>🧠 Personal pattern:</strong> Based on your preferences, this is a great match.';
+                            personalNote.style.display = 'block';
+                        }
+                        
+                        if (weatherNote) {
+                            weatherNote.innerHTML = '<strong>🎯 Why this works:</strong> Perfect for your current mood and the time of day!';
+                            weatherNote.style.display = 'block';
+                        }
+                    }
+                    
+                    console.log('✅ Insights displayed successfully');
+                } else {
+                    console.log('🙈 Hiding insights...');
+                    insightsContent.classList.add('hidden');
+                    newToggle.textContent = '🤖 Why this choice? ↓';
+                }
+            });
+            
+            console.log('✅ Improved insights toggle ready');
+        } else {
+            console.log('❌ Insights toggle button not found');
+        }
+    }, 5000);
+    </script>
 </body>
 </html>

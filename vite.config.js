@@ -1,13 +1,22 @@
+// vite.config.js
 import { defineConfig } from 'vite';
+import legacy from '@vitejs/plugin-legacy';
 
 export default defineConfig({
-  root: '.',
+  plugins: [
+    legacy({
+      targets: ['defaults', 'not IE 11']
+    })
+  ],
+  server: {
+    port: 5166,
+    host: true
+  },
   build: {
     outDir: 'dist',
-    assetsDir: 'assets',
-    target: 'es2015'
+    sourcemap: true
   },
-  server: {
-    port: 3000
+  define: {
+    global: 'globalThis'
   }
 });

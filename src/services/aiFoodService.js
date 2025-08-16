@@ -233,7 +233,7 @@ Focus on authentic local foods, not just international chains.
     const now = new Date();
     
     return {
-      // Temporal context
+      // Existing context...
       time: {
         hour: now.getHours(),
         dayOfWeek: now.getDay(),
@@ -243,22 +243,21 @@ Focus on authentic local foods, not just international chains.
         isWorkHours: this.isWorkHours(now)
       },
       
-      // Location & Cultural context
       location: this.userLocation,
       culture: this.userCulture,
-      
-      // Personal context
       personalHistory: this.getRecentHistory(),
       patterns: await this.getPersonalPatterns(mood),
       preferences: this.getUserPreferences(mood),
       
-      // Environmental context (Phase 3)
+      // NEW: Weather context
       weather: await this.getWeatherContext(),
       
       // Contextual hints
       isQuickDecision: context.quick || false,
       budget: context.budget || 'medium',
       socialSituation: context.social || 'solo',
+      includeRestaurants: context.includeRestaurants || false,
+      culturalPriority: context.culturalPriority !== false,
       
       // User provided context
       ...context
@@ -269,60 +268,100 @@ Focus on authentic local foods, not just international chains.
     const recentChoicesText = this.formatPersonalHistory(context.personalHistory);
     const patternsText = this.formatPersonalPatterns(context.patterns);
     const situationText = this.formatCurrentSituation(context);
-
+    
+    // Weather context
+    const weatherText = context.weather 
+      ? `Weather: ${context.weather.temperature}°C, ${context.weather.description}${context.weather.isRaining ? ' (raining)' : ''}${context.weather.isCold ? ' (cold day)' : ''}${context.weather.isHot ? ' (hot day)' : ''}`
+      : 'Weather: unknown';
+  
     return `
-You are VFIED, a culturally-aware AI food friend who knows this person personally.
-
-CURRENT SITUATION:
-- Location: ${context.location.city}, ${context.location.country}
-- Time: ${context.time.timeOfDay} on ${this.getDayName(context.time.dayOfWeek)}
-- Mood: ${mood}
-- Weather: ${context.weather?.condition || 'unknown'} (${context.weather?.temperature || '?'}°C)
-- Social situation: ${context.socialSituation}
-
-CULTURAL KNOWLEDGE:
-- Local cuisine: ${context.culture?.mainCuisine || 'mixed'}
-- Popular local foods: ${context.culture?.popularFoods?.join(', ') || 'varied'}
-- Cultural context: ${context.culture?.culturalNotes || 'diverse food scene'}
-
-PERSONAL LEARNING:
-Recent choices: ${recentChoicesText}
-Learned patterns: ${patternsText}
-
-CURRENT CONTEXT:
-${situationText}
-
-TASK: Suggest 1 perfect food option considering:
-1. Their exact location and what's actually available there
-2. Their personal preferences and patterns
-3. Current mood, time, and weather
-4. Local cultural context and authentic options
-5. What they can realistically get right now
-
-Prioritize authentic local options over international chains when possible.
-
-Respond with this exact JSON structure:
-{
-  "food": {
-    "name": "specific food name (local if possible)",
-    "emoji": "appropriate emoji",
-    "type": "cuisine type",
-    "category": "comfort/healthy/celebration/recovery/local"
-  },
-  "friendMessage": "supportive message as their food friend (2-3 sentences)",
-  "reasoning": "why this fits their situation right now",
-  "culturalNote": "how this fits their local food culture (if applicable)",
-  "personalNote": "reference to their patterns/preferences (if applicable)",
-  "availabilityNote": "where they can get this in ${context.location.city}",
-  "alternatives": [
-    {"name": "backup option 1", "emoji": "🍽️", "reason": "why this works too"},
-    {"name": "backup option 2", "emoji": "🥘", "reason": "another good choice"}
-  ],
-  "confidence": 85
-}
-
-Be specific to ${context.location.city} - suggest foods actually available there!
+  You are VFIED, a culturally-aware AI food friend who knows this person personally.
+  
+  CURRENT SITUATION:
+  - Location: ${context.location?.city || 'Unknown'}, ${context.location?.country || 'Unknown'}
+  - Time: ${context.time?.timeOfDay || 'unknown'} on ${this.getDayName(context.time?.dayOfWeek || 0)}
+  - Mood: ${mood}
+  - ${weatherText}
+  - Social situation: ${context.socialSituation}
+  
+  CULTURAL KNOWLEDGE:
+  - Local cuisine: ${context.culture?.mainCuisine || 'mixed'}
+  - Popular local foods: ${context.culture?.popularFoods?.join(', ') || 'varied'}
+  - Cultural context: ${context.culture?.culturalNotes || 'diverse food scene'}
+  
+  PERSONAL LEARNING:
+  Recent choices: ${recentChoicesText}
+  Learned patterns: ${patternsText}
+  
+  WEATHER CONTEXT:
+  ${this.getWeatherFoodAdvice(context.weather)}
+  
+  CURRENT CONTEXT:
+  ${situationText}
+  
+  TASK: Suggest 1 perfect food option considering:
+  1. Their exact location and what's actually available there
+  2. Current weather conditions and temperature
+  3. Their personal preferences and patterns
+  4. Current mood, time, and weather
+  5. Local cultural context and authentic options
+  6. What they can realistically get right now
+  
+  Weather should influence your suggestion:
+  - Cold weather (< 15°C): Suggest warm, comforting foods
+  - Hot weather (> 30°C): Suggest cool, refreshing foods  
+  - Rainy weather: Suggest comfort foods and warm drinks
+  - Perfect weather: Any food that fits mood and culture
+  
+  Prioritize authentic local options over international chains when possible.
+  
+  Respond with this exact JSON structure:
+  {
+    "food": {
+      "name": "specific food name (local if possible)",
+      "emoji": "appropriate emoji",
+      "type": "cuisine type", 
+      "category": "comfort/healthy/celebration/recovery/local"
+    },
+    "friendMessage": "supportive message as their food friend (2-3 sentences)",
+    "reasoning": "why this fits their situation right now",
+    "culturalNote": "how this fits their local food culture (if applicable)",
+    "personalNote": "reference to their patterns/preferences (if applicable)",
+    "weatherNote": "how the weather influenced this choice",
+    "availabilityNote": "where they can get this in ${context.location?.city || 'their area'}",
+    "alternatives": [
+      {"name": "backup option 1", "emoji": "🍽️", "reason": "why this works too"},
+      {"name": "backup option 2", "emoji": "🥘", "reason": "another good choice"}
+    ],
+    "confidence": 85
+  }
+  
+  Be specific to ${context.location?.city || 'their location'} and current weather conditions!
     `;
+  }
+  
+  getWeatherFoodAdvice(weather) {
+    if (!weather) return 'Weather unknown - suggest based on other factors';
+    
+    let advice = [];
+    
+    if (weather.isCold) {
+      advice.push(`Cold ${weather.temperature}°C day - prioritize warm, comforting foods like soups, stews, hot beverages`);
+    } else if (weather.isHot) {
+      advice.push(`Hot ${weather.temperature}°C day - suggest cool, refreshing options like salads, cold drinks, ice cream`);
+    } else {
+      advice.push(`Comfortable ${weather.temperature}°C - any food that matches mood and culture`);
+    }
+    
+    if (weather.isRaining) {
+      advice.push('Rainy day - perfect for comfort foods and staying cozy indoors');
+    }
+    
+    if (weather.isSnowing) {
+      advice.push('Snowy weather - hearty, warming foods are ideal');
+    }
+    
+    return advice.join(', ');
   }
 
   async callOpenAI(prompt, options = {}) {
@@ -420,49 +459,78 @@ Be specific to ${context.location.city} - suggest foods actually available there
   }
 
   async getWeatherContext() {
-    if (!this.weatherApiKey || !this.userLocation.lat) {
+    if (!this.weatherApiKey) {
       return this.getSimulatedWeather();
     }
-
+  
     try {
+      if (!this.userLocation?.lat) {
+        return this.getSimulatedWeather();
+      }
+  
       const response = await fetch(
         `https://api.openweathermap.org/data/2.5/weather?lat=${this.userLocation.lat}&lon=${this.userLocation.lng}&appid=${this.weatherApiKey}&units=metric`
       );
       
       if (!response.ok) throw new Error('Weather API failed');
       
-      const weather = await response.json();
+      const data = await response.json();
       
       return {
-        condition: weather.weather[0].main.toLowerCase(),
-        description: weather.weather[0].description,
-        temperature: Math.round(weather.main.temp),
-        humidity: weather.main.humidity,
-        feelsLike: Math.round(weather.main.feels_like),
-        isRaining: weather.weather[0].main.toLowerCase().includes('rain'),
-        isCold: weather.main.temp < 15,
-        isHot: weather.main.temp > 25,
-        windSpeed: weather.wind?.speed || 0
+        temperature: Math.round(data.main.temp),
+        feelsLike: Math.round(data.main.feels_like),
+        humidity: data.main.humidity,
+        condition: data.weather[0].main.toLowerCase(),
+        description: data.weather[0].description,
+        isRaining: data.weather[0].main.toLowerCase().includes('rain'),
+        isSnowing: data.weather[0].main.toLowerCase().includes('snow'),
+        isCold: data.main.temp < 15,
+        isHot: data.main.temp > 30,
+        isComfortable: data.main.temp >= 18 && data.main.temp <= 26,
+        timestamp: new Date().toISOString()
       };
     } catch (error) {
-      console.log('Weather API unavailable, using simulated data');
+      console.error('Weather fetch error:', error);
       return this.getSimulatedWeather();
     }
   }
 
   getSimulatedWeather() {
-    // Simulate weather based on location and time
-    const temp = 15 + Math.random() * 20; // 15-35°C
+    // Smart simulation based on location and time
+    const country = this.userLocation?.countryCode || 'US';
+    const hour = new Date().getHours();
+    
+    let baseTemp = 20;
+    
+    // Temperature by region
+    const tempMap = {
+      'KE': 22, 'NG': 28, 'ET': 18, 'ZA': 20, // Africa
+      'IN': 25, 'JP': 18, 'CN': 16, 'TH': 30, // Asia
+      'GB': 12, 'DE': 15, 'FR': 16, 'IT': 18, // Europe
+      'US': 18, 'CA': 10, 'MX': 24, 'BR': 26  // Americas
+    };
+    
+    baseTemp = tempMap[country] || 20;
+    
+    // Daily variation
+    const tempVariation = Math.sin((hour - 6) * Math.PI / 12) * 8;
+    const temp = Math.round(baseTemp + tempVariation + (Math.random() * 6 - 3));
+    
     const conditions = ['clear', 'cloudy', 'rain', 'sunny'];
     const condition = conditions[Math.floor(Math.random() * conditions.length)];
     
     return {
+      temperature: temp,
+      feelsLike: temp + Math.floor(Math.random() * 6) - 3,
       condition,
-      temperature: Math.round(temp),
+      description: condition === 'clear' ? 'clear sky' : condition,
       isRaining: condition === 'rain',
+      isSnowing: false,
       isCold: temp < 15,
-      isHot: temp > 25,
-      simulated: true
+      isHot: temp > 30,
+      isComfortable: temp >= 18 && temp <= 26,
+      simulated: true,
+      timestamp: new Date().toISOString()
     };
   }
 
@@ -720,10 +788,12 @@ Be specific to ${context.location.city} - suggest foods actually available there
     let situation = [];
     
     if (context.weather?.isRaining) situation.push('raining');
-    if (context.weather?.isCold) situation.push('cold weather');
-    if (context.weather?.isHot) situation.push('hot weather');
+    if (context.weather?.isCold) situation.push(`cold weather (${context.weather.temperature}°C)`);
+    if (context.weather?.isHot) situation.push(`hot weather (${context.weather.temperature}°C)`);
     if (context.time?.isWeekend) situation.push('weekend');
     if (context.time?.isWorkHours) situation.push('work hours');
+    if (context.includeRestaurants) situation.push('wants restaurant options');
+    if (context.culturalPriority) situation.push('prefers local/cultural foods');
     
     return situation.join(', ') || 'normal day';
   }
@@ -810,13 +880,89 @@ export const aiFoodService = new AIFoodService();
 
 // Export main functions for the app
 export const getAIFoodSuggestion = async (mood, context = {}) => {
-  console.log(`🤖 Getting AI suggestion for mood: ${mood}`);
-  return await aiFoodService.getPersonalizedFoodSuggestion(mood, context);
+  console.log(`🤖 Getting AI suggestion for mood: ${mood} via MCP`);
+  
+  try {
+    const response = await fetch('https://vfied-mcp-server.onrender.com/mcp/get_food_suggestion', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        mood,
+        location: {
+          city: aiFoodService.userLocation?.city || 'Unknown',
+          country: aiFoodService.userLocation?.country || 'Unknown',
+          countryCode: aiFoodService.userLocation?.countryCode || 'US'
+        },
+        context: {
+          budget: context.budget || 'medium',
+          socialSituation: context.socialSituation || 'solo',
+          timeConstraint: context.quick ? 'quick' : 'normal'
+        },
+        userId: context.userId || 'anonymous'
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`MCP server error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ MCP mood suggestion received:', data);
+    
+    return {
+      ...data,
+      source: 'mcp'
+    };
+
+  } catch (error) {
+    console.error('❌ MCP mood call failed, using fallback:', error);
+    return await aiFoodService.getPersonalizedFoodSuggestion(mood, context);
+  }
 };
 
-export const getAIQuickDecision = async () => {
-  console.log('🎲 Getting AI quick decision...');
-  return await aiFoodService.getPersonalizedFoodSuggestion('random', { quick: true });
+// REPLACE this function in aiFoodService.js:
+export const getAIQuickDecision = async (context = {}) => {
+  console.log('🎲 Getting AI quick decision from MCP...');
+  
+  try {
+    const response = await fetch('https://vfied-mcp-server.onrender.com/mcp/get_quick_food_decision', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        location: aiFoodService.userLocation,
+        userId: context.userId || 'anonymous',
+        context: {
+          includeRestaurants: context.includeRestaurants,
+          quick: true,
+          budget: context.budget || 'medium',
+          timeConstraint: 'quick'
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`MCP server error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('✅ MCP response received:', data);
+    
+    return {
+      ...data,
+      source: 'mcp',
+      interactionId: data.interactionId || Date.now().toString()
+    };
+
+  } catch (error) {
+    console.error('❌ MCP call failed, using fallback:', error);
+    
+    // Fallback to your existing direct AI call
+    return await aiFoodService.getPersonalizedFoodSuggestion('random', context);
+  }
 };
 
 export const updateAIFeedback = async (interactionId, rating) => {

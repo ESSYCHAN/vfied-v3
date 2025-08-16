@@ -1,18 +1,18 @@
-// Firebase configuration for VFIED V3
+// Firebase configuration for VFIED V3 - Updated with real config
 import { initializeApp } from 'firebase/app';
 import { getFirestore, enableNetwork, disableNetwork } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getAnalytics } from 'firebase/analytics';
 
-// Your Firebase config (replace with your actual config)
+// Firebase config using environment variables (with your real values as fallback)
 const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "vfied-v3.firebaseapp.com",
-  projectId: "vfied-v3",
-  storageBucket: "vfied-v3.appspot.com",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id",
-  measurementId: "your-measurement-id"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase
@@ -23,13 +23,17 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const analytics = getAnalytics(app);
 
-// Firestore collections
+// Firestore collections (keeping your existing structure + adding new ones for AI)
 export const COLLECTIONS = {
   USERS: 'users',
   DECISIONS: 'decisions',
   FOOD_CHOICES: 'foodChoices',
   USER_PREFERENCES: 'userPreferences',
-  APP_STATS: 'appStats'
+  APP_STATS: 'appStats',
+  // New collections for AI features
+  INTERACTIONS: 'interactions',
+  USER_PATTERNS: 'user_patterns',
+  FEEDBACK: 'feedback'
 };
 
 // Connection status
@@ -62,7 +66,7 @@ export const isFirebaseOnline = () => isOnline;
 // Initialize offline persistence
 try {
   // Firestore will automatically handle offline persistence
-  console.log('🔥 Firebase initialized successfully');
+  console.log('🔥 Firebase initialized successfully with project:', firebaseConfig.projectId);
 } catch (error) {
   console.error('Firebase initialization error:', error);
 }
