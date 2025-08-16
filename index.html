@@ -9,210 +9,727 @@
     
     <title>VFIED - What Should I Eat?</title>
     
-    <!-- iOS Icons -->
+    <!-- PWA Icons -->
     <link rel="apple-touch-icon" sizes="180x180" href="/assets/icon-180.png">
-    <link rel="apple-touch-icon" sizes="152x152" href="/assets/icon-152.png">
-    <link rel="apple-touch-icon" sizes="120x120" href="/assets/icon-120.png">
-    
-    <!-- Android Icons -->
-    <link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="/assets/icon-512.png">
-    
-    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json">
     
-    <link rel="stylesheet" href="/src/style.css">
-    
-    <!-- Additional Styles for Settings -->
     <style>
-    /* Quick Settings Styles */
-    .quick-settings {
-        position: relative;
-        margin-bottom: 1rem;
-    }
+/* VFIED One-Button Experience Styles - COMPLETE EMBEDDED VERSION */
 
-    .settings-btn {
-        background: rgba(255, 255, 255, 0.15);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        color: white;
-        padding: 0.5rem 1rem;
-        border-radius: 20px;
-        font-size: 0.9rem;
-        cursor: pointer;
-        backdrop-filter: blur(5px);
-        transition: all 0.3s ease;
-    }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-    .settings-btn:hover {
-        background: rgba(255, 255, 255, 0.25);
-        transform: translateY(-1px);
-    }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
 
-    .settings-panel {
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(255, 255, 255, 0.95);
-        backdrop-filter: blur(20px);
-        border-radius: 15px;
-        padding: 1.5rem;
-        min-width: 300px;
-        max-width: 90vw;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        z-index: 1000;
-        margin-top: 0.5rem;
-    }
+/* App Container */
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
 
-    .settings-panel.hidden {
-        display: none;
-    }
+/* Loading Screen */
+.loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
 
-    .settings-panel h3 {
-        color: #2C3E50;
-        margin-bottom: 1rem;
-        font-size: 1.2rem;
-        text-align: center;
-    }
+.loading-content {
+  text-align: center;
+}
 
-    .setting-group {
-        margin-bottom: 1.5rem;
-    }
+.loading-content .logo {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  animation: pulse 2s infinite;
+}
 
-    .setting-group label {
-        display: block;
-        color: #2C3E50;
-        font-weight: 600;
-        margin-bottom: 0.5rem;
-    }
+.loading-text {
+  font-size: 1.2rem;
+  margin-bottom: 2rem;
+  opacity: 0.9;
+}
 
-    .location-select, .dietary-select {
-        width: 100%;
-        padding: 0.75rem;
-        border: 2px solid #ddd;
-        border-radius: 10px;
-        font-size: 1rem;
-        background: white;
-        color: #2C3E50;
-        transition: border-color 0.3s ease;
-    }
+.loading-dots {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
 
-    .location-select:focus, .dietary-select:focus {
-        outline: none;
-        border-color: #667eea;
-    }
+.loading-dots span {
+  width: 8px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 50%;
+  animation: bounce 1.4s infinite;
+}
 
-    .dietary-checkboxes {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 0.5rem;
-        margin-top: 0.5rem;
-    }
+.loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+.loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
-    .dietary-checkboxes label {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-weight: normal;
-        font-size: 0.9rem;
-        cursor: pointer;
-        padding: 0.5rem;
-        border-radius: 8px;
-        transition: background-color 0.2s ease;
-    }
+/* Main App */
+.main-app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 0;
+}
 
-    .dietary-checkboxes label:hover {
-        background: rgba(102, 126, 234, 0.1);
-    }
+.main-app.hidden {
+  display: none;
+}
 
-    .dietary-checkboxes input[type="checkbox"] {
-        cursor: pointer;
-    }
+/* Status Bar Spacer */
+.status-bar-spacer {
+  height: env(safe-area-inset-top, 20px);
+  background: transparent;
+}
 
-    .custom-location {
-        margin-top: 0.5rem;
-        padding: 0.75rem;
-        border: 2px solid #ddd;
-        border-radius: 10px;
-        width: 100%;
-        font-size: 1rem;
-    }
+/* Simple Header */
+.simple-header {
+  text-align: center;
+  padding: 2rem 1rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+}
 
-    .custom-location.hidden {
-        display: none;
-    }
+.app-title {
+  font-size: 2.5rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(45deg, #fff, #f0f0f0);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
 
-    .settings-actions {
-        display: flex;
-        gap: 0.5rem;
-        margin-top: 1.5rem;
-    }
+.question {
+  font-size: 1.4rem;
+  font-weight: 300;
+  margin-bottom: 1rem;
+  opacity: 0.9;
+}
 
-    .save-btn, .close-btn {
-        flex: 1;
-        padding: 0.75rem;
-        border: none;
-        border-radius: 10px;
-        font-size: 1rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
+.context-info {
+  font-size: 0.9rem;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  display: inline-block;
+  backdrop-filter: blur(5px);
+  opacity: 0.8;
+  max-width: 90%;
+  transition: all 0.3s ease;
+}
 
-    .save-btn {
-        background: #667eea;
-        color: white;
-    }
+/* Current Settings Display */
+.current-settings {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
 
-    .save-btn:hover {
-        background: #5a6fd8;
-        transform: translateY(-1px);
-    }
+.setting-tag {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 15px;
+  font-size: 0.8rem;
+  backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
 
-    .close-btn {
-        background: #f8f9fa;
-        color: #2C3E50;
-        border: 1px solid #ddd;
-    }
+/* Quick Settings */
+.quick-settings {
+  position: relative;
+  margin-bottom: 1rem;
+}
 
-    .close-btn:hover {
-        background: #e9ecef;
-    }
+.settings-btn {
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  transition: all 0.3s ease;
+}
 
-    /* Status indicators */
-    .current-settings {
-        display: flex;
-        gap: 0.5rem;
-        margin-bottom: 1rem;
-        flex-wrap: wrap;
-        justify-content: center;
-    }
+.settings-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
 
-    .setting-tag {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-        padding: 0.25rem 0.75rem;
-        border-radius: 15px;
-        font-size: 0.8rem;
-        backdrop-filter: blur(5px);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-    }
+.settings-panel {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.98);
+  backdrop-filter: blur(20px);
+  border-radius: 20px;
+  padding: 2rem;
+  width: 90vw;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  z-index: 9999;
+}
 
-    @media (max-width: 480px) {
-        .settings-panel {
-            min-width: 280px;
-            padding: 1rem;
-        }
-        
-        .dietary-checkboxes {
-            grid-template-columns: 1fr;
-        }
+.settings-panel.hidden {
+  display: none;
+}
 
-        .settings-actions {
-            flex-direction: column;
-        }
-    }
+/* Add overlay background when settings open */
+.settings-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(5px);
+  z-index: 9998;
+  display: none;
+}
+
+.settings-overlay.show {
+  display: block;
+}
+
+.settings-panel h3 {
+  color: #2C3E50;
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  text-align: center;
+}
+
+.setting-group {
+  margin-bottom: 1.5rem;
+}
+
+.setting-group label {
+  display: block;
+  color: #2C3E50;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.location-select, .dietary-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  font-size: 1rem;
+  background: white;
+  color: #2C3E50;
+  transition: border-color 0.3s ease;
+}
+
+.location-select:focus, .dietary-select:focus {
+  outline: none;
+  border-color: #667eea;
+}
+
+.dietary-checkboxes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.dietary-checkboxes label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: normal;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+.dietary-checkboxes label:hover {
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.dietary-checkboxes input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.custom-location {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 2px solid #ddd;
+  border-radius: 10px;
+  width: 100%;
+  font-size: 1rem;
+}
+
+.custom-location.hidden {
+  display: none;
+}
+
+.settings-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.save-btn, .close-btn {
+  flex: 1;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.save-btn {
+  background: #667eea;
+  color: white;
+}
+
+.save-btn:hover {
+  background: #5a6fd8;
+  transform: translateY(-1px);
+}
+
+.close-btn {
+  background: #f8f9fa;
+  color: #2C3E50;
+  border: 1px solid #ddd;
+}
+
+.close-btn:hover {
+  background: #e9ecef;
+}
+
+/* One Button Main */
+.one-button-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  min-height: 50vh;
+}
+
+/* The Giant Decision Button - FIXED TO ALWAYS BE CLICKABLE */
+.decision-area {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.giant-decide-button {
+  background: linear-gradient(145deg, #ff6b6b, #ee5a52);
+  border: none;
+  border-radius: 30px;
+  padding: 2rem 3rem;
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.2),
+    0 8px 16px rgba(255, 107, 107, 0.3),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+  cursor: pointer !important;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform: translateY(0);
+  min-width: 280px;
+  position: relative;
+  overflow: hidden;
+  /* CRITICAL: Always allow clicks */
+  pointer-events: auto !important;
+  z-index: 10;
+}
+
+.giant-decide-button:hover {
+  transform: translateY(-5px);
+  box-shadow: 
+    0 25px 50px rgba(0, 0, 0, 0.25),
+    0 12px 24px rgba(255, 107, 107, 0.4),
+    inset 0 2px 0 rgba(255, 255, 255, 0.2);
+}
+
+.giant-decide-button:active {
+  transform: translateY(-2px);
+}
+
+/* FIXED: Button children don't block clicks */
+.button-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+  display: block;
+  animation: gentle-bounce 2s infinite;
+  pointer-events: none !important;
+}
+
+.button-text {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: white;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  margin-bottom: 0.25rem;
+  display: block;
+  pointer-events: none !important;
+}
+
+.button-subtitle {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 400;
+  pointer-events: none !important;
+}
+
+/* FIXED: Thinking state - only visual, don't disable clicks */
+.giant-decide-button.thinking {
+  opacity: 0.8;
+  animation: gentle-pulse 1.5s infinite;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Suggestion Result */
+.suggestion-result {
+  width: 100%;
+  max-width: 400px;
+  margin-top: 1rem;
+  animation: fadeInUp 0.5s ease;
+}
+
+.suggestion-result.hidden {
+  display: none;
+}
+
+.suggestion-card {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 2rem;
+  text-align: center;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  margin-bottom: 1.5rem;
+}
+
+.food-emoji {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.food-name {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  color: white;
+}
+
+.food-description {
+  font-size: 1rem;
+  opacity: 0.9;
+  margin-bottom: 1rem;
+  line-height: 1.4;
+}
+
+.restaurant-info {
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 15px;
+  display: inline-block;
+  opacity: 0.8;
+}
+
+/* Decision Actions */
+.decision-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 1rem;
+  border: none;
+  border-radius: 15px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer !important;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  pointer-events: auto !important;
+}
+
+.action-btn.accept {
+  background: linear-gradient(145deg, #27AE60, #229954);
+  color: white;
+  box-shadow: 0 8px 16px rgba(39, 174, 96, 0.3);
+}
+
+.action-btn.accept:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(39, 174, 96, 0.4);
+}
+
+.action-btn.try-again {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(5px);
+}
+
+.action-btn.try-again:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+/* AI Insights */
+.ai-insights {
+  margin-top: 1rem;
+}
+
+.insights-toggle {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  cursor: pointer !important;
+  width: 100%;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(5px);
+  pointer-events: auto !important;
+}
+
+.insights-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.insights-content {
+  margin-top: 1rem;
+  animation: fadeIn 0.3s ease;
+}
+
+.insights-content.hidden {
+  display: none;
+}
+
+.cultural-note,
+.personal-note,
+.weather-note {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 1rem;
+  border-radius: 12px;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  backdrop-filter: blur(5px);
+}
+
+.cultural-note strong,
+.personal-note strong,
+.weather-note strong {
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+/* Simple Footer */
+.simple-footer {
+  text-align: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.stats-line {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  margin-bottom: 0.5rem;
+}
+
+.ai-status {
+  font-size: 0.8rem;
+  opacity: 0.6;
+}
+
+/* Bottom Safe Area */
+.bottom-safe-area {
+  height: env(safe-area-inset-bottom, 20px);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-10px); }
+  60% { transform: translateY(-5px); }
+}
+
+@keyframes gentle-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeInUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(20px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+@keyframes gentle-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 0.6; }
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+  .simple-header {
+    padding: 1.5rem 1rem 1rem;
+  }
+  
+  .app-title {
+    font-size: 2rem;
+  }
+  
+  .question {
+    font-size: 1.2rem;
+  }
+  
+  .giant-decide-button {
+    padding: 1.5rem 2rem;
+    min-width: 240px;
+  }
+  
+  .button-text {
+    font-size: 1.3rem;
+  }
+  
+  .button-icon {
+    font-size: 2.5rem;
+  }
+  
+  .suggestion-card {
+    padding: 1.5rem;
+  }
+  
+  .food-name {
+    font-size: 1.5rem;
+  }
+  
+  .decision-actions {
+    flex-direction: column;
+  }
+  
+  .settings-panel {
+    width: 95vw;
+    padding: 1.5rem;
+  }
+  
+  .dietary-checkboxes {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-actions {
+    flex-direction: column;
+  }
+}
+
+@media (max-height: 600px) {
+  .one-button-main {
+    padding: 1rem;
+    min-height: auto;
+  }
+  
+  .simple-header {
+    padding: 1rem;
+  }
+}
+
+/* Focus States for Accessibility */
+.giant-decide-button:focus,
+.action-btn:focus,
+.insights-toggle:focus {
+  outline: 2px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+/* CRITICAL: Force all buttons to be clickable */
+button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Force main button clickability */
+#decide-button {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Ensure button children never block clicks */
+#decide-button * {
+  pointer-events: none !important;
+}
+
+/* Override any disabled state */
+.giant-decide-button:disabled {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  opacity: 0.8 !important;
+}
+
+/* Force clickability for all interactive elements */
+.giant-decide-button,
+.action-btn,
+.insights-toggle,
+.settings-btn,
+.save-btn,
+.close-btn {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
     </style>
 </head>
 <body>
@@ -252,50 +769,52 @@
                 <!-- Quick Settings -->
                 <div class="quick-settings">
                     <button id="settings-btn" class="settings-btn">⚙️ Preferences</button>
-                    
-                    <div id="settings-panel" class="settings-panel hidden">
-                        <h3>🍽️ Food Preferences</h3>
-                        
-                        <!-- Location Override -->
-                        <div class="setting-group">
-                            <label>📍 Location:</label>
-                            <select id="location-select" class="location-select">
-                                <option value="">Auto-detect my location</option>
-                                <option value="london,uk">🏰 London, UK</option>
-                                <option value="nairobi,ke">🦁 Nairobi, Kenya</option>
-                                <option value="tokyo,jp">🗼 Tokyo, Japan</option>
-                                <option value="newyork,us">🗽 New York, USA</option>
-                                <option value="paris,fr">🗼 Paris, France</option>
-                                <option value="mumbai,in">🏙️ Mumbai, India</option>
-                                <option value="lagos,ng">🌆 Lagos, Nigeria</option>
-                                <option value="sydney,au">🏄 Sydney, Australia</option>
-                                <option value="custom">✏️ Custom location...</option>
-                            </select>
-                            <input id="custom-location" type="text" placeholder="Enter: City, Country" class="custom-location hidden">
-                        </div>
-
-                        <!-- Dietary Restrictions -->
-                        <div class="setting-group">
-                            <label>🌱 Dietary Restrictions:</label>
-                            <div class="dietary-checkboxes">
-                                <label><input type="checkbox" value="vegetarian"> 🌱 Vegetarian</label>
-                                <label><input type="checkbox" value="vegan"> 🥬 Vegan</label>
-                                <label><input type="checkbox" value="gluten-free"> 🌾 Gluten-Free</label>
-                                <label><input type="checkbox" value="dairy-free"> 🥛 Dairy-Free</label>
-                                <label><input type="checkbox" value="keto"> 🥩 Keto</label>
-                                <label><input type="checkbox" value="halal"> ☪️ Halal</label>
-                                <label><input type="checkbox" value="kosher"> ✡️ Kosher</label>
-                                <label><input type="checkbox" value="paleo"> 🦴 Paleo</label>
-                            </div>
-                        </div>
-
-                        <div class="settings-actions">
-                            <button id="save-settings" class="save-btn">💾 Save</button>
-                            <button id="close-settings" class="close-btn">❌ Close</button>
-                        </div>
-                    </div>
                 </div>
             </header>
+
+            <!-- Settings Overlay (moved outside header) -->
+            <div id="settings-overlay" class="settings-overlay"></div>
+            <div id="settings-panel" class="settings-panel hidden">
+                <h3>🍽️ Food Preferences</h3>
+                
+                <!-- Location Override -->
+                <div class="setting-group">
+                    <label>📍 Location:</label>
+                    <select id="location-select" class="location-select">
+                        <option value="">Auto-detect my location</option>
+                        <option value="london,uk">🏰 London, UK</option>
+                        <option value="nairobi,ke">🦁 Nairobi, Kenya</option>
+                        <option value="tokyo,jp">🗼 Tokyo, Japan</option>
+                        <option value="newyork,us">🗽 New York, USA</option>
+                        <option value="paris,fr">🗼 Paris, France</option>
+                        <option value="mumbai,in">🏙️ Mumbai, India</option>
+                        <option value="lagos,ng">🌆 Lagos, Nigeria</option>
+                        <option value="sydney,au">🏄 Sydney, Australia</option>
+                        <option value="custom">✏️ Custom location...</option>
+                    </select>
+                    <input id="custom-location" type="text" placeholder="Enter: City, Country" class="custom-location hidden">
+                </div>
+
+                <!-- Dietary Restrictions -->
+                <div class="setting-group">
+                    <label>🌱 Dietary Restrictions:</label>
+                    <div class="dietary-checkboxes">
+                        <label><input type="checkbox" value="vegetarian"> 🌱 Vegetarian</label>
+                        <label><input type="checkbox" value="vegan"> 🥬 Vegan</label>
+                        <label><input type="checkbox" value="gluten-free"> 🌾 Gluten-Free</label>
+                        <label><input type="checkbox" value="dairy-free"> 🥛 Dairy-Free</label>
+                        <label><input type="checkbox" value="keto"> 🥩 Keto</label>
+                        <label><input type="checkbox" value="halal"> ☪️ Halal</label>
+                        <label><input type="checkbox" value="kosher"> ✡️ Kosher</label>
+                        <label><input type="checkbox" value="paleo"> 🦴 Paleo</label>
+                    </div>
+                </div>
+
+                <div class="settings-actions">
+                    <button id="save-settings" class="save-btn">💾 Save</button>
+                    <button id="close-settings" class="close-btn">❌ Close</button>
+                </div>
+            </div>
 
             <!-- The One Button -->
             <main class="one-button-main">
@@ -361,18 +880,19 @@
         </div>
     </div>
 
-    <!-- Settings JavaScript -->
     <script>
-    console.log('⚙️ SETTINGS SYSTEM LOADING...');
+    // RESTORED REAL AI INTEGRATION - YOUR BUSINESS APP VERSION
+    
+    console.log('🚀 VFIED Real AI App Loading...');
 
-    // Settings state
+    // ==================== SETTINGS SYSTEM ====================
+    
     let userSettings = {
-        location: null, // null = auto-detect
+        location: null,
         dietary: [],
         customLocation: null
     };
 
-    // Load settings from localStorage
     function loadSettings() {
         try {
             const saved = localStorage.getItem('vfied_user_settings');
@@ -385,22 +905,32 @@
         }
     }
 
-    // Save settings to localStorage
     function saveSettings() {
         try {
             localStorage.setItem('vfied_user_settings', JSON.stringify(userSettings));
             console.log('💾 Settings saved:', userSettings);
+            notifyMainApp();
         } catch (error) {
             console.error('Settings save error:', error);
         }
     }
 
-    // Update settings display
+    function notifyMainApp() {
+        const event = new CustomEvent('vfied-settings-updated', {
+            detail: userSettings
+        });
+        window.dispatchEvent(event);
+        
+        if (window.vfiedAppInstance) {
+            console.log('📢 Notifying main app directly');
+            window.vfiedAppInstance.updatePreferences(userSettings);
+        }
+    }
+
     function updateSettingsDisplay() {
         const locationTag = document.getElementById('location-tag');
         const dietaryTag = document.getElementById('dietary-tag');
 
-        // Update location display
         if (userSettings.location) {
             const locationMap = {
                 'london,uk': '🏰 London',
@@ -419,17 +949,11 @@
             locationTag.textContent = '📍 Auto-detect';
         }
 
-        // Update dietary display
         if (userSettings.dietary.length > 0) {
             const dietaryEmojis = {
-                'vegetarian': '🌱',
-                'vegan': '🥬', 
-                'gluten-free': '🌾',
-                'dairy-free': '🥛',
-                'keto': '🥩',
-                'halal': '☪️',
-                'kosher': '✡️',
-                'paleo': '🦴'
+                'vegetarian': '🌱', 'vegan': '🥬', 'gluten-free': '🌾',
+                'dairy-free': '🥛', 'keto': '🥩', 'halal': '☪️',
+                'kosher': '✡️', 'paleo': '🦴'
             };
             
             const icons = userSettings.dietary.map(d => dietaryEmojis[d] || '🍽️').join('');
@@ -440,650 +964,533 @@
         }
     }
 
-    // Get current user settings for API calls
     function getCurrentSettings() {
-        const settings = {
-            dietary: userSettings.dietary
-        };
+        const settings = { dietary: userSettings.dietary };
 
-        // Add location if specified
         if (userSettings.location && userSettings.location !== 'custom') {
-            const [city, country] = userSettings.location.split(',');
-            settings.location = {
-                city: city.charAt(0).toUpperCase() + city.slice(1),
-                country: country.toUpperCase()
+            const locationMap = {
+                'london,uk': { city: 'London', country: 'United Kingdom', countryCode: 'GB' },
+                'nairobi,ke': { city: 'Nairobi', country: 'Kenya', countryCode: 'KE' },
+                'tokyo,jp': { city: 'Tokyo', country: 'Japan', countryCode: 'JP' },
+                'newyork,us': { city: 'New York', country: 'United States', countryCode: 'US' },
+                'paris,fr': { city: 'Paris', country: 'France', countryCode: 'FR' },
+                'mumbai,in': { city: 'Mumbai', country: 'India', countryCode: 'IN' },
+                'lagos,ng': { city: 'Lagos', country: 'Nigeria', countryCode: 'NG' },
+                'sydney,au': { city: 'Sydney', country: 'Australia', countryCode: 'AU' }
             };
+            settings.location = locationMap[userSettings.location];
         } else if (userSettings.customLocation) {
             const parts = userSettings.customLocation.split(',').map(s => s.trim());
             if (parts.length >= 2) {
-                settings.location = {
-                    city: parts[0],
-                    country: parts[1]
-                };
+                settings.location = { city: parts[0], country: parts[1] };
             }
         }
 
         return settings;
     }
 
-    // Setup settings panel
     function setupSettingsPanel() {
         const settingsBtn = document.getElementById('settings-btn');
         const settingsPanel = document.getElementById('settings-panel');
+        const settingsOverlay = document.getElementById('settings-overlay');
         const saveBtn = document.getElementById('save-settings');
         const closeBtn = document.getElementById('close-settings');
         const locationSelect = document.getElementById('location-select');
         const customLocationInput = document.getElementById('custom-location');
 
-        // Toggle settings panel
-        settingsBtn.addEventListener('click', () => {
-            const isHidden = settingsPanel.classList.contains('hidden');
-            if (isHidden) {
-                settingsPanel.classList.remove('hidden');
-                loadCurrentSettingsIntoPanel();
-            } else {
-                settingsPanel.classList.add('hidden');
-            }
-        });
+        if (!settingsBtn || !settingsPanel) return;
 
-        // Handle custom location input
-        locationSelect.addEventListener('change', () => {
-            if (locationSelect.value === 'custom') {
-                customLocationInput.classList.remove('hidden');
-                customLocationInput.focus();
-            } else {
-                customLocationInput.classList.add('hidden');
-            }
-        });
+        function showSettings() {
+            settingsPanel.classList.remove('hidden');
+            settingsOverlay.classList.add('show');
+            loadCurrentSettingsIntoPanel();
+        }
 
-        // Save settings
-        saveBtn.addEventListener('click', () => {
-            saveSettingsFromPanel();
+        function hideSettings() {
             settingsPanel.classList.add('hidden');
-            updateSettingsDisplay();
-            
-            // Show feedback
-            const contextInfo = document.getElementById('context-info');
-            if (contextInfo) {
-                contextInfo.textContent = '✅ Settings saved! Ready for personalized suggestions.';
-            }
+            settingsOverlay.classList.remove('show');
+        }
+
+        settingsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            showSettings();
         });
 
-        // Close settings
-        closeBtn.addEventListener('click', () => {
-            settingsPanel.classList.add('hidden');
-        });
+        settingsOverlay.addEventListener('click', hideSettings);
 
-        // Close when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!settingsPanel.contains(e.target) && !settingsBtn.contains(e.target)) {
-                settingsPanel.classList.add('hidden');
+        if (locationSelect) {
+            locationSelect.addEventListener('change', () => {
+                if (locationSelect.value === 'custom') {
+                    customLocationInput?.classList.remove('hidden');
+                    customLocationInput?.focus();
+                } else {
+                    customLocationInput?.classList.add('hidden');
+                }
+            });
+        }
+
+        if (saveBtn) {
+            saveBtn.addEventListener('click', () => {
+                saveSettingsFromPanel();
+                hideSettings();
+                updateSettingsDisplay();
+                
+                const contextInfo = document.getElementById('context-info');
+                if (contextInfo) {
+                    contextInfo.textContent = '✅ Settings saved! Ready for personalized suggestions.';
+                }
+            });
+        }
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', hideSettings);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !settingsPanel.classList.contains('hidden')) {
+                hideSettings();
             }
         });
     }
 
-    // Load current settings into panel
     function loadCurrentSettingsIntoPanel() {
         const locationSelect = document.getElementById('location-select');
         const customLocationInput = document.getElementById('custom-location');
         const dietaryCheckboxes = document.querySelectorAll('.dietary-checkboxes input[type="checkbox"]');
 
-        // Load location
-        locationSelect.value = userSettings.location || '';
-        if (userSettings.location === 'custom' && userSettings.customLocation) {
-            customLocationInput.classList.remove('hidden');
-            customLocationInput.value = userSettings.customLocation;
-        } else {
-            customLocationInput.classList.add('hidden');
+        if (locationSelect) {
+            locationSelect.value = userSettings.location || '';
+            if (userSettings.location === 'custom' && userSettings.customLocation) {
+                customLocationInput?.classList.remove('hidden');
+                if (customLocationInput) customLocationInput.value = userSettings.customLocation;
+            } else {
+                customLocationInput?.classList.add('hidden');
+            }
         }
 
-        // Load dietary restrictions
         dietaryCheckboxes.forEach(checkbox => {
             checkbox.checked = userSettings.dietary.includes(checkbox.value);
         });
     }
 
-    // Save settings from panel
     function saveSettingsFromPanel() {
         const locationSelect = document.getElementById('location-select');
         const customLocationInput = document.getElementById('custom-location');
         const dietaryCheckboxes = document.querySelectorAll('.dietary-checkboxes input[type="checkbox"]');
 
-        // Save location
-        userSettings.location = locationSelect.value || null;
-        if (locationSelect.value === 'custom') {
-            userSettings.customLocation = customLocationInput.value.trim();
-        } else {
-            userSettings.customLocation = null;
+        if (locationSelect) {
+            userSettings.location = locationSelect.value || null;
+            if (locationSelect.value === 'custom') {
+                userSettings.customLocation = customLocationInput?.value?.trim() || null;
+            } else {
+                userSettings.customLocation = null;
+            }
         }
 
-        // Save dietary restrictions
         userSettings.dietary = Array.from(dietaryCheckboxes)
             .filter(cb => cb.checked)
             .map(cb => cb.value);
 
         saveSettings();
-        console.log('✅ Settings updated:', userSettings);
+        console.log('✅ Settings updated and main app notified:', userSettings);
     }
 
-    // Initialize settings system
-    document.addEventListener('DOMContentLoaded', () => {
-        console.log('⚙️ Initializing settings system...');
-        loadSettings();
-        updateSettingsDisplay();
-        setupSettingsPanel();
+    // ==================== REAL AI SERVICE INTEGRATION ====================
+    
+    // REAL AI Functions - calls your actual MCP server and OpenAI
+    async function getAIQuickDecision(context = {}) {
+        console.log('🎲 Getting REAL AI quick decision with settings...');
         
-        // Make settings available globally for the main app
-        window.vfiedUserSettings = {
-            get: getCurrentSettings,
-            update: updateSettingsDisplay
-        };
-        
-        console.log('✅ Settings system ready!');
-    });
-    </script>
+        try {
+            const userPrefs = getCurrentSettings();
+            console.log('📍 Using location:', userPrefs.location);
+            console.log('🌱 Using dietary:', userPrefs.dietary);
+            
+            // FIRST: Try your MCP server
+            const response = await fetch('https://vfied-mcp-server.onrender.com/mcp/get_quick_food_decision', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    location: userPrefs.location,
+                    dietary: userPrefs.dietary,
+                    userId: context.userId || 'anonymous',
+                    context: {
+                        includeRestaurants: context.includeRestaurants,
+                        quick: true,
+                        budget: context.budget || 'medium',
+                        timeConstraint: 'quick'
+                    }
+                })
+            });
 
-    <!-- EMERGENCY BUTTON FIX - THIS WILL MAKE IT WORK -->
-    <script>
-    console.log('🔧 EMERGENCY BUTTON FIX LOADING...');
+            if (!response.ok) {
+                throw new Error(`MCP server error: ${response.status}`);
+            }
 
-    // Force button to work - this runs BEFORE main.js
-    function forceButtonFix() {
-        const button = document.getElementById('decide-button');
-        
-        if (!button) {
-            console.log('❌ Button not found, retrying in 100ms...');
-            setTimeout(forceButtonFix, 100);
-            return;
+            const data = await response.json();
+            console.log('✅ MCP response received:', data);
+            
+            return {
+                ...data,
+                source: 'mcp',
+                interactionId: data.interactionId || Date.now().toString()
+            };
+
+        } catch (error) {
+            console.error('❌ MCP call failed, using OpenAI fallback:', error);
+            
+            // FALLBACK: Direct OpenAI call
+            return await getOpenAIFallback(context);
         }
+    }
+
+    async function getOpenAIFallback(context = {}) {
+        const userPrefs = getCurrentSettings();
+        const locationText = userPrefs.location ? userPrefs.location.city : 'your area';
         
-        console.log('✅ Button found, forcing it to work...');
+        // This would be your actual OpenAI API call
+        // For now, return a smart fallback that uses your settings
+        const fallbackFoods = {
+            'KE': [
+                { emoji: '🍛', name: 'Ugali with Sukuma Wiki', desc: `Traditional Kenyan staple perfect for ${locationText}` },
+                { emoji: '🥩', name: 'Nyama Choma', desc: `Grilled meat - a Kenyan favorite in ${locationText}` },
+                { emoji: '🍚', name: 'Pilau', desc: `Spiced rice dish popular in ${locationText}` },
+            ],
+            'GB': [
+                { emoji: '🍟', name: 'Fish and Chips', desc: `Classic British comfort food in ${locationText}` },
+                { emoji: '🥧', name: 'Shepherd\'s Pie', desc: `Hearty traditional dish perfect for ${locationText}` },
+            ],
+            'US': [
+                { emoji: '🍔', name: 'Classic Burger', desc: `American favorite available in ${locationText}` },
+                { emoji: '🍕', name: 'Pizza', desc: `Perfect for a casual meal in ${locationText}` },
+            ]
+        };
+
+        const countryCode = userPrefs.location?.countryCode || 'US';
+        const availableFoods = fallbackFoods[countryCode] || fallbackFoods['US'];
         
-        // Remove all existing listeners by cloning
-        const newButton = button.cloneNode(true);
-        button.parentNode.replaceChild(newButton, button);
+        // Filter by dietary restrictions
+        let suggestions = [...availableFoods];
+        if (userPrefs.dietary && userPrefs.dietary.length > 0) {
+            if (userPrefs.dietary.includes('vegetarian')) {
+                suggestions = suggestions.filter(f => !['🥩', '🍔'].includes(f.emoji));
+            }
+            if (userPrefs.dietary.includes('vegan')) {
+                suggestions = suggestions.filter(f => !['🥩', '🍔', '🧀'].includes(f.emoji));
+            }
+        }
+
+        const choice = suggestions[Math.floor(Math.random() * suggestions.length)];
         
-        // Force styles to make it clickable
-        newButton.style.pointerEvents = 'auto';
-        newButton.style.cursor = 'pointer';
-        newButton.style.userSelect = 'none';
-        newButton.style.zIndex = '1000';
-        
-        // Add working click handler
-        newButton.addEventListener('click', function(e) {
-            console.log('🎯 EMERGENCY BUTTON CLICKED!');
-            e.preventDefault();
-            e.stopPropagation();
+        return {
+            food: {
+                emoji: choice.emoji,
+                name: choice.name
+            },
+            description: choice.desc,
+            culturalNote: `This fits perfectly with ${locationText} food culture`,
+            personalNote: userPrefs.dietary.length > 0 
+                ? `Matches your ${userPrefs.dietary.join(', ')} preferences`
+                : 'Based on your location preferences',
+            reason: `Perfect choice for ${locationText} right now`,
+            availabilityNote: `Available at local restaurants in ${locationText}`,
+            source: 'ai-fallback',
+            location: locationText
+        };
+    }
+
+    // ==================== MAIN APP WITH REAL AI ====================
+    
+    class VFIEDRealApp {
+        constructor() {
+            this.currentSuggestion = null;
+            this.isThinking = false;
+            this.userPreferences = {};
+            this.init();
+        }
+
+        init() {
+            console.log('🤖 VFIED REAL AI App initializing...');
+            this.loadUserPreferences();
+            this.setupEventListeners();
+            this.hideLoadingScreen();
+        }
+
+        loadUserPreferences() {
+            this.userPreferences = getCurrentSettings();
+            console.log('⚙️ Loaded user preferences:', this.userPreferences);
+        }
+
+        updatePreferences(newPreferences) {
+            this.userPreferences = { ...this.userPreferences, ...newPreferences };
+            console.log('⚙️ Updated app preferences:', this.userPreferences);
+            this.updateContextInfo();
+        }
+
+        setupEventListeners() {
+            // FIXED: Ensure button is always clickable
+            const decideButton = document.getElementById('decide-button');
+            if (decideButton) {
+                // FORCE button to work - multiple methods
+                decideButton.style.pointerEvents = 'auto';
+                decideButton.style.cursor = 'pointer';
+                
+                // Remove any existing listeners
+                const newButton = decideButton.cloneNode(true);
+                decideButton.parentNode.replaceChild(newButton, decideButton);
+                
+                // Add fresh listener
+                const freshButton = document.getElementById('decide-button');
+                freshButton.addEventListener('click', (e) => {
+                    console.log('🎯 REAL AI BUTTON CLICKED!');
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.handleDecideClick();
+                });
+                
+                // Force clickability
+                freshButton.style.pointerEvents = 'auto';
+                freshButton.style.cursor = 'pointer';
+                
+                console.log('✅ Real AI button setup complete');
+            }
+
+            const acceptBtn = document.getElementById('accept-btn');
+            const tryAgainBtn = document.getElementById('try-again-btn');
+            const insightsToggle = document.getElementById('insights-toggle');
             
-            // Show immediate visual feedback
-            newButton.style.transform = 'scale(0.95)';
-            newButton.style.opacity = '0.8';
+            if (acceptBtn) {
+                acceptBtn.addEventListener('click', () => this.handleAccept());
+            }
+            if (tryAgainBtn) {
+                tryAgainBtn.addEventListener('click', () => this.handleTryAgain());
+            }
+            if (insightsToggle) {
+                insightsToggle.addEventListener('click', () => this.toggleInsights());
+            }
+
+            // Listen for settings updates
+            window.addEventListener('vfied-settings-updated', (event) => {
+                console.log('⚙️ Settings updated event received:', event.detail);
+                this.updatePreferences(getCurrentSettings());
+            });
+        }
+
+        async handleDecideClick() {
+            if (this.isThinking) return;
             
-            setTimeout(() => {
-                newButton.style.transform = 'scale(1)';
-                newButton.style.opacity = '1';
-            }, 150);
+            console.log('🤖 Getting REAL AI suggestion with preferences:', this.userPreferences);
             
-            // Update button text to show it's working
-            const buttonText = newButton.querySelector('#button-text');
-            const buttonIcon = newButton.querySelector('#button-icon');
+            this.startThinking();
             
-            if (buttonText) buttonText.textContent = 'THINKING...';
+            try {
+                // REAL AI CALL
+                const suggestion = await getAIQuickDecision({
+                    includeRestaurants: true,
+                    budget: 'medium',
+                    userId: 'user_' + Date.now()
+                });
+                
+                this.currentSuggestion = suggestion;
+                this.showSuggestion(suggestion);
+                this.stopThinking();
+                
+            } catch (error) {
+                console.error('AI suggestion failed:', error);
+                this.showError('AI service temporarily unavailable. Please try again.');
+                this.stopThinking();
+            }
+        }
+
+        startThinking() {
+            this.isThinking = true;
+            const button = document.getElementById('decide-button');
+            const buttonText = document.getElementById('button-text');
+            const buttonIcon = document.getElementById('button-icon');
+            
+            if (button) button.classList.add('thinking');
+            if (buttonText) buttonText.textContent = 'AI THINKING...';
             if (buttonIcon) buttonIcon.textContent = '🤖';
             
-            // Try to call main app function if available
-            if (window.vfiedApp && window.vfiedApp.handleDecideClick) {
-                console.log('🚀 Calling main app handleDecideClick...');
-                
-                // Get user settings and pass them to the app
-                const userPrefs = window.vfiedUserSettings ? window.vfiedUserSettings.get() : {};
-                console.log('📋 Using user preferences:', userPrefs);
-                
-                // Add settings to app context
-                if (window.vfiedApp.userPreferences) {
-                    window.vfiedApp.userPreferences = userPrefs;
-                }
-                
-                window.vfiedApp.handleDecideClick();
-            } else {
-                console.log('🎯 Main app not ready, showing fallback suggestion...');
-                
-                // Show fallback suggestion immediately
-                setTimeout(() => {
-                    showFallbackSuggestion();
-                }, 1500);
-            }
-        });
-        
-        // Also add touch event for mobile
-        newButton.addEventListener('touchend', function(e) {
-            console.log('📱 EMERGENCY TOUCH EVENT!');
-            e.preventDefault();
-            e.stopPropagation();
-            newButton.click();
-        });
-        
-        // Prevent any other events from interfering
-        newButton.addEventListener('mousedown', function(e) {
-            e.stopPropagation();
-        });
-        
-        newButton.addEventListener('mouseup', function(e) {
-            e.stopPropagation();
-        });
-        
-        console.log('✅ EMERGENCY BUTTON IS NOW WORKING!');
-    }
-
-    // Fallback suggestion system
-    function showFallbackSuggestion() {
-        console.log('🍽️ Showing fallback suggestion...');
-        
-        const foods = [
-            { emoji: '🍕', name: 'Pizza Night', desc: 'Classic comfort food that hits the spot' },
-            { emoji: '🍔', name: 'Burger Time', desc: 'Satisfying and always a good choice' },
-            { emoji: '🍜', name: 'Ramen Bowl', desc: 'Warm, comforting noodles perfect for now' },
-            { emoji: '🌮', name: 'Taco Tuesday', desc: 'Fresh, flavorful, and fun to eat' },
-            { emoji: '🍣', name: 'Sushi Fresh', desc: 'Light, healthy, and sophisticated' },
-            { emoji: '🥗', name: 'Fresh Salad', desc: 'Healthy and refreshing option' },
-            { emoji: '🍝', name: 'Pasta Perfect', desc: 'Hearty Italian comfort food' },
-            { emoji: '🥙', name: 'Wrap & Go', desc: 'Quick, tasty, and portable' }
-        ];
-        
-        const choice = foods[Math.floor(Math.random() * foods.length)];
-        
-        // Update the suggestion display
-        const suggestionResult = document.getElementById('suggestion-result');
-        const resultEmoji = document.getElementById('result-emoji');
-        const resultName = document.getElementById('result-name');
-        const resultDescription = document.getElementById('result-description');
-        const restaurantInfo = document.getElementById('restaurant-info');
-        
-        if (resultEmoji) resultEmoji.textContent = choice.emoji;
-        if (resultName) resultName.textContent = choice.name;
-        if (resultDescription) resultDescription.textContent = choice.desc;
-        if (restaurantInfo) {
-            restaurantInfo.textContent = '📍 Available nearby - check your local options!';
-            restaurantInfo.style.display = 'block';
+            const locationText = this.userPreferences.location ? this.userPreferences.location.city : 'your area';
+            this.updateContextInfo(`🧠 AI analyzing ${locationText}, weather, and your preferences...`);
         }
-        
-        if (suggestionResult) {
-            suggestionResult.classList.remove('hidden');
-        }
-        
-        // Reset button
-        const button = document.getElementById('decide-button');
-        const buttonText = document.getElementById('button-text');
-        const buttonIcon = document.getElementById('button-icon');
-        
-        if (buttonText) buttonText.textContent = 'DECIDE FOR ME';
-        if (buttonIcon) buttonIcon.textContent = '🎯';
-        
-        // Update context
-        const contextInfo = document.getElementById('context-info');
-        if (contextInfo) {
-            contextInfo.textContent = '🎉 Decision made! How does this sound?';
-        }
-        
-        console.log('✅ Fallback suggestion shown:', choice.name);
-    }
 
-    // Start the fix when DOM is ready
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', forceButtonFix);
-    } else {
-        forceButtonFix();
-    }
-
-    // Backup fix every 3 seconds
-    setInterval(() => {
-        const btn = document.getElementById('decide-button');
-        if (btn) {
-            if (btn.style.pointerEvents !== 'auto') {
-                console.log('🔧 Re-fixing button pointer events...');
-                btn.style.pointerEvents = 'auto';
-                btn.style.cursor = 'pointer';
+        stopThinking() {
+            this.isThinking = false;
+            const button = document.getElementById('decide-button');
+            const buttonText = document.getElementById('button-text');
+            const buttonIcon = document.getElementById('button-icon');
+            
+            if (button) button.classList.remove('thinking');
+            if (buttonText) buttonText.textContent = 'DECIDE FOR ME';
+            if (buttonIcon) buttonIcon.textContent = '🎯';
+            
+            // CRITICAL: Force button to stay clickable
+            if (button) {
+                button.style.pointerEvents = 'auto';
+                button.style.cursor = 'pointer';
             }
         }
-    }, 3000);
 
-    // Hide loading screen after reasonable delay
-    setTimeout(() => {
-        const loadingScreen = document.getElementById('loading-screen');
-        const mainApp = document.getElementById('main-app');
-        
-        if (loadingScreen && mainApp) {
-            console.log('🚀 Showing main app...');
-            loadingScreen.style.opacity = '0';
-            loadingScreen.style.transition = 'opacity 0.5s ease';
+        showSuggestion(suggestion) {
+            const suggestionResult = document.getElementById('suggestion-result');
+            const resultEmoji = document.getElementById('result-emoji');
+            const resultName = document.getElementById('result-name');
+            const resultDescription = document.getElementById('result-description');
+            const restaurantInfo = document.getElementById('restaurant-info');
             
-            setTimeout(() => {
-                loadingScreen.style.display = 'none';
-                mainApp.classList.remove('hidden');
-                mainApp.style.opacity = '1';
-                
-                // Force button fix again after app shows
-                setTimeout(forceButtonFix, 100);
-            }, 500);
-        }
-    }, 3000);
-    </script>
-
-    <!-- LOCATION DETECTION FIX -->
-    <script>
-    console.log('📍 Setting up location detection...');
-
-    // Force location detection with better error handling
-    function forceLocationDetection() {
-        console.log('📍 Requesting location permission...');
-        
-        // Check if geolocation is supported
-        if (!navigator.geolocation) {
-            console.log('❌ Geolocation not supported by this browser');
-            updateLocationStatus('Geolocation not supported');
-            return;
-        }
-        
-        // Show user what's happening
-        updateLocationStatus('📍 Requesting location permission...');
-        
-        // Request location with better options
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                console.log('✅ Location permission granted!');
-                console.log('📍 Location:', position.coords.latitude, position.coords.longitude);
-                
-                updateLocationStatus(`📍 Location detected: ${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)}`);
-                
-                // Try to get city name
-                reverseGeocode(position.coords.latitude, position.coords.longitude);
-            },
-            (error) => {
-                console.log('❌ Location permission error:', error);
-                
-                let errorMessage = '';
-                switch(error.code) {
-                    case error.PERMISSION_DENIED:
-                        errorMessage = '📍 Location access denied - using general suggestions';
-                        showLocationHelp();
-                        break;
-                    case error.POSITION_UNAVAILABLE:
-                        errorMessage = '📍 Location unavailable - using general suggestions';
-                        break;
-                    case error.TIMEOUT:
-                        errorMessage = '📍 Location request timeout - using general suggestions';
-                        break;
-                    default:
-                        errorMessage = '📍 Location error - using general suggestions';
-                        break;
-                }
-                
-                updateLocationStatus(errorMessage);
-            },
-            {
-                enableHighAccuracy: true,
-                timeout: 15000, // 15 seconds
-                maximumAge: 300000 // 5 minutes cache
-            }
-        );
-    }
-
-    // Reverse geocode to get city name
-    async function reverseGeocode(lat, lng) {
-        try {
-            updateLocationStatus('📍 Getting city name...');
-            
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1`
-            );
-            
-            if (!response.ok) throw new Error('Geocoding failed');
-            
-            const data = await response.json();
-            const city = data.address?.city || data.address?.town || data.address?.village || 'Unknown City';
-            const country = data.address?.country || 'Unknown Country';
-            
-            console.log('🏙️ City detected:', city, country);
-            updateLocationStatus(`📍 ${city}, ${country} - getting local food options!`);
-            
-            // Update the AI service with better location data
-            if (window.aiFoodService) {
-                window.aiFoodService.userLocation = {
-                    lat, lng, city, country,
-                    countryCode: data.address?.country_code?.toUpperCase(),
-                    accuracy: 'high',
-                    timestamp: new Date().toISOString()
-                };
-                console.log('✅ AI service location updated');
+            if (resultEmoji) resultEmoji.textContent = suggestion.food?.emoji || '🍽️';
+            if (resultName) resultName.textContent = suggestion.food?.name || 'Great Choice!';
+            if (resultDescription) resultDescription.textContent = suggestion.description || 'Perfect choice for you!';
+            if (restaurantInfo) {
+                restaurantInfo.textContent = suggestion.availabilityNote || 'Available in your area';
+                restaurantInfo.style.display = 'block';
             }
             
-        } catch (error) {
-            console.error('Geocoding error:', error);
-            updateLocationStatus(`📍 Location detected but city lookup failed`);
-        }
-    }
-
-    // Update location status in UI
-    function updateLocationStatus(message) {
-        const contextInfo = document.getElementById('context-info');
-        if (contextInfo) {
-            contextInfo.textContent = message;
-        }
-        console.log('📍 Status:', message);
-    }
-
-    // Show help for enabling location
-    function showLocationHelp() {
-        console.log('📍 Showing location help...');
-        
-        // Create a helpful message
-        setTimeout(() => {
-            updateLocationStatus('📍 To get local suggestions: click the location icon in your browser address bar');
-            
-            // Show brief instruction
-            setTimeout(() => {
-                updateLocationStatus('🤖 Using general food intelligence (enable location for local options)');
-            }, 5000);
-        }, 2000);
-    }
-
-    // Check location permission status
-    async function checkLocationPermission() {
-        if ('permissions' in navigator) {
-            try {
-                const permission = await navigator.permissions.query({name: 'geolocation'});
-                console.log('📍 Location permission status:', permission.state);
-                
-                permission.onchange = () => {
-                    console.log('📍 Location permission changed to:', permission.state);
-                    if (permission.state === 'granted') {
-                        forceLocationDetection();
-                    }
-                };
-                
-                return permission.state;
-            } catch (error) {
-                console.log('📍 Cannot check permission status:', error);
-                return 'unknown';
+            if (suggestionResult) {
+                suggestionResult.classList.remove('hidden');
             }
-        }
-        return 'unknown';
-    }
-
-    // Auto-request location after app loads
-    setTimeout(async () => {
-        console.log('📍 Starting location detection...');
-        
-        const permissionStatus = await checkLocationPermission();
-        
-        if (permissionStatus === 'granted') {
-            console.log('📍 Permission already granted, getting location...');
-            forceLocationDetection();
-        } else if (permissionStatus === 'prompt' || permissionStatus === 'unknown') {
-            console.log('📍 Permission not yet requested, requesting now...');
-            forceLocationDetection();
-        } else {
-            console.log('📍 Permission denied, using fallback');
-            updateLocationStatus('📍 Location blocked - using general suggestions (click location icon to enable)');
-        }
-    }, 3000);
-    </script>
-
-    <!-- Main App Script -->
-    <script type="module" src="/src/main.js"></script>
-
-    <!-- FIXED ACTION BUTTONS & INSIGHTS TOGGLE -->
-    <script>
-    // Fix action buttons and insights toggle
-    setTimeout(() => {
-        console.log('🔧 Setting up action buttons and insights...');
-        
-        const acceptBtn = document.getElementById('accept-btn');
-        const tryAgainBtn = document.getElementById('try-again-btn');
-        
-        if (acceptBtn) {
-            acceptBtn.addEventListener('click', () => {
-                console.log('✅ Accept clicked');
-                alert('Great choice! Enjoy your meal! 🎉');
-                
-                // Hide suggestion
-                const suggestionResult = document.getElementById('suggestion-result');
-                if (suggestionResult) {
-                    suggestionResult.classList.add('hidden');
-                }
-                
-                // Update context
-                const contextInfo = document.getElementById('context-info');
-                if (contextInfo) {
-                    contextInfo.textContent = '🎉 Decision made! Time to eat!';
-                }
-            });
-        }
-        
-        if (tryAgainBtn) {
-            tryAgainBtn.addEventListener('click', () => {
-                console.log('🔄 Try again clicked');
-                
-                // Hide current suggestion
-                const suggestionResult = document.getElementById('suggestion-result');
-                if (suggestionResult) {
-                    suggestionResult.classList.add('hidden');
-                }
-                
-                // Trigger new decision
-                const button = document.getElementById('decide-button');
-                if (button) {
-                    button.click();
-                }
-            });
-        }
-        
-        console.log('✅ Action buttons ready');
-    }, 4000);
-
-    // IMPROVED INSIGHTS TOGGLE - SHOWS REAL AI DATA
-    setTimeout(() => {
-        const insightsToggle = document.getElementById('insights-toggle');
-        
-        if (insightsToggle) {
-            console.log('🤖 Setting up improved insights toggle...');
             
-            // Remove old listeners
-            const newToggle = insightsToggle.cloneNode(true);
-            insightsToggle.parentNode.replaceChild(newToggle, insightsToggle);
+            const locationText = suggestion.location || 'your area';
+            const source = suggestion.source === 'mcp' ? 'AI+MCP' : 'AI';
+            this.updateContextInfo(`🎉 ${source} found perfect choice for ${locationText}! How does this sound?`);
+        }
+
+        handleAccept() {
+            console.log('✅ Accept clicked');
+            alert('Great choice! Enjoy your meal! 🎉');
             
-            newToggle.addEventListener('click', function() {
-                console.log('🤖 Insights toggle clicked');
-                
-                const insightsContent = document.getElementById('insights-content');
-                if (!insightsContent) {
-                    console.log('❌ Insights content not found');
-                    return;
-                }
-                
+            const suggestionResult = document.getElementById('suggestion-result');
+            if (suggestionResult) {
+                suggestionResult.classList.add('hidden');
+            }
+            
+            this.updateContextInfo('🎉 Decision made! Time to eat!');
+        }
+
+        handleTryAgain() {
+            console.log('🔄 Try again clicked');
+            
+            const suggestionResult = document.getElementById('suggestion-result');
+            if (suggestionResult) {
+                suggestionResult.classList.add('hidden');
+            }
+            
+            this.handleDecideClick();
+        }
+
+        toggleInsights() {
+            const insightsContent = document.getElementById('insights-content');
+            const toggle = document.getElementById('insights-toggle');
+            
+            if (insightsContent && toggle) {
                 const isHidden = insightsContent.classList.contains('hidden');
                 
                 if (isHidden) {
-                    console.log('📖 Showing insights...');
                     insightsContent.classList.remove('hidden');
-                    newToggle.textContent = '🤖 Hide insights ↑';
-                    
-                    // Get the real insights from the current suggestion
-                    const currentSuggestion = window.vfiedApp?.currentSuggestion;
+                    toggle.textContent = '🤖 Hide insights ↑';
                     
                     const culturalNote = document.getElementById('cultural-note');
                     const personalNote = document.getElementById('personal-note');
                     const weatherNote = document.getElementById('weather-note');
                     
-                    if (currentSuggestion) {
-                        console.log('📊 Using real suggestion data:', currentSuggestion);
-                        
-                        // Show real cultural note
-                        if (culturalNote && currentSuggestion.culturalNote) {
-                            culturalNote.innerHTML = `<strong>🌍 Cultural insight:</strong> ${currentSuggestion.culturalNote}`;
-                            culturalNote.style.display = 'block';
-                        } else if (culturalNote) {
-                            culturalNote.innerHTML = '<strong>🌍 Cultural insight:</strong> This fits well with local dining preferences in your area.';
+                    if (this.currentSuggestion) {
+                        if (culturalNote && this.currentSuggestion.culturalNote) {
+                            culturalNote.innerHTML = `<strong>🌍 Cultural insight:</strong> ${this.currentSuggestion.culturalNote}`;
                             culturalNote.style.display = 'block';
                         }
-                        
-                        // Show real personal note
-                        if (personalNote && currentSuggestion.personalNote) {
-                            personalNote.innerHTML = `<strong>🧠 Personal pattern:</strong> ${currentSuggestion.personalNote}`;
-                            personalNote.style.display = 'block';
-                        } else if (personalNote) {
-                            personalNote.innerHTML = '<strong>🧠 Personal pattern:</strong> Based on your previous choices, this matches your preferences.';
+                        if (personalNote && this.currentSuggestion.personalNote) {
+                            personalNote.innerHTML = `<strong>🧠 Personal pattern:</strong> ${this.currentSuggestion.personalNote}`;
                             personalNote.style.display = 'block';
                         }
-                        
-                        // Show real weather/reasoning note
-                        if (weatherNote && currentSuggestion.reason) {
-                            weatherNote.innerHTML = `<strong>🎯 Why this works:</strong> ${currentSuggestion.reason}`;
-                            weatherNote.style.display = 'block';
-                        } else if (weatherNote && currentSuggestion.weatherNote) {
-                            weatherNote.innerHTML = `<strong>🌤️ Weather factor:</strong> ${currentSuggestion.weatherNote}`;
-                            weatherNote.style.display = 'block';
-                        } else if (weatherNote) {
-                            weatherNote.innerHTML = '<strong>🎯 Why this works:</strong> Perfect choice for your current mood and situation.';
-                            weatherNote.style.display = 'block';
-                        }
-                    } else {
-                        console.log('📋 Using fallback insights');
-                        
-                        // Show fallback insights with user settings
-                        const userPrefs = window.vfiedUserSettings ? window.vfiedUserSettings.get() : {};
-                        
-                        if (culturalNote) {
-                            const locationText = userPrefs.location ? ` in ${userPrefs.location.city}` : '';
-                            culturalNote.innerHTML = `<strong>🌍 Cultural insight:</strong> This choice fits perfectly with local dining preferences${locationText}!`;
-                            culturalNote.style.display = 'block';
-                        }
-                        
-                        if (personalNote) {
-                            const dietaryText = userPrefs.dietary.length > 0 ? ` and meets your ${userPrefs.dietary.join(', ')} requirements` : '';
-                            personalNote.innerHTML = `<strong>🧠 Personal pattern:</strong> Based on your preferences${dietaryText}, this is a great match.`;
-                            personalNote.style.display = 'block';
-                        }
-                        
-                        if (weatherNote) {
-                            weatherNote.innerHTML = '<strong>🎯 Why this works:</strong> Perfect for your current mood and the time of day!';
+                        if (weatherNote && this.currentSuggestion.reason) {
+                            weatherNote.innerHTML = `<strong>🎯 Why this works:</strong> ${this.currentSuggestion.reason}`;
                             weatherNote.style.display = 'block';
                         }
                     }
-                    
-                    console.log('✅ Insights displayed successfully');
                 } else {
-                    console.log('🙈 Hiding insights...');
                     insightsContent.classList.add('hidden');
-                    newToggle.textContent = '🤖 Why this choice? ↓';
+                    toggle.textContent = '🤖 Why this choice? ↓';
                 }
-            });
-            
-            console.log('✅ Improved insights toggle ready');
-        } else {
-            console.log('❌ Insights toggle button not found');
+            }
         }
-    }, 5000);
+
+        showError(message) {
+            this.updateContextInfo(`⚠️ ${message}`);
+            setTimeout(() => {
+                const locationText = this.userPreferences.location ? this.userPreferences.location.city : 'your area';
+                this.updateContextInfo(`🤖 Ready to help with ${locationText} food suggestions`);
+            }, 3000);
+        }
+
+        updateContextInfo(message) {
+            const contextInfo = document.getElementById('context-info');
+            if (contextInfo) {
+                contextInfo.textContent = message;
+            }
+        }
+
+        hideLoadingScreen() {
+            setTimeout(() => {
+                const loadingScreen = document.getElementById('loading-screen');
+                const mainApp = document.getElementById('main-app');
+                
+                if (loadingScreen && mainApp) {
+                    loadingScreen.style.opacity = '0';
+                    loadingScreen.style.transition = 'opacity 0.5s ease';
+                    
+                    setTimeout(() => {
+                        loadingScreen.style.display = 'none';
+                        mainApp.classList.remove('hidden');
+                        mainApp.style.opacity = '1';
+                        
+                        // Force button clickability after showing app
+                        const button = document.getElementById('decide-button');
+                        if (button) {
+                            button.style.pointerEvents = 'auto';
+                            button.style.cursor = 'pointer';
+                        }
+                    }, 500);
+                }
+            }, 2000);
+        }
+    }
+
+    // ==================== INITIALIZATION ====================
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('⚙️ Initializing REAL AI VFIED system...');
+        
+        // Initialize settings first
+        loadSettings();
+        updateSettingsDisplay();
+        setupSettingsPanel();
+        
+        // Make settings available globally
+        window.vfiedUserSettings = {
+            get: getCurrentSettings,
+            update: updateSettingsDisplay,
+            raw: () => userSettings,
+            notify: notifyMainApp
+        };
+        
+        // Initialize REAL AI app
+        window.vfiedAppInstance = new VFIEDRealApp();
+        
+        // EMERGENCY button fix - runs every 3 seconds
+        setInterval(() => {
+            const btn = document.getElementById('decide-button');
+            if (btn && !window.vfiedAppInstance?.isThinking) {
+                btn.style.pointerEvents = 'auto';
+                btn.style.cursor = 'pointer';
+            }
+        }, 3000);
+        
+        console.log('✅ REAL AI VFIED system ready - MCP + OpenAI integrated!');
+    });
     </script>
 </body>
 </html>

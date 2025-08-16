@@ -1,5 +1,5 @@
-// VFIED Complete AI Food Service - OpenAI + Cultural + Personal + MCPs
-// ALL PHASES IMPLEMENTATION
+// VFIED Complete AI Food Service - FIXED SETTINGS INTEGRATION
+// ALL PHASES IMPLEMENTATION + PROPER SETTINGS SUPPORT
 
 import { db, COLLECTIONS } from '../firebase.js';
 import { collection, addDoc, query, where, orderBy, limit, getDocs, updateDoc, doc } from 'firebase/firestore';
@@ -34,95 +34,92 @@ class AIFoodService {
     console.log('✅ VFIED AI Service ready with full intelligence!');
   }
 
-  // ==================== PHASE 1: LOCATION + CULTURAL INTELLIGENCE ====================
+  // ==================== SETTINGS INTEGRATION FIX ====================
   
-  async detectLocation() {
-    try {
-      console.log('📍 Detecting location...');
-      
-      // Get precise location
-      const position = await this.getCurrentPosition();
-      this.userLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy,
-        timestamp: new Date().toISOString()
-      };
-
-      // Reverse geocode for cultural context
-      const locationData = await this.reverseGeocode(this.userLocation);
-      this.userLocation = { ...this.userLocation, ...locationData };
-      
-      console.log('📍 Location detected:', this.userLocation.city, this.userLocation.country);
-      
-    } catch (error) {
-      console.log('📍 Using fallback location context');
-      this.userLocation = { 
-        city: 'Unknown', 
-        country: 'Unknown',
-        countryCode: 'US' // Default fallback
-      };
+  // NEW: Get current effective location (settings override or detected)
+  getEffectiveLocation() {
+    // FIRST: Check if user has overridden location in settings
+    const userSettings = this.getUserSettings();
+    
+    if (userSettings && userSettings.location) {
+      console.log('📍 Using settings location override:', userSettings.location);
+      return userSettings.location;
     }
+    
+    // FALLBACK: Use detected location
+    if (this.userLocation && this.userLocation.city !== 'Unknown') {
+      console.log('📍 Using detected location:', this.userLocation);
+      return this.userLocation;
+    }
+    
+    // FINAL FALLBACK: Default
+    console.log('📍 Using default location fallback');
+    return { 
+      city: 'Unknown', 
+      country: 'Unknown',
+      countryCode: 'US'
+    };
   }
 
-  async getCurrentPosition() {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation not supported'));
-        return;
+  // NEW: Get user settings from localStorage
+  getUserSettings() {
+    try {
+      const saved = localStorage.getItem('vfied_user_settings');
+      if (saved) {
+        const settings = JSON.parse(saved);
+        console.log('⚙️ Loaded user settings:', settings);
+        return settings;
       }
-
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000 // 5 minutes cache
-      });
-    });
-  }
-
-  async reverseGeocode(location) {
-    try {
-      // Using OpenStreetMap Nominatim (free, no API key needed)
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${location.lat}&lon=${location.lng}&format=json&addressdetails=1`
-      );
-      
-      if (!response.ok) throw new Error('Geocoding failed');
-      
-      const data = await response.json();
-      
-      return {
-        city: data.address?.city || data.address?.town || data.address?.village || 'Unknown',
-        country: data.address?.country || 'Unknown',
-        countryCode: data.address?.country_code?.toUpperCase() || 'US',
-        region: data.address?.state || data.address?.region,
-        neighbourhood: data.address?.neighbourhood || data.address?.suburb,
-        displayName: data.display_name
-      };
-      
     } catch (error) {
-      console.error('Geocoding failed:', error);
-      return {
-        city: 'Unknown',
-        country: 'Unknown',
-        countryCode: 'US'
-      };
+      console.error('Settings load error:', error);
     }
+    return null;
   }
 
+  // NEW: Convert settings location format to our format
+  parseSettingsLocation(settingsLocation) {
+    if (!settingsLocation) return null;
+    
+    // Handle different location formats from settings
+    if (typeof settingsLocation === 'object' && settingsLocation.city) {
+      return settingsLocation;
+    }
+    
+    // Handle string format like "nairobi,ke"
+    if (typeof settingsLocation === 'string') {
+      const locationMap = {
+        'london,uk': { city: 'London', country: 'United Kingdom', countryCode: 'GB' },
+        'nairobi,ke': { city: 'Nairobi', country: 'Kenya', countryCode: 'KE' },
+        'tokyo,jp': { city: 'Tokyo', country: 'Japan', countryCode: 'JP' },
+        'newyork,us': { city: 'New York', country: 'United States', countryCode: 'US' },
+        'paris,fr': { city: 'Paris', country: 'France', countryCode: 'FR' },
+        'mumbai,in': { city: 'Mumbai', country: 'India', countryCode: 'IN' },
+        'lagos,ng': { city: 'Lagos', country: 'Nigeria', countryCode: 'NG' },
+        'sydney,au': { city: 'Sydney', country: 'Australia', countryCode: 'AU' }
+      };
+      
+      return locationMap[settingsLocation.toLowerCase()] || null;
+    }
+    
+    return null;
+  }
+
+  // UPDATED: Detect cultural context with settings awareness
   async detectCulturalContext() {
+    const effectiveLocation = this.getEffectiveLocation();
+    
     if (!this.openaiApiKey) {
-      console.log('🌍 Using fallback cultural context');
-      this.userCulture = this.getFallbackCulture();
+      console.log('🌍 Using fallback cultural context for:', effectiveLocation.city);
+      this.userCulture = this.getFallbackCulture(effectiveLocation.countryCode);
       return;
     }
 
     try {
-      console.log('🌍 Detecting cultural food context...');
+      console.log('🌍 Detecting cultural food context for:', effectiveLocation.city, effectiveLocation.country);
       
       const culturalPrompt = `
-Location: ${this.userLocation.city}, ${this.userLocation.country}
-Country Code: ${this.userLocation.countryCode}
+Location: ${effectiveLocation.city}, ${effectiveLocation.country}
+Country Code: ${effectiveLocation.countryCode}
 
 Analyze the food culture for this location. Return a JSON object with:
 {
@@ -154,47 +151,140 @@ Focus on authentic local foods, not just international chains.
       });
       
       this.userCulture = JSON.parse(culturalData);
-      console.log('🌍 Cultural context learned:', this.userCulture.mainCuisine);
+      console.log('🌍 Cultural context learned for', effectiveLocation.city, ':', this.userCulture.mainCuisine);
       
     } catch (error) {
       console.error('Cultural detection failed:', error);
-      this.userCulture = this.getFallbackCulture();
+      this.userCulture = this.getFallbackCulture(effectiveLocation.countryCode);
     }
   }
 
-  getFallbackCulture() {
-    // Fallback cultural data based on country code
+  // UPDATED: Fallback culture with proper country code support
+  getFallbackCulture(countryCode = 'US') {
     const fallbacks = {
       'KE': { // Kenya
         mainCuisine: 'East African',
         popularFoods: ['ugali', 'nyama choma', 'sukuma wiki', 'pilau', 'chapati'],
         comfortFoods: ['ugali with stew', 'mandazi', 'chai'],
-        streetFoods: ['roasted maize', 'samosa', 'mutura']
+        streetFoods: ['roasted maize', 'samosa', 'mutura'],
+        culturalNotes: 'Kenyan cuisine focuses on hearty staples like ugali, with grilled meats and fresh vegetables.'
       },
       'NG': { // Nigeria
         mainCuisine: 'West African',
         popularFoods: ['jollof rice', 'pounded yam', 'egusi soup', 'suya', 'plantain'],
         comfortFoods: ['jollof rice', 'pepper soup', 'puff puff'],
-        streetFoods: ['suya', 'boli', 'akara']
+        streetFoods: ['suya', 'boli', 'akara'],
+        culturalNotes: 'Nigerian food is bold and spicy, with jollof rice and various soups being central to the cuisine.'
       },
       'IN': { // India
         mainCuisine: 'Indian',
         popularFoods: ['dal rice', 'roti', 'biryani', 'curry', 'chapati'],
         comfortFoods: ['dal rice', 'khichdi', 'chai'],
-        streetFoods: ['samosa', 'chaat', 'vada pav']
+        streetFoods: ['samosa', 'chaat', 'vada pav'],
+        culturalNotes: 'Indian cuisine varies by region but commonly features spices, rice, lentils, and diverse vegetarian options.'
+      },
+      'GB': { // UK
+        mainCuisine: 'British',
+        popularFoods: ['fish and chips', 'shepherd\'s pie', 'bangers and mash', 'curry', 'roast dinner'],
+        comfortFoods: ['fish and chips', 'pie and mash', 'tea and biscuits'],
+        streetFoods: ['fish and chips', 'pasty', 'sandwich'],
+        culturalNotes: 'British cuisine combines traditional comfort foods with influences from former colonies, especially Indian cuisine.'
+      },
+      'JP': { // Japan
+        mainCuisine: 'Japanese',
+        popularFoods: ['rice', 'miso soup', 'sushi', 'ramen', 'tempura'],
+        comfortFoods: ['ramen', 'rice bowl', 'miso soup'],
+        streetFoods: ['takoyaki', 'yakitori', 'onigiri'],
+        culturalNotes: 'Japanese cuisine emphasizes fresh ingredients, seasonal eating, and careful presentation.'
       },
       'US': { // USA - Default
         mainCuisine: 'American',
         popularFoods: ['burger', 'pizza', 'sandwich', 'pasta', 'tacos'],
         comfortFoods: ['mac and cheese', 'pizza', 'ice cream'],
-        streetFoods: ['hot dog', 'food truck tacos', 'bagel']
+        streetFoods: ['hot dog', 'food truck tacos', 'bagel'],
+        culturalNotes: 'American cuisine is diverse, combining influences from many cultures with a focus on convenience and variety.'
       }
     };
 
-    return fallbacks[this.userLocation.countryCode] || fallbacks['US'];
+    return fallbacks[countryCode] || fallbacks['US'];
   }
 
-  // ==================== PHASE 2: ADVANCED AI PERSONALIZATION ====================
+  // ==================== EXISTING LOCATION DETECTION (UNCHANGED) ====================
+  
+  async detectLocation() {
+    try {
+      console.log('📍 Detecting location...');
+      
+      // Get precise location
+      const position = await this.getCurrentPosition();
+      this.userLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: new Date().toISOString()
+      };
+
+      // Reverse geocode for cultural context
+      const locationData = await this.reverseGeocode(this.userLocation);
+      this.userLocation = { ...this.userLocation, ...locationData };
+      
+      console.log('📍 Auto-detected location:', this.userLocation.city, this.userLocation.country);
+      
+    } catch (error) {
+      console.log('📍 Using fallback location context');
+      this.userLocation = { 
+        city: 'Unknown', 
+        country: 'Unknown',
+        countryCode: 'US'
+      };
+    }
+  }
+
+  async getCurrentPosition() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutes cache
+      });
+    });
+  }
+
+  async reverseGeocode(location) {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${location.lat}&lon=${location.lng}&format=json&addressdetails=1`
+      );
+      
+      if (!response.ok) throw new Error('Geocoding failed');
+      
+      const data = await response.json();
+      
+      return {
+        city: data.address?.city || data.address?.town || data.address?.village || 'Unknown',
+        country: data.address?.country || 'Unknown',
+        countryCode: data.address?.country_code?.toUpperCase() || 'US',
+        region: data.address?.state || data.address?.region,
+        neighbourhood: data.address?.neighbourhood || data.address?.suburb,
+        displayName: data.display_name
+      };
+      
+    } catch (error) {
+      console.error('Geocoding failed:', error);
+      return {
+        city: 'Unknown',
+        country: 'Unknown',
+        countryCode: 'US'
+      };
+    }
+  }
+
+  // ==================== UPDATED AI PERSONALIZATION WITH SETTINGS ====================
 
   async getPersonalizedFoodSuggestion(mood, context = {}) {
     if (!this.openaiApiKey) {
@@ -202,8 +292,11 @@ Focus on authentic local foods, not just international chains.
     }
 
     try {
-      // Gather comprehensive context
-      const fullContext = await this.gatherFullContext(mood, context);
+      // IMPORTANT: Use effective location (settings override or detected)
+      const effectiveLocation = this.getEffectiveLocation();
+      
+      // Gather comprehensive context with proper location
+      const fullContext = await this.gatherFullContext(mood, context, effectiveLocation);
       
       // Generate personalized prompt
       const prompt = this.buildPersonalizedPrompt(mood, fullContext);
@@ -229,11 +322,13 @@ Focus on authentic local foods, not just international chains.
     }
   }
 
-  async gatherFullContext(mood, context) {
+  // UPDATED: Gather context with effective location
+  async gatherFullContext(mood, context, effectiveLocation = null) {
     const now = new Date();
+    const location = effectiveLocation || this.getEffectiveLocation();
+    const userSettings = this.getUserSettings();
     
     return {
-      // Existing context...
       time: {
         hour: now.getHours(),
         dayOfWeek: now.getDay(),
@@ -243,13 +338,16 @@ Focus on authentic local foods, not just international chains.
         isWorkHours: this.isWorkHours(now)
       },
       
-      location: this.userLocation,
+      location: location,
       culture: this.userCulture,
       personalHistory: this.getRecentHistory(),
       patterns: await this.getPersonalPatterns(mood),
       preferences: this.getUserPreferences(mood),
       
-      // NEW: Weather context
+      // Include dietary restrictions from settings
+      dietary: userSettings?.dietary || [],
+      
+      // Weather context
       weather: await this.getWeatherContext(),
       
       // Contextual hints
@@ -264,6 +362,7 @@ Focus on authentic local foods, not just international chains.
     };
   }
 
+  // UPDATED: Build prompt with proper location context
   buildPersonalizedPrompt(mood, context) {
     const recentChoicesText = this.formatPersonalHistory(context.personalHistory);
     const patternsText = this.formatPersonalPatterns(context.patterns);
@@ -273,73 +372,81 @@ Focus on authentic local foods, not just international chains.
     const weatherText = context.weather 
       ? `Weather: ${context.weather.temperature}°C, ${context.weather.description}${context.weather.isRaining ? ' (raining)' : ''}${context.weather.isCold ? ' (cold day)' : ''}${context.weather.isHot ? ' (hot day)' : ''}`
       : 'Weather: unknown';
+
+    // Dietary restrictions
+    const dietaryText = context.dietary && context.dietary.length > 0
+      ? `DIETARY RESTRICTIONS: User follows ${context.dietary.join(', ')}. ONLY suggest foods that are 100% compatible with these restrictions.`
+      : '';
   
     return `
-  You are VFIED, a culturally-aware AI food friend who knows this person personally.
-  
-  CURRENT SITUATION:
-  - Location: ${context.location?.city || 'Unknown'}, ${context.location?.country || 'Unknown'}
-  - Time: ${context.time?.timeOfDay || 'unknown'} on ${this.getDayName(context.time?.dayOfWeek || 0)}
-  - Mood: ${mood}
-  - ${weatherText}
-  - Social situation: ${context.socialSituation}
-  
-  CULTURAL KNOWLEDGE:
-  - Local cuisine: ${context.culture?.mainCuisine || 'mixed'}
-  - Popular local foods: ${context.culture?.popularFoods?.join(', ') || 'varied'}
-  - Cultural context: ${context.culture?.culturalNotes || 'diverse food scene'}
-  
-  PERSONAL LEARNING:
-  Recent choices: ${recentChoicesText}
-  Learned patterns: ${patternsText}
-  
-  WEATHER CONTEXT:
-  ${this.getWeatherFoodAdvice(context.weather)}
-  
-  CURRENT CONTEXT:
-  ${situationText}
-  
-  TASK: Suggest 1 perfect food option considering:
-  1. Their exact location and what's actually available there
-  2. Current weather conditions and temperature
-  3. Their personal preferences and patterns
-  4. Current mood, time, and weather
-  5. Local cultural context and authentic options
-  6. What they can realistically get right now
-  
-  Weather should influence your suggestion:
-  - Cold weather (< 15°C): Suggest warm, comforting foods
-  - Hot weather (> 30°C): Suggest cool, refreshing foods  
-  - Rainy weather: Suggest comfort foods and warm drinks
-  - Perfect weather: Any food that fits mood and culture
-  
-  Prioritize authentic local options over international chains when possible.
-  
-  Respond with this exact JSON structure:
-  {
-    "food": {
-      "name": "specific food name (local if possible)",
-      "emoji": "appropriate emoji",
-      "type": "cuisine type", 
-      "category": "comfort/healthy/celebration/recovery/local"
-    },
-    "friendMessage": "supportive message as their food friend (2-3 sentences)",
-    "reasoning": "why this fits their situation right now",
-    "culturalNote": "how this fits their local food culture (if applicable)",
-    "personalNote": "reference to their patterns/preferences (if applicable)",
-    "weatherNote": "how the weather influenced this choice",
-    "availabilityNote": "where they can get this in ${context.location?.city || 'their area'}",
-    "alternatives": [
-      {"name": "backup option 1", "emoji": "🍽️", "reason": "why this works too"},
-      {"name": "backup option 2", "emoji": "🥘", "reason": "another good choice"}
-    ],
-    "confidence": 85
-  }
-  
-  Be specific to ${context.location?.city || 'their location'} and current weather conditions!
+You are VFIED, a culturally-aware AI food friend who knows this person personally.
+
+CURRENT SITUATION:
+- Location: ${context.location?.city || 'Unknown'}, ${context.location?.country || 'Unknown'}
+- Time: ${context.time?.timeOfDay || 'unknown'} on ${this.getDayName(context.time?.dayOfWeek || 0)}
+- Mood: ${mood}
+- ${weatherText}
+- Social situation: ${context.socialSituation}
+
+${dietaryText}
+
+CULTURAL KNOWLEDGE:
+- Local cuisine: ${context.culture?.mainCuisine || 'mixed'}
+- Popular local foods: ${context.culture?.popularFoods?.join(', ') || 'varied'}
+- Cultural context: ${context.culture?.culturalNotes || 'diverse food scene'}
+
+PERSONAL LEARNING:
+Recent choices: ${recentChoicesText}
+Learned patterns: ${patternsText}
+
+WEATHER CONTEXT:
+${this.getWeatherFoodAdvice(context.weather)}
+
+CURRENT CONTEXT:
+${situationText}
+
+TASK: Suggest 1 perfect food option considering:
+1. Their exact location (${context.location?.city}) and what's actually available there
+2. Current weather conditions and temperature
+3. Their personal preferences and dietary restrictions
+4. Current mood, time, and weather
+5. Local cultural context and authentic options from ${context.location?.country}
+6. What they can realistically get right now in ${context.location?.city}
+
+Weather should influence your suggestion:
+- Cold weather (< 15°C): Suggest warm, comforting foods
+- Hot weather (> 30°C): Suggest cool, refreshing foods  
+- Rainy weather: Suggest comfort foods and warm drinks
+- Perfect weather: Any food that fits mood and culture
+
+Prioritize authentic ${context.culture?.mainCuisine || 'local'} options over international chains when possible.
+
+Respond with this exact JSON structure:
+{
+  "food": {
+    "name": "specific food name (local ${context.location?.country} food if possible)",
+    "emoji": "appropriate emoji",
+    "type": "cuisine type", 
+    "category": "comfort/healthy/celebration/recovery/local"
+  },
+  "friendMessage": "supportive message as their food friend (2-3 sentences)",
+  "reasoning": "why this fits their situation right now in ${context.location?.city}",
+  "culturalNote": "how this fits ${context.location?.country} food culture",
+  "personalNote": "reference to their patterns/preferences (if applicable)",
+  "weatherNote": "how the weather influenced this choice",
+  "availabilityNote": "where they can get this in ${context.location?.city}",
+  "alternatives": [
+    {"name": "backup option 1", "emoji": "🍽️", "reason": "why this works too"},
+    {"name": "backup option 2", "emoji": "🥘", "reason": "another good choice"}
+  ],
+  "confidence": 85
+}
+
+Be specific to ${context.location?.city}, ${context.location?.country} and current weather conditions!
     `;
   }
-  
+
+  // Rest of the existing methods unchanged...
   getWeatherFoodAdvice(weather) {
     if (!weather) return 'Weather unknown - suggest based on other factors';
     
@@ -447,137 +554,7 @@ Focus on authentic local foods, not just international chains.
     }
   }
 
-  // ==================== PHASE 3: MCP INTEGRATION ====================
-
-  async initializeContextSources() {
-    // Initialize external context sources
-    await this.setupWeatherService();
-    await this.setupCalendarIntegration();
-    await this.setupHealthIntegration();
-    
-    console.log('🔗 Context sources initialized');
-  }
-
-  async getWeatherContext() {
-    if (!this.weatherApiKey) {
-      return this.getSimulatedWeather();
-    }
-  
-    try {
-      if (!this.userLocation?.lat) {
-        return this.getSimulatedWeather();
-      }
-  
-      const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${this.userLocation.lat}&lon=${this.userLocation.lng}&appid=${this.weatherApiKey}&units=metric`
-      );
-      
-      if (!response.ok) throw new Error('Weather API failed');
-      
-      const data = await response.json();
-      
-      return {
-        temperature: Math.round(data.main.temp),
-        feelsLike: Math.round(data.main.feels_like),
-        humidity: data.main.humidity,
-        condition: data.weather[0].main.toLowerCase(),
-        description: data.weather[0].description,
-        isRaining: data.weather[0].main.toLowerCase().includes('rain'),
-        isSnowing: data.weather[0].main.toLowerCase().includes('snow'),
-        isCold: data.main.temp < 15,
-        isHot: data.main.temp > 30,
-        isComfortable: data.main.temp >= 18 && data.main.temp <= 26,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('Weather fetch error:', error);
-      return this.getSimulatedWeather();
-    }
-  }
-
-  getSimulatedWeather() {
-    // Smart simulation based on location and time
-    const country = this.userLocation?.countryCode || 'US';
-    const hour = new Date().getHours();
-    
-    let baseTemp = 20;
-    
-    // Temperature by region
-    const tempMap = {
-      'KE': 22, 'NG': 28, 'ET': 18, 'ZA': 20, // Africa
-      'IN': 25, 'JP': 18, 'CN': 16, 'TH': 30, // Asia
-      'GB': 12, 'DE': 15, 'FR': 16, 'IT': 18, // Europe
-      'US': 18, 'CA': 10, 'MX': 24, 'BR': 26  // Americas
-    };
-    
-    baseTemp = tempMap[country] || 20;
-    
-    // Daily variation
-    const tempVariation = Math.sin((hour - 6) * Math.PI / 12) * 8;
-    const temp = Math.round(baseTemp + tempVariation + (Math.random() * 6 - 3));
-    
-    const conditions = ['clear', 'cloudy', 'rain', 'sunny'];
-    const condition = conditions[Math.floor(Math.random() * conditions.length)];
-    
-    return {
-      temperature: temp,
-      feelsLike: temp + Math.floor(Math.random() * 6) - 3,
-      condition,
-      description: condition === 'clear' ? 'clear sky' : condition,
-      isRaining: condition === 'rain',
-      isSnowing: false,
-      isCold: temp < 15,
-      isHot: temp > 30,
-      isComfortable: temp >= 18 && temp <= 26,
-      simulated: true,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  async setupWeatherService() {
-    // Weather service setup
-    console.log('🌤️ Weather service configured');
-  }
-
-  async setupCalendarIntegration() {
-    // Calendar integration would go here
-    // For now, simulate based on time patterns
-    console.log('📅 Calendar integration simulated');
-  }
-
-  async setupHealthIntegration() {
-    // Health data integration would go here
-    // For now, simulate basic health context
-    console.log('💪 Health integration simulated');
-  }
-
-  async getCalendarContext() {
-    // Simulated calendar context
-    const hour = new Date().getHours();
-    const isWorkDay = new Date().getDay() >= 1 && new Date().getDay() <= 5;
-    
-    return {
-      nextMeeting: isWorkDay && hour < 17 ? 'work meeting' : 'free time',
-      isWorkHours: isWorkDay && hour >= 9 && hour <= 17,
-      stressLevel: isWorkDay && hour >= 14 && hour <= 16 ? 'high' : 'medium',
-      hasTimeToEat: true,
-      socialPlans: hour >= 18 ? 'possible dinner plans' : 'solo time'
-    };
-  }
-
-  async getHealthContext() {
-    // Simulated health context
-    return {
-      lastWorkout: this.getLastWorkoutTime(),
-      energyLevel: this.getEnergyLevel(),
-      hydrationLevel: 'medium',
-      sleepQuality: 'good',
-      stepsToday: Math.floor(Math.random() * 8000) + 2000
-    };
-  }
-
-  // ==================== PERSONAL LEARNING & PATTERNS ====================
-
+  // All other existing methods remain the same...
   async loadPersonalHistory() {
     try {
       const q = query(
@@ -659,7 +636,7 @@ Focus on authentic local foods, not just international chains.
           confidence: suggestion.confidence
         },
         timestamp: new Date().toISOString(),
-        rating: null, // Will be updated when user provides feedback
+        rating: null,
         userLocation: context.location
       };
 
@@ -680,7 +657,6 @@ Focus on authentic local foods, not just international chains.
         ratedAt: new Date().toISOString()
       });
       
-      // Trigger pattern relearning for positive ratings
       if (rating >= 4) {
         this.schedulePatternUpdate();
       }
@@ -691,9 +667,103 @@ Focus on authentic local foods, not just international chains.
     }
   }
 
-  // ==================== FALLBACK FUNCTIONS ====================
+  // Weather and other utility methods remain the same...
+  async initializeContextSources() {
+    await this.setupWeatherService();
+    await this.setupCalendarIntegration();
+    await this.setupHealthIntegration();
+    console.log('🔗 Context sources initialized');
+  }
+
+  async getWeatherContext() {
+    if (!this.weatherApiKey) {
+      return this.getSimulatedWeather();
+    }
+  
+    try {
+      if (!this.userLocation?.lat) {
+        return this.getSimulatedWeather();
+      }
+  
+      const response = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?lat=${this.userLocation.lat}&lon=${this.userLocation.lng}&appid=${this.weatherApiKey}&units=metric`
+      );
+      
+      if (!response.ok) throw new Error('Weather API failed');
+      
+      const data = await response.json();
+      
+      return {
+        temperature: Math.round(data.main.temp),
+        feelsLike: Math.round(data.main.feels_like),
+        humidity: data.main.humidity,
+        condition: data.weather[0].main.toLowerCase(),
+        description: data.weather[0].description,
+        isRaining: data.weather[0].main.toLowerCase().includes('rain'),
+        isSnowing: data.weather[0].main.toLowerCase().includes('snow'),
+        isCold: data.main.temp < 15,
+        isHot: data.main.temp > 30,
+        isComfortable: data.main.temp >= 18 && data.main.temp <= 26,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Weather fetch error:', error);
+      return this.getSimulatedWeather();
+    }
+  }
+
+  getSimulatedWeather() {
+    const effectiveLocation = this.getEffectiveLocation();
+    const country = effectiveLocation?.countryCode || 'US';
+    const hour = new Date().getHours();
+    
+    let baseTemp = 20;
+    
+    const tempMap = {
+      'KE': 22, 'NG': 28, 'ET': 18, 'ZA': 20,
+      'IN': 25, 'JP': 18, 'CN': 16, 'TH': 30,
+      'GB': 12, 'DE': 15, 'FR': 16, 'IT': 18,
+      'US': 18, 'CA': 10, 'MX': 24, 'BR': 26
+    };
+    
+    baseTemp = tempMap[country] || 20;
+    
+    const tempVariation = Math.sin((hour - 6) * Math.PI / 12) * 8;
+    const temp = Math.round(baseTemp + tempVariation + (Math.random() * 6 - 3));
+    
+    const conditions = ['clear', 'cloudy', 'rain', 'sunny'];
+    const condition = conditions[Math.floor(Math.random() * conditions.length)];
+    
+    return {
+      temperature: temp,
+      feelsLike: temp + Math.floor(Math.random() * 6) - 3,
+      condition,
+      description: condition === 'clear' ? 'clear sky' : condition,
+      isRaining: condition === 'rain',
+      isSnowing: false,
+      isCold: temp < 15,
+      isHot: temp > 30,
+      isComfortable: temp >= 18 && temp <= 26,
+      simulated: true,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async setupWeatherService() {
+    console.log('🌤️ Weather service configured');
+  }
+
+  async setupCalendarIntegration() {
+    console.log('📅 Calendar integration simulated');
+  }
+
+  async setupHealthIntegration() {
+    console.log('💪 Health integration simulated');
+  }
 
   getFallbackSuggestion(mood) {
+    const effectiveLocation = this.getEffectiveLocation();
+    
     const fallbackFoods = {
       'tired': { name: 'Order Something Good', emoji: '🍕' },
       'stressed': { name: 'Comfort Food', emoji: '🍜' },
@@ -712,16 +782,16 @@ Focus on authentic local foods, not just international chains.
         emoji: food.emoji,
         category: 'comfort'
       },
-      description: `Here's what sounds good for ${mood} mood!`,
-      friendResponse: `Here's what sounds good for ${mood} mood!`,
+      description: `Here's what sounds good for ${mood} mood in ${effectiveLocation.city}!`,
+      friendResponse: `Here's what sounds good for ${mood} mood in ${effectiveLocation.city}!`,
       reason: 'Fallback suggestion - AI service unavailable',
       confidence: 60,
-      source: 'fallback'
+      source: 'fallback',
+      location: effectiveLocation.city
     };
   }
 
-  // ==================== UTILITY FUNCTIONS ====================
-
+  // Utility methods remain the same...
   generateFoodId(name) {
     return name.toLowerCase()
       .replace(/\s+/g, '-')
@@ -746,20 +816,6 @@ Focus on authentic local foods, not just international chains.
     const hour = date.getHours();
     const day = date.getDay();
     return day >= 1 && day <= 5 && hour >= 9 && hour <= 17;
-  }
-
-  getLastWorkoutTime() {
-    const hours = Math.floor(Math.random() * 48);
-    return hours < 24 ? `${hours} hours ago` : `${Math.floor(hours/24)} days ago`;
-  }
-
-  getEnergyLevel() {
-    const hour = new Date().getHours();
-    if (hour < 8) return 'low';
-    if (hour < 12) return 'high';
-    if (hour < 15) return 'medium';
-    if (hour < 18) return 'medium';
-    return 'low';
   }
 
   formatPersonalHistory(history) {
@@ -803,7 +859,6 @@ Focus on authentic local foods, not just international chains.
   }
 
   getUserPreferences(mood) {
-    // Extract preferences from history
     const moodChoices = this.personalHistory.filter(choice => 
       choice.mood === mood && choice.rating >= 4
     );
@@ -871,18 +926,25 @@ Focus on authentic local foods, not just international chains.
 
   analyzePersonalPatterns() {
     console.log('🧠 Analyzing personal patterns...');
-    // Additional pattern analysis logic here
   }
 }
 
 // Create singleton instance
 export const aiFoodService = new AIFoodService();
 
-// Export main functions for the app
+// UPDATED EXPORT FUNCTIONS - NOW WITH PROPER SETTINGS INTEGRATION
+
 export const getAIFoodSuggestion = async (mood, context = {}) => {
-  console.log(`🤖 Getting AI suggestion for mood: ${mood} via MCP`);
+  console.log(`🤖 Getting AI suggestion for mood: ${mood} with settings awareness`);
   
   try {
+    // Get effective location (settings override or detected)
+    const effectiveLocation = aiFoodService.getEffectiveLocation();
+    const userSettings = aiFoodService.getUserSettings();
+    
+    console.log('📍 Using effective location:', effectiveLocation);
+    console.log('⚙️ Using user settings:', userSettings);
+    
     const response = await fetch('https://vfied-mcp-server.onrender.com/mcp/get_food_suggestion', {
       method: 'POST',
       headers: {
@@ -890,11 +952,8 @@ export const getAIFoodSuggestion = async (mood, context = {}) => {
       },
       body: JSON.stringify({
         mood,
-        location: {
-          city: aiFoodService.userLocation?.city || 'Unknown',
-          country: aiFoodService.userLocation?.country || 'Unknown',
-          countryCode: aiFoodService.userLocation?.countryCode || 'US'
-        },
+        location: effectiveLocation, // USE EFFECTIVE LOCATION
+        dietary: userSettings?.dietary || [], // INCLUDE DIETARY RESTRICTIONS
         context: {
           budget: context.budget || 'medium',
           socialSituation: context.socialSituation || 'solo',
@@ -909,31 +968,39 @@ export const getAIFoodSuggestion = async (mood, context = {}) => {
     }
 
     const data = await response.json();
-    console.log('✅ MCP mood suggestion received:', data);
+    console.log('✅ MCP mood suggestion received for', effectiveLocation.city, ':', data);
     
     return {
       ...data,
-      source: 'mcp'
+      source: 'mcp',
+      location: effectiveLocation.city
     };
 
   } catch (error) {
-    console.error('❌ MCP mood call failed, using fallback:', error);
+    console.error('❌ MCP mood call failed, using local AI:', error);
     return await aiFoodService.getPersonalizedFoodSuggestion(mood, context);
   }
 };
 
-// REPLACE this function in aiFoodService.js:
 export const getAIQuickDecision = async (context = {}) => {
-  console.log('🎲 Getting AI quick decision from MCP...');
+  console.log('🎲 Getting AI quick decision with settings awareness...');
   
   try {
+    // Get effective location and settings
+    const effectiveLocation = aiFoodService.getEffectiveLocation();
+    const userSettings = aiFoodService.getUserSettings();
+    
+    console.log('📍 Quick decision using location:', effectiveLocation);
+    console.log('⚙️ Quick decision using settings:', userSettings);
+    
     const response = await fetch('https://vfied-mcp-server.onrender.com/mcp/get_quick_food_decision', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        location: aiFoodService.userLocation,
+        location: effectiveLocation, // USE EFFECTIVE LOCATION
+        dietary: userSettings?.dietary || [], // INCLUDE DIETARY RESTRICTIONS
         userId: context.userId || 'anonymous',
         context: {
           includeRestaurants: context.includeRestaurants,
@@ -949,18 +1016,17 @@ export const getAIQuickDecision = async (context = {}) => {
     }
 
     const data = await response.json();
-    console.log('✅ MCP response received:', data);
+    console.log('✅ MCP quick decision received for', effectiveLocation.city, ':', data);
     
     return {
       ...data,
       source: 'mcp',
+      location: effectiveLocation.city,
       interactionId: data.interactionId || Date.now().toString()
     };
 
   } catch (error) {
-    console.error('❌ MCP call failed, using fallback:', error);
-    
-    // Fallback to your existing direct AI call
+    console.error('❌ MCP quick decision failed, using local AI:', error);
     return await aiFoodService.getPersonalizedFoodSuggestion('random', context);
   }
 };
@@ -972,16 +1038,18 @@ export const updateAIFeedback = async (interactionId, rating) => {
 
 export const getAILocationContext = () => {
   return {
-    location: aiFoodService.userLocation,
+    location: aiFoodService.getEffectiveLocation(), // USE EFFECTIVE LOCATION
     culture: aiFoodService.userCulture
   };
 };
 
 export const getAIServiceStatus = () => {
+  const effectiveLocation = aiFoodService.getEffectiveLocation();
   return {
     hasOpenAI: !!aiFoodService.openaiApiKey,
-    hasLocation: !!aiFoodService.userLocation?.city,
+    hasLocation: !!effectiveLocation?.city && effectiveLocation.city !== 'Unknown',
     hasCulture: !!aiFoodService.userCulture?.mainCuisine,
-    hasHistory: aiFoodService.personalHistory.length > 0
+    hasHistory: aiFoodService.personalHistory.length > 0,
+    effectiveLocation: effectiveLocation
   };
 };

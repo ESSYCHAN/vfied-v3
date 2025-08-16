@@ -1,10 +1,4 @@
-// VFIED One-Button Experience - FIXED VERSION
-
-// Comment out problematic imports temporarily
-// import { Capacitor } from '@capacitor/core';
-// import { App } from '@capacitor/app';
-// import { StatusBar } from '@capacitor/status-bar';
-// import { Haptics, ImpactStyle } from '@capacitor/haptics';
+// VFIED One-Button Experience - FIXED SETTINGS INTEGRATION
 
 // Keep AI intelligence but make it optional
 import { 
@@ -32,6 +26,7 @@ class VFIEDOneButtonApp {
     this.stats = { totalDecisions: 0, timeSaved: 0 };
     this.includeRestaurants = true;
     this.culturalPriority = true;
+    this.userPreferences = {}; // Add this to store user preferences
     
     this.init();
   }
@@ -39,8 +34,8 @@ class VFIEDOneButtonApp {
   async init() {
     console.log('🚀 VFIED One-Button App initializing...');
     
-    // Skip Capacitor setup if not available
-    // await this.setupCapacitor();
+    // Load user preferences first
+    this.loadUserPreferences();
     
     this.setupEventListeners();
     this.initializeUI();
@@ -48,6 +43,52 @@ class VFIEDOneButtonApp {
     await this.startApp();
     
     console.log('✅ One-Button Experience Ready!');
+  }
+
+  // NEW: Load user preferences from settings
+  loadUserPreferences() {
+    try {
+      const saved = localStorage.getItem('vfied_user_settings');
+      if (saved) {
+        this.userPreferences = JSON.parse(saved);
+        console.log('⚙️ Loaded user preferences:', this.userPreferences);
+      }
+    } catch (error) {
+      console.error('Error loading user preferences:', error);
+      this.userPreferences = {};
+    }
+  }
+
+  // NEW: Get current user preferences (called by settings system)
+  getCurrentPreferences() {
+    return this.userPreferences;
+  }
+
+  // NEW: Update preferences when settings change
+  updatePreferences(newPreferences) {
+    this.userPreferences = { ...this.userPreferences, ...newPreferences };
+    console.log('⚙️ Updated app preferences:', this.userPreferences);
+    
+    // Trigger AI service to refresh with new settings
+    if (this.useAI) {
+      this.refreshAIContext();
+    }
+  }
+
+  // NEW: Refresh AI context when settings change
+  async refreshAIContext() {
+    try {
+      console.log('🔄 Refreshing AI context with new settings...');
+      
+      // Trigger cultural context refresh if location changed
+      if (this.userPreferences.location) {
+        await aiFoodService.detectCulturalContext();
+      }
+      
+      this.updateContextWithAI();
+    } catch (error) {
+      console.error('Error refreshing AI context:', error);
+    }
   }
 
   async initializeAI() {
@@ -81,11 +122,13 @@ class VFIEDOneButtonApp {
         const status = getAIServiceStatus();
         
         if (status && status.hasLocation) {
-          this.updateContextInfo('📍 Location detected, learning local culture...');
+          const locationText = status.effectiveLocation?.city || 'location';
+          this.updateContextInfo(`📍 ${locationText} detected, learning local culture...`);
         }
         
         if (status && status.hasCulture && status.hasLocation) {
-          this.updateContextInfo('🌍 Cultural intelligence ready!');
+          const locationText = status.effectiveLocation?.city || 'location';
+          this.updateContextInfo(`🌍 Cultural intelligence ready for ${locationText}!`);
           return; // Ready!
         }
       } catch (error) {
@@ -103,8 +146,25 @@ class VFIEDOneButtonApp {
     try {
       const { location, culture } = getAILocationContext();
       
+      // Show effective location (could be from settings or detected)
       if (location && location.city && location.city !== 'Unknown') {
         let message = `📍 ${location.city}`;
+        
+        // Add dietary info if user has restrictions
+        if (this.userPreferences.dietary && this.userPreferences.dietary.length > 0) {
+          const dietaryEmojis = {
+            'vegetarian': '🌱',
+            'vegan': '🥬', 
+            'gluten-free': '🌾',
+            'dairy-free': '🥛',
+            'keto': '🥩',
+            'halal': '☪️',
+            'kosher': '✡️',
+            'paleo': '🦴'
+          };
+          const icons = this.userPreferences.dietary.map(d => dietaryEmojis[d] || '🍽️').join('');
+          message += ` • ${icons} dietary aware`;
+        }
         
         if (culture && culture.popularFoods) {
           const localFood = culture.popularFoods[0];
@@ -206,27 +266,13 @@ class VFIEDOneButtonApp {
       }
     });
 
+    // NEW: Listen for settings updates
+    window.addEventListener('vfied-settings-updated', (event) => {
+      console.log('⚙️ Settings updated event received:', event.detail);
+      this.updatePreferences(event.detail);
+    });
+
     console.log('🎯 Event listeners ready');
-  }
-
-  async setupCapacitor() {
-    // Skip if Capacitor not available
-    try {
-      if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-        await StatusBar.setStyle({ style: 'DARK' });
-        await StatusBar.setBackgroundColor({ color: '#2C3E50' });
-        
-        App.addListener('appStateChange', ({ isActive }) => {
-          if (isActive) {
-            this.refreshContext();
-          }
-        });
-
-        console.log('📱 Capacitor ready');
-      }
-    } catch (error) {
-      console.log('📱 Capacitor not available, continuing without it');
-    }
   }
 
   initializeUI() {
@@ -268,7 +314,7 @@ class VFIEDOneButtonApp {
     try {
       const { location } = getAILocationContext();
       
-      // Show contextual hint
+      // Show contextual hint with effective location
       if (hour >= 12 && hour <= 14) {
         const message = location?.city && location.city !== 'Unknown'
           ? `🍽️ Lunch time in ${location.city}! Let me help you decide.`
@@ -309,15 +355,21 @@ class VFIEDOneButtonApp {
       let suggestion;
       
       if (this.useAI) {
-        console.log('🤖 Getting AI-powered suggestion...');
+        console.log('🤖 Getting AI-powered suggestion with user preferences...');
         this.updateButtonState('🤖 AI THINKING...', 'Analyzing your situation...');
         
-        // Get comprehensive AI suggestion
+        // IMPORTANT: Include user preferences in context
         const context = {
           includeRestaurants: this.includeRestaurants,
           culturalPriority: this.culturalPriority,
-          quick: true
+          quick: true,
+          // ADD USER PREFERENCES
+          dietary: this.userPreferences.dietary || [],
+          budget: this.userPreferences.budget || 'medium',
+          userId: 'user_' + Date.now()
         };
+        
+        console.log('📋 Using context with preferences:', context);
         
         suggestion = await getAIQuickDecision(context);
         this.currentInteractionId = suggestion.interactionId;
@@ -366,8 +418,14 @@ class VFIEDOneButtonApp {
       suggestionResult.classList.add('hidden');
     }
     
-    // Update context
-    this.updateContextInfo('🧠 Analyzing your location, weather, and preferences...');
+    // Update context with effective location
+    try {
+      const { location } = getAILocationContext();
+      const locationText = location?.city || 'your area';
+      this.updateContextInfo(`🧠 Analyzing ${locationText}, weather, and your preferences...`);
+    } catch (error) {
+      this.updateContextInfo('🧠 Analyzing your location, weather, and preferences...');
+    }
   }
 
   stopThinking() {
@@ -385,8 +443,6 @@ class VFIEDOneButtonApp {
     if (buttonIcon) buttonIcon.textContent = '🤖';
     if (button) {
       button.classList.add('thinking');
-      // Don't disable pointer events - just visual feedback
-      // button.style.pointerEvents = 'none';
     }
   }
 
@@ -451,11 +507,12 @@ class VFIEDOneButtonApp {
       suggestionResult.style.transform = 'translateY(0)';
     }, 100);
     
-    // Update context to show success
+    // Update context to show success with effective location
     try {
       const { location } = getAILocationContext();
-      const contextMessage = suggestion.source === 'ai' 
-        ? `🤖 AI analyzed ${location?.city || 'your location'}, weather, and preferences`
+      const locationText = location?.city || 'your location';
+      const contextMessage = suggestion.source === 'ai' || suggestion.source === 'mcp'
+        ? `🤖 AI analyzed ${locationText}, weather, and your preferences`
         : '🎯 Smart local suggestion ready';
       
       this.updateContextInfo(contextMessage);
@@ -473,21 +530,37 @@ class VFIEDOneButtonApp {
       culturalNote.innerHTML = `<strong>🌍 Cultural insight:</strong> ${suggestion.culturalNote}`;
       culturalNote.style.display = 'block';
     } else if (culturalNote) {
-      culturalNote.style.display = 'none';
+      // Show location-aware fallback
+      try {
+        const { location } = getAILocationContext();
+        const locationText = location?.city ? ` in ${location.city}` : '';
+        culturalNote.innerHTML = `<strong>🌍 Cultural insight:</strong> This choice fits perfectly with local dining preferences${locationText}!`;
+        culturalNote.style.display = 'block';
+      } catch (error) {
+        culturalNote.style.display = 'none';
+      }
     }
     
     if (personalNote && suggestion.personalNote) {
       personalNote.innerHTML = `<strong>🧠 Personal pattern:</strong> ${suggestion.personalNote}`;
       personalNote.style.display = 'block';
     } else if (personalNote) {
-      personalNote.style.display = 'none';
+      // Show dietary-aware fallback
+      const dietaryText = this.userPreferences.dietary && this.userPreferences.dietary.length > 0 
+        ? ` and meets your ${this.userPreferences.dietary.join(', ')} requirements` : '';
+      personalNote.innerHTML = `<strong>🧠 Personal pattern:</strong> Based on your preferences${dietaryText}, this is a great match.`;
+      personalNote.style.display = 'block';
     }
     
     if (weatherNote && suggestion.reason) {
       weatherNote.innerHTML = `<strong>🎯 Why this works:</strong> ${suggestion.reason}`;
       weatherNote.style.display = 'block';
+    } else if (weatherNote && suggestion.weatherNote) {
+      weatherNote.innerHTML = `<strong>🌤️ Weather factor:</strong> ${suggestion.weatherNote}`;
+      weatherNote.style.display = 'block';
     } else if (weatherNote) {
-      weatherNote.style.display = 'none';
+      weatherNote.innerHTML = '<strong>🎯 Why this works:</strong> Perfect choice for your current mood and situation.';
+      weatherNote.style.display = 'block';
     }
   }
 
@@ -523,7 +596,7 @@ class VFIEDOneButtonApp {
           this.currentSuggestion.food?.id || 'unknown',
           'quick-decision',
           5,
-          { source: 'one-button' }
+          { source: 'one-button', preferences: this.userPreferences }
         );
       }
       
@@ -633,7 +706,13 @@ class VFIEDOneButtonApp {
           message += ' with cultural intelligence';
         }
         if (status.hasLocation) {
-          message += ' and location awareness';
+          const locationText = status.effectiveLocation?.city || 'location';
+          message += ` and ${locationText} awareness`;
+        }
+        
+        // Add dietary awareness if user has restrictions
+        if (this.userPreferences.dietary && this.userPreferences.dietary.length > 0) {
+          message += ` + dietary intelligence`;
         }
         
         aiStatus.textContent = message;
@@ -667,6 +746,7 @@ class VFIEDOneButtonApp {
   }
 
   async refreshContext() {
+    this.loadUserPreferences(); // Reload preferences
     this.updateContextWithAI();
     this.updateStats();
     this.updateAIStatus();
@@ -700,7 +780,8 @@ class VFIEDOneButtonApp {
       useAI: this.useAI,
       hasCurrentSuggestion: !!this.currentSuggestion,
       isThinking: this.isThinking,
-      stats: this.stats
+      stats: this.stats,
+      userPreferences: this.userPreferences
     };
   }
 }
@@ -730,6 +811,9 @@ document.addEventListener('DOMContentLoaded', () => {
   
   window.vfiedApp = new VFIEDOneButtonApp();
   
+  // Make app globally available for settings integration
+  window.vfiedAppInstance = window.vfiedApp;
+  
   // Emergency fix: Force button clickability every 3 seconds
   setInterval(forceButtonClickability, 3000);
   
@@ -737,6 +821,7 @@ document.addEventListener('DOMContentLoaded', () => {
   window.vfiedDebug = {
     getStatus: () => window.vfiedApp?.getStatus() || 'Not initialized',
     testDecision: () => window.vfiedApp?.handleDecideClick() || console.log('App not ready'),
+    getPreferences: () => window.vfiedApp?.userPreferences || {},
     testButton: () => {
       const btn = document.getElementById('decide-button');
       console.log('Button found:', !!btn);

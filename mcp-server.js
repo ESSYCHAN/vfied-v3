@@ -1,4 +1,4 @@
-// VFIED MCP Server - Complete with Weather + Dietary Intelligence (No Firebase)
+// VFIED MCP Server - Complete with Weather + Dietary Intelligence + MCP Protocol
 import express from 'express';
 import cors from 'cors';
 
@@ -989,7 +989,262 @@ function buildWeatherReasoning(weather, suggestion) {
   return reasoning.join(' • ') || `Good choice for ${weather.description}`;
 }
 
-// ==================== MCP ENDPOINTS ====================
+// ==================== MCP PROTOCOL ENDPOINTS ====================
+
+// MCP Initialize - Required for protocol handshake
+app.post('/mcp/initialize', (req, res) => {
+  res.json({
+    protocolVersion: "2024-11-05",
+    capabilities: {
+      tools: {}
+    },
+    serverInfo: {
+      name: "vfied-food-intelligence",
+      version: "1.4.0"
+    }
+  });
+});
+
+// MCP Tools List - Tells OpenAI what tools are available
+app.post('/mcp/tools/list', (req, res) => {
+  res.json({
+    tools: [
+      {
+        name: "get_quick_food_decision",
+        description: "Get instant food decision based on location, weather, and dietary restrictions",
+        inputSchema: {
+          type: "object",
+          properties: {
+            location: {
+              type: "object",
+              properties: {
+                city: { type: "string" },
+                country: { type: "string" },
+                latitude: { type: "number" },
+                longitude: { type: "number" }
+              }
+            },
+            dietary: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: ["vegetarian", "vegan", "gluten-free", "dairy-free", "keto", "halal", "kosher", "nut-free", "paleo", "pescatarian"]
+              },
+              description: "Dietary restrictions"
+            },
+            context: {
+              type: "object",
+              properties: {
+                budget: { type: "string", enum: ["low", "medium", "high"] },
+                social: { type: "string", enum: ["solo", "couple", "group", "family"] },
+                includeRestaurants: { type: "boolean" }
+              }
+            }
+          }
+        }
+      },
+      {
+        name: "get_food_suggestion",
+        description: "Get personalized food suggestion based on mood, weather, location, and dietary needs",
+        inputSchema: {
+          type: "object",
+          properties: {
+            mood: {
+              type: "string",
+              enum: ["tired", "stressed", "celebrating", "healthy", "hungry", "lazy", "energetic"],
+              description: "Current mood"
+            },
+            location: {
+              type: "object",
+              properties: {
+                city: { type: "string" },
+                country: { type: "string" },
+                latitude: { type: "number" },
+                longitude: { type: "number" }
+              }
+            },
+            dietary: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: ["vegetarian", "vegan", "gluten-free", "dairy-free", "keto", "halal", "kosher", "nut-free", "paleo", "pescatarian"]
+              }
+            },
+            context: {
+              type: "object",
+              properties: {
+                budget: { type: "string" },
+                social: { type: "string" },
+                includeRestaurants: { type: "boolean" }
+              }
+            }
+          },
+          required: ["mood"]
+        }
+      },
+      {
+        name: "validate_dietary_compliance",
+        description: "Check if a food item complies with specific dietary restrictions",
+        inputSchema: {
+          type: "object",
+          properties: {
+            foodName: {
+              type: "string",
+              description: "Name of the food to validate"
+            },
+            dietary: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: ["vegetarian", "vegan", "gluten-free", "dairy-free", "keto", "halal", "kosher", "nut-free", "paleo", "pescatarian"]
+              }
+            }
+          },
+          required: ["foodName", "dietary"]
+        }
+      },
+      {
+        name: "get_cultural_food_context",
+        description: "Get cultural food context and recommendations for a specific location",
+        inputSchema: {
+          type: "object",
+          properties: {
+            location: {
+              type: "object",
+              properties: {
+                city: { type: "string" },
+                country: { type: "string" }
+              },
+              required: ["country"]
+            },
+            dietary: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: ["vegetarian", "vegan", "gluten-free", "dairy-free", "keto", "halal", "kosher", "nut-free", "paleo", "pescatarian"]
+              }
+            }
+          },
+          required: ["location"]
+        }
+      }
+    ]
+  });
+});
+
+// MCP Tools Call - Executes the actual tool calls
+app.post('/mcp/tools/call', async (req, res) => {
+  try {
+    const { name, arguments: args } = req.body;
+    
+    let result;
+    let statusCode = 200;
+    
+    switch (name) {
+      case "get_quick_food_decision":
+        try {
+          const response = await fetch(`${req.protocol}://${req.get('host')}/mcp/get_quick_food_decision`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(args || {})
+          });
+          result = await response.json();
+          statusCode = response.status;
+        } catch (error) {
+          throw new Error(`Failed to get quick decision: ${error.message}`);
+        }
+        break;
+        
+      case "get_food_suggestion":
+        try {
+          const response = await fetch(`${req.protocol}://${req.get('host')}/mcp/get_food_suggestion`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(args)
+          });
+          result = await response.json();
+          statusCode = response.status;
+        } catch (error) {
+          throw new Error(`Failed to get food suggestion: ${error.message}`);
+        }
+        break;
+        
+      case "validate_dietary_compliance":
+        try {
+          const response = await fetch(`${req.protocol}://${req.get('host')}/mcp/validate_dietary_compliance`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(args)
+          });
+          result = await response.json();
+          statusCode = response.status;
+        } catch (error) {
+          throw new Error(`Failed to validate dietary compliance: ${error.message}`);
+        }
+        break;
+        
+      case "get_cultural_food_context":
+        try {
+          const response = await fetch(`${req.protocol}://${req.get('host')}/mcp/get_cultural_food_context`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(args)
+          });
+          result = await response.json();
+          statusCode = response.status;
+        } catch (error) {
+          throw new Error(`Failed to get cultural context: ${error.message}`);
+        }
+        break;
+        
+      default:
+        return res.status(400).json({
+          error: {
+            code: "INVALID_TOOL",
+            message: `Unknown tool: ${name}`
+          }
+        });
+    }
+    
+    if (statusCode !== 200) {
+      return res.status(statusCode).json({
+        error: {
+          code: "TOOL_ERROR",
+          message: result.error || "Tool execution failed"
+        }
+      });
+    }
+    
+    // MCP requires responses in this specific format
+    res.json({
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(result, null, 2)
+        }
+      ]
+    });
+    
+  } catch (error) {
+    console.error('MCP tool call error:', error);
+    res.status(500).json({
+      error: {
+        code: "INTERNAL_ERROR",
+        message: error.message
+      }
+    });
+  }
+});
+
+// MCP Ping - Health check for MCP protocol
+app.post('/mcp/ping', (req, res) => {
+  res.json({
+    pong: true,
+    timestamp: new Date().toISOString()
+  });
+});
+
+// ==================== EXISTING ENDPOINTS ====================
 
 // Health check
 app.get('/health', (req, res) => {
@@ -1004,14 +1259,16 @@ app.get('/health', (req, res) => {
       "Cultural food awareness", 
       "Personal pattern learning",
       "OpenAI integration",
-      "Location detection"
+      "Location detection",
+      "MCP Protocol Support"
     ],
     services: {
       ai: !!aiFoodService.openaiApiKey,
       weather: !!weatherService.openWeatherKey,
       dietary: true,
       location: !!aiFoodService.userLocation?.city,
-      culture: !!aiFoodService.userCulture?.mainCuisine
+      culture: !!aiFoodService.userCulture?.mainCuisine,
+      mcp: true
     }
   });
 });
@@ -1227,6 +1484,7 @@ app.listen(PORT, () => {
   console.log(`🤖 AI Status: ${aiFoodService.openaiApiKey ? 'Connected' : 'Local Mode'}`);
   console.log(`🌤️ Weather API: ${weatherService.openWeatherKey ? 'Connected' : 'Simulated'}`);
   console.log(`🌱 Dietary Intelligence: Active`);
+  console.log(`🔗 MCP Protocol: Active`);
   console.log(`🔗 Health: http://localhost:${PORT}/health`);
 });
 
