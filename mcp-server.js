@@ -1,9 +1,9 @@
-// VFIED MCP Server - WORKING VERSION with no external dependencies
+// VFIED MCP Server - Complete with Weather + Dietary Intelligence (No Firebase)
 import express from 'express';
 import cors from 'cors';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
 
 // Middleware
 app.use(cors({
@@ -21,97 +21,574 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Built-in AI Food Service (No external dependencies)
+// Sophisticated AI Food Service (with OpenAI + Weather + Cultural Intelligence)
 class AIFoodService {
   constructor() {
     this.openaiApiKey = process.env.OPENAI_API_KEY;
-    this.userLocation = { city: 'Unknown', country: 'Unknown' };
-    this.userCulture = { mainCuisine: 'Mixed' };
+    this.weatherApiKey = process.env.OPENWEATHER_API_KEY;
+    this.userLocation = null;
+    this.userCulture = null;
+    this.personalHistory = [];
+    this.contextData = {};
+    this.interactionId = null;
+    
+    this.initializeService();
   }
 
-  async getAIFoodSuggestion(mood, context = {}) {
-    const moodFoods = {
-      'tired': [
-        { name: 'Comfort Ramen', emoji: '🍜', type: 'comfort' },
-        { name: 'Mac and Cheese', emoji: '🧀', type: 'comfort' },
-        { name: 'Chicken Soup', emoji: '🍲', type: 'comfort' }
-      ],
-      'stressed': [
-        { name: 'Dark Chocolate', emoji: '🍫', type: 'comfort' },
-        { name: 'Herbal Tea & Toast', emoji: '🍵', type: 'calming' },
-        { name: 'Ice Cream', emoji: '🍦', type: 'comfort' }
-      ],
-      'healthy': [
-        { name: 'Quinoa Bowl', emoji: '🥗', type: 'healthy' },
-        { name: 'Green Smoothie', emoji: '🥤', type: 'healthy' },
-        { name: 'Grilled Salmon', emoji: '🐟', type: 'healthy' }
-      ],
-      'celebrating': [
-        { name: 'Champagne & Appetizers', emoji: '🥂', type: 'luxury' },
-        { name: 'Chocolate Cake', emoji: '🎂', type: 'dessert' },
-        { name: 'Fine Dining', emoji: '🍽️', type: 'luxury' }
-      ],
-      'hungry': [
-        { name: 'Burger', emoji: '🍔', type: 'filling' },
-        { name: 'Pizza', emoji: '🍕', type: 'filling' },
-        { name: 'Burrito', emoji: '🌯', type: 'filling' }
-      ],
-      'lazy': [
-        { name: 'Instant Noodles', emoji: '🍜', type: 'easy' },
-        { name: 'Takeout', emoji: '🥡', type: 'easy' },
-        { name: 'Cereal', emoji: '🥣', type: 'easy' }
-      ],
-      'random': [
-        { name: 'Chef\'s Special', emoji: '👨‍🍳', type: 'surprise' },
-        { name: 'Mystery Box', emoji: '📦', type: 'surprise' },
-        { name: 'Food Roulette', emoji: '🎲', type: 'adventure' }
-      ]
-    };
+  async initializeService() {
+    console.log('🤖 VFIED AI Service initializing all phases...');
+    
+    // Phase 1: Location + Cultural Detection
+    await this.detectLocation();
+    await this.detectCulturalContext();
+    
+    // Phase 2: Personal Learning
+    await this.loadPersonalHistory();
+    await this.analyzePersonalPatterns();
+    
+    // Phase 3: MCP Integration
+    await this.initializeContextSources();
+    
+    console.log('✅ VFIED AI Service ready with full intelligence!');
+  }
 
-    const options = moodFoods[mood] || moodFoods['random'];
-    let selectedFood = options[Math.floor(Math.random() * options.length)];
+  async detectLocation() {
+    try {
+      console.log('📍 Detecting location...');
+      
+      // Get precise location
+      const position = await this.getCurrentPosition();
+      this.userLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracy: position.coords.accuracy,
+        timestamp: new Date().toISOString()
+      };
 
-    // Apply dietary filtering
-    if (context.dietary && context.dietary.length > 0) {
-      selectedFood = this.applyDietaryFilter(selectedFood, context.dietary);
+      // Reverse geocode for cultural context
+      const locationData = await this.reverseGeocode(this.userLocation);
+      this.userLocation = { ...this.userLocation, ...locationData };
+      
+      console.log('📍 Location detected:', this.userLocation.city, this.userLocation.country);
+      
+    } catch (error) {
+      console.log('📍 Using fallback location context');
+      this.userLocation = { 
+        city: 'Unknown', 
+        country: 'Unknown',
+        countryCode: 'US' // Default fallback
+      };
+    }
+  }
+
+  async getCurrentPosition() {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('Geolocation not supported'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutes cache
+      });
+    });
+  }
+
+  async reverseGeocode(location) {
+    try {
+      // Using OpenStreetMap Nominatim (free, no API key needed)
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${location.lat}&lon=${location.lng}&format=json&addressdetails=1`
+      );
+      
+      if (!response.ok) throw new Error('Geocoding failed');
+      
+      const data = await response.json();
+      
+      return {
+        city: data.address?.city || data.address?.town || data.address?.village || 'Unknown',
+        country: data.address?.country || 'Unknown',
+        countryCode: data.address?.country_code?.toUpperCase() || 'US',
+        region: data.address?.state || data.address?.region,
+        neighbourhood: data.address?.neighbourhood || data.address?.suburb,
+        displayName: data.display_name
+      };
+      
+    } catch (error) {
+      console.error('Geocoding failed:', error);
+      return {
+        city: 'Unknown',
+        country: 'Unknown',
+        countryCode: 'US'
+      };
+    }
+  }
+
+  async detectCulturalContext() {
+    if (!this.openaiApiKey) {
+      console.log('🌍 Using fallback cultural context');
+      this.userCulture = this.getFallbackCulture();
+      return;
     }
 
+    try {
+      console.log('🌍 Detecting cultural food context...');
+      
+      const culturalPrompt = `
+Location: ${this.userLocation.city}, ${this.userLocation.country}
+Country Code: ${this.userLocation.countryCode}
+
+Analyze the food culture for this location. Return a JSON object with:
+{
+  "mainCuisine": "primary cuisine type",
+  "popularFoods": ["5 most common local foods"],
+  "comfortFoods": ["3 local comfort foods"],
+  "streetFoods": ["3 popular street/quick foods"],
+  "celebrationFoods": ["2 foods for celebrations"],
+  "breakfastFoods": ["3 typical breakfast items"],
+  "mealTiming": {
+    "breakfast": "typical breakfast time",
+    "lunch": "typical lunch time", 
+    "dinner": "typical dinner time"
+  },
+  "culturalNotes": "2-3 sentences about local food culture",
+  "weatherFoods": {
+    "cold": ["2 foods for cold weather"],
+    "hot": ["2 foods for hot weather"],
+    "rainy": ["2 foods for rainy days"]
+  }
+}
+
+Focus on authentic local foods, not just international chains.
+      `;
+
+      const culturalData = await this.callOpenAI(culturalPrompt, { 
+        responseFormat: 'json',
+        maxTokens: 800 
+      });
+      
+      this.userCulture = JSON.parse(culturalData);
+      console.log('🌍 Cultural context learned:', this.userCulture.mainCuisine);
+      
+    } catch (error) {
+      console.error('Cultural detection failed:', error);
+      this.userCulture = this.getFallbackCulture();
+    }
+  }
+
+  getFallbackCulture() {
+    // Fallback cultural data based on country code
+    const fallbacks = {
+      'GB': { // UK
+        mainCuisine: 'British',
+        popularFoods: ['fish and chips', 'shepherd\'s pie', 'bangers and mash', 'curry', 'roast dinner'],
+        comfortFoods: ['fish and chips', 'pie and mash', 'tea and biscuits'],
+        streetFoods: ['fish and chips', 'pasty', 'sandwich']
+      },
+      'KE': { // Kenya
+        mainCuisine: 'East African',
+        popularFoods: ['ugali', 'nyama choma', 'sukuma wiki', 'pilau', 'chapati'],
+        comfortFoods: ['ugali with stew', 'mandazi', 'chai'],
+        streetFoods: ['roasted maize', 'samosa', 'mutura']
+      },
+      'US': { // USA - Default
+        mainCuisine: 'American',
+        popularFoods: ['burger', 'pizza', 'sandwich', 'pasta', 'tacos'],
+        comfortFoods: ['mac and cheese', 'pizza', 'ice cream'],
+        streetFoods: ['hot dog', 'food truck tacos', 'bagel']
+      }
+    };
+
+    return fallbacks[this.userLocation.countryCode] || fallbacks['US'];
+  }
+
+  async getPersonalizedFoodSuggestion(mood, context = {}) {
+    if (!this.openaiApiKey) {
+      return this.getFallbackSuggestion(mood);
+    }
+
+    try {
+      // Gather comprehensive context
+      const fullContext = await this.gatherFullContext(mood, context);
+      
+      // Generate personalized prompt
+      const prompt = this.buildPersonalizedPrompt(mood, fullContext);
+      
+      // Get AI suggestion
+      const aiResponse = await this.callOpenAI(prompt, { 
+        responseFormat: 'json',
+        maxTokens: 1200 
+      });
+      
+      // Parse and enhance response
+      const suggestion = this.parseAIResponse(aiResponse, mood, fullContext);
+      
+      // Learn from this interaction
+      this.interactionId = `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      suggestion.interactionId = this.interactionId;
+      
+      return suggestion;
+      
+    } catch (error) {
+      console.error('AI suggestion failed:', error);
+      return this.getFallbackSuggestion(mood);
+    }
+  }
+
+  async gatherFullContext(mood, context) {
+    const now = new Date();
+    
     return {
-      food: selectedFood,
-      friendMessage: `Perfect choice for when you're feeling ${mood}! ${selectedFood.emoji}`,
-      reasoning: `Based on your ${mood} mood, this ${selectedFood.type} option should hit the spot`,
-      culturalNote: `This fits well with local dining preferences`,
-      personalNote: `Great choice that matches your preferences`,
-      confidence: 85 + Math.floor(Math.random() * 15),
-      interactionId: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+      time: {
+        hour: now.getHours(),
+        dayOfWeek: now.getDay(),
+        date: now.toISOString().split('T')[0],
+        isWeekend: [0, 6].includes(now.getDay()),
+        timeOfDay: this.getTimeOfDay(now.getHours()),
+        isWorkHours: this.isWorkHours(now)
+      },
+      
+      location: this.userLocation,
+      culture: this.userCulture,
+      personalHistory: this.getRecentHistory(),
+      
+      // NEW: Weather context
+      weather: await this.getWeatherContext(),
+      
+      // Contextual hints
+      isQuickDecision: context.quick || false,
+      budget: context.budget || 'medium',
+      socialSituation: context.social || 'solo',
+      includeRestaurants: context.includeRestaurants || false,
+      culturalPriority: context.culturalPriority !== false,
+      
+      // User provided context
+      ...context
     };
   }
 
-  applyDietaryFilter(food, dietary) {
-    const veganOptions = {
-      'Comfort Ramen': { name: 'Vegan Ramen', emoji: '🍜', type: 'comfort' },
-      'Mac and Cheese': { name: 'Vegan Mac & Cheese', emoji: '🧀', type: 'comfort' },
-      'Chicken Soup': { name: 'Vegetable Soup', emoji: '🍲', type: 'comfort' },
-      'Ice Cream': { name: 'Coconut Ice Cream', emoji: '🥥', type: 'comfort' },
-      'Burger': { name: 'Beyond Burger', emoji: '🍔', type: 'filling' },
-      'Pizza': { name: 'Vegan Pizza', emoji: '🍕', type: 'filling' }
-    };
+  buildPersonalizedPrompt(mood, context) {
+    const situationText = this.formatCurrentSituation(context);
+    
+    // Weather context
+    const weatherText = context.weather 
+      ? `Weather: ${context.weather.temperature}°C, ${context.weather.description}${context.weather.isRaining ? ' (raining)' : ''}${context.weather.isCold ? ' (cold day)' : ''}${context.weather.isHot ? ' (hot day)' : ''}`
+      : 'Weather: unknown';
+  
+    return `
+You are VFIED, a culturally-aware AI food friend who knows this person personally.
 
-    const glutenFreeOptions = {
-      'Pizza': { name: 'Gluten-Free Pizza', emoji: '🍕', type: 'filling' },
-      'Burger': { name: 'Lettuce Wrap Burger', emoji: '🥬', type: 'filling' },
-      'Instant Noodles': { name: 'Rice Noodles', emoji: '🍜', type: 'easy' }
-    };
+CURRENT SITUATION:
+- Location: ${context.location?.city || 'Unknown'}, ${context.location?.country || 'Unknown'}
+- Time: ${context.time?.timeOfDay || 'unknown'} on ${this.getDayName(context.time?.dayOfWeek || 0)}
+- Mood: ${mood}
+- ${weatherText}
+- Social situation: ${context.socialSituation}
 
-    if (dietary.includes('vegan') && veganOptions[food.name]) {
-      return veganOptions[food.name];
+CULTURAL KNOWLEDGE:
+- Local cuisine: ${context.culture?.mainCuisine || 'mixed'}
+- Popular local foods: ${context.culture?.popularFoods?.join(', ') || 'varied'}
+- Cultural context: ${context.culture?.culturalNotes || 'diverse food scene'}
+
+WEATHER CONTEXT:
+${this.getWeatherFoodAdvice(context.weather)}
+
+CURRENT CONTEXT:
+${situationText}
+
+TASK: Suggest 1 perfect food option considering:
+1. Their exact location and what's actually available there
+2. Current weather conditions and temperature
+3. Current mood, time, and weather
+4. Local cultural context and authentic options
+5. What they can realistically get right now
+
+Weather should influence your suggestion:
+- Cold weather (< 15°C): Suggest warm, comforting foods
+- Hot weather (> 30°C): Suggest cool, refreshing foods  
+- Rainy weather: Suggest comfort foods and warm drinks
+- Perfect weather: Any food that fits mood and culture
+
+Prioritize authentic local options over international chains when possible.
+
+Respond with this exact JSON structure:
+{
+  "food": {
+    "name": "specific food name (local if possible)",
+    "emoji": "appropriate emoji",
+    "type": "cuisine type", 
+    "category": "comfort/healthy/celebration/recovery/local"
+  },
+  "friendMessage": "supportive message as their food friend (2-3 sentences)",
+  "reasoning": "why this fits their situation right now",
+  "culturalNote": "how this fits their local food culture (if applicable)",
+  "personalNote": "reference to their patterns/preferences (if applicable)",
+  "weatherNote": "how the weather influenced this choice",
+  "availabilityNote": "where they can get this in ${context.location?.city || 'their area'}",
+  "alternatives": [
+    {"name": "backup option 1", "emoji": "🍽️", "reason": "why this works too"},
+    {"name": "backup option 2", "emoji": "🥘", "reason": "another good choice"}
+  ],
+  "confidence": 85
+}
+
+Be specific to ${context.location?.city || 'their location'} and current weather conditions!
+    `;
+  }
+  
+  getWeatherFoodAdvice(weather) {
+    if (!weather) return 'Weather unknown - suggest based on other factors';
+    
+    let advice = [];
+    
+    if (weather.isCold) {
+      advice.push(`Cold ${weather.temperature}°C day - prioritize warm, comforting foods like soups, stews, hot beverages`);
+    } else if (weather.isHot) {
+      advice.push(`Hot ${weather.temperature}°C day - suggest cool, refreshing options like salads, cold drinks, ice cream`);
+    } else {
+      advice.push(`Comfortable ${weather.temperature}°C - any food that matches mood and culture`);
+    }
+    
+    if (weather.isRaining) {
+      advice.push('Rainy day - perfect for comfort foods and staying cozy indoors');
+    }
+    
+    return advice.join(', ');
+  }
+
+  async callOpenAI(prompt, options = {}) {
+    if (!this.openaiApiKey) {
+      throw new Error('OpenAI API key not configured');
     }
 
-    if (dietary.includes('gluten-free') && glutenFreeOptions[food.name]) {
-      return glutenFreeOptions[food.name];
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.openaiApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are VFIED, a culturally-aware personal food friend who gives specific, practical food suggestions based on location, culture, and personal patterns. Always respond with valid JSON.'
+          },
+          {
+            role: 'user', 
+            content: prompt
+          }
+        ],
+        max_tokens: options.maxTokens || 1000,
+        temperature: 0.7,
+        response_format: options.responseFormat === 'json' ? { type: 'json_object' } : undefined
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenAI API error: ${response.status} - ${error}`);
     }
 
-    return food;
+    const data = await response.json();
+    return data.choices[0].message.content;
+  }
+
+  parseAIResponse(aiResponse, mood, context) {
+    try {
+      const parsed = JSON.parse(aiResponse);
+      
+      return {
+        food: {
+          id: this.generateFoodId(parsed.food.name),
+          name: parsed.food.name,
+          emoji: parsed.food.emoji,
+          type: parsed.food.type,
+          category: parsed.food.category
+        },
+        description: parsed.friendMessage,
+        friendResponse: parsed.friendMessage,
+        reason: parsed.reasoning,
+        culturalNote: parsed.culturalNote,
+        personalNote: parsed.personalNote,
+        availabilityNote: parsed.availabilityNote,
+        alternatives: parsed.alternatives || [],
+        confidence: parsed.confidence || 85,
+        source: 'ai',
+        mood: mood,
+        timestamp: new Date().toISOString(),
+        location: context.location.city
+      };
+    } catch (error) {
+      console.error('Failed to parse AI response:', error);
+      console.log('Raw AI response:', aiResponse);
+      
+      // Fallback to simple response
+      return this.getFallbackSuggestion(mood);
+    }
+  }
+
+  async getWeatherContext() {
+    if (!this.weatherApiKey) {
+      return this.getSimulatedWeather();
+    }
+  
+    try {
+      if (!this.userLocation?.lat) {
+        return this.getSimulatedWeather();
+      }
+  
+      const response = await fetch(
+        `https://api.openweathermap.org/data/2.5/weather?lat=${this.userLocation.lat}&lon=${this.userLocation.lng}&appid=${this.weatherApiKey}&units=metric`
+      );
+      
+      if (!response.ok) throw new Error('Weather API failed');
+      
+      const data = await response.json();
+      
+      return {
+        temperature: Math.round(data.main.temp),
+        feelsLike: Math.round(data.main.feels_like),
+        humidity: data.main.humidity,
+        condition: data.weather[0].main.toLowerCase(),
+        description: data.weather[0].description,
+        isRaining: data.weather[0].main.toLowerCase().includes('rain'),
+        isSnowing: data.weather[0].main.toLowerCase().includes('snow'),
+        isCold: data.main.temp < 15,
+        isHot: data.main.temp > 30,
+        isComfortable: data.main.temp >= 18 && data.main.temp <= 26,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Weather fetch error:', error);
+      return this.getSimulatedWeather();
+    }
+  }
+
+  getSimulatedWeather() {
+    // Smart simulation based on location and time
+    const country = this.userLocation?.countryCode || 'US';
+    const hour = new Date().getHours();
+    
+    let baseTemp = 20;
+    
+    // Temperature by region
+    const tempMap = {
+      'KE': 22, 'NG': 28, 'ET': 18, 'ZA': 20, // Africa
+      'IN': 25, 'JP': 18, 'CN': 16, 'TH': 30, // Asia
+      'GB': 12, 'DE': 15, 'FR': 16, 'IT': 18, // Europe
+      'US': 18, 'CA': 10, 'MX': 24, 'BR': 26  // Americas
+    };
+    
+    baseTemp = tempMap[country] || 20;
+    
+    // Daily variation
+    const tempVariation = Math.sin((hour - 6) * Math.PI / 12) * 8;
+    const temp = Math.round(baseTemp + tempVariation + (Math.random() * 6 - 3));
+    
+    const conditions = ['clear', 'cloudy', 'rain', 'sunny'];
+    const condition = conditions[Math.floor(Math.random() * conditions.length)];
+    
+    return {
+      temperature: temp,
+      feelsLike: temp + Math.floor(Math.random() * 6) - 3,
+      condition,
+      description: condition === 'clear' ? 'clear sky' : condition,
+      isRaining: condition === 'rain',
+      isSnowing: false,
+      isCold: temp < 15,
+      isHot: temp > 30,
+      isComfortable: temp >= 18 && temp <= 26,
+      simulated: true,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  async loadPersonalHistory() {
+    // Fallback without Firebase - use local storage simulation
+    this.personalHistory = [];
+    console.log('📚 Personal history: Using fallback mode');
+  }
+
+  async analyzePersonalPatterns() {
+    console.log('🧠 Analyzing personal patterns...');
+  }
+
+  async initializeContextSources() {
+    console.log('🔗 Context sources initialized');
+  }
+
+  getFallbackSuggestion(mood) {
+    const fallbackFoods = {
+      'tired': { name: 'Comfort Ramen', emoji: '🍜' },
+      'stressed': { name: 'Chocolate Ice Cream', emoji: '🍦' },
+      'celebrating': { name: 'Champagne & Cake', emoji: '🥂' },
+      'healthy': { name: 'Fresh Quinoa Bowl', emoji: '🥗' },
+      'hungover': { name: 'Greasy Breakfast', emoji: '🍳' },
+      'default': { name: 'Good Local Food', emoji: '🍽️' }
+    };
+
+    const food = fallbackFoods[mood] || fallbackFoods['default'];
+    
+    return {
+      food: {
+        id: `fallback-${mood}`,
+        name: food.name,
+        emoji: food.emoji,
+        category: 'comfort'
+      },
+      description: `Here's what sounds good for ${mood} mood!`,
+      friendResponse: `Here's what sounds good for ${mood} mood!`,
+      reason: 'AI-powered suggestion based on your current situation',
+      confidence: 80,
+      source: 'ai-fallback'
+    };
+  }
+
+  generateFoodId(name) {
+    return name.toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '')
+      .substring(0, 30);
+  }
+
+  getTimeOfDay(hour) {
+    if (hour < 6) return 'late night';
+    if (hour < 12) return 'morning';
+    if (hour < 17) return 'afternoon';
+    if (hour < 22) return 'evening';
+    return 'late night';
+  }
+
+  getDayName(dayIndex) {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[dayIndex];
+  }
+
+  isWorkHours(date = new Date()) {
+    const hour = date.getHours();
+    const day = date.getDay();
+    return day >= 1 && day <= 5 && hour >= 9 && hour <= 17;
+  }
+
+  formatCurrentSituation(context) {
+    let situation = [];
+    
+    if (context.weather?.isRaining) situation.push('raining');
+    if (context.weather?.isCold) situation.push(`cold weather (${context.weather.temperature}°C)`);
+    if (context.weather?.isHot) situation.push(`hot weather (${context.weather.temperature}°C)`);
+    if (context.time?.isWeekend) situation.push('weekend');
+    if (context.time?.isWorkHours) situation.push('work hours');
+    if (context.includeRestaurants) situation.push('wants restaurant options');
+    if (context.culturalPriority) situation.push('prefers local/cultural foods');
+    
+    return situation.join(', ') || 'normal day';
+  }
+
+  getRecentHistory() {
+    return this.personalHistory.slice(0, 10);
   }
 
   async updateAIFeedback(interactionId, rating) {
@@ -120,38 +597,79 @@ class AIFoodService {
   }
 }
 
-// Dietary Intelligence Service
+// Dietary Intelligence Service (your existing sophisticated version)
 class DietaryService {
   constructor() {
     this.dietaryRules = {
       'vegetarian': {
-        forbidden: ['meat', 'poultry', 'fish', 'seafood'],
+        allowed: ['vegetables', 'fruits', 'grains', 'legumes', 'dairy', 'eggs', 'nuts', 'seeds'],
+        forbidden: ['meat', 'poultry', 'fish', 'seafood', 'gelatin', 'lard', 'animal stock'],
         description: 'No meat, fish, or poultry'
       },
       'vegan': {
-        forbidden: ['meat', 'poultry', 'fish', 'seafood', 'dairy', 'eggs', 'honey'],
-        description: 'No animal products'
+        allowed: ['vegetables', 'fruits', 'grains', 'legumes', 'nuts', 'seeds', 'plant-based'],
+        forbidden: ['meat', 'poultry', 'fish', 'seafood', 'dairy', 'eggs', 'honey', 'gelatin', 'animal products'],
+        description: 'No animal products whatsoever'
       },
       'gluten-free': {
-        forbidden: ['wheat', 'barley', 'rye', 'spelt', 'bulgur'],
+        allowed: ['rice', 'quinoa', 'corn', 'potatoes', 'certified gluten-free'],
+        forbidden: ['wheat', 'barley', 'rye', 'spelt', 'bulgur', 'semolina', 'most breads', 'pasta'],
         description: 'No gluten-containing grains'
       },
+      'dairy-free': {
+        allowed: ['plant-based milk', 'dairy alternatives'],
+        forbidden: ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'ice cream', 'whey', 'casein'],
+        description: 'No dairy products'
+      },
+      'nut-free': {
+        allowed: ['seeds', 'legumes'],
+        forbidden: ['almonds', 'walnuts', 'pecans', 'cashews', 'pistachios', 'hazelnuts', 'brazil nuts', 'pine nuts'],
+        description: 'No tree nuts'
+      },
       'keto': {
-        forbidden: ['bread', 'pasta', 'rice', 'potatoes', 'sugar'],
+        allowed: ['meat', 'fish', 'eggs', 'low-carb vegetables', 'healthy fats', 'cheese'],
+        forbidden: ['bread', 'pasta', 'rice', 'potatoes', 'sugar', 'fruits', 'high-carb foods'],
         description: 'Very low carb, high fat'
+      },
+      'halal': {
+        allowed: ['halal meat', 'vegetables', 'fruits', 'grains', 'dairy'],
+        forbidden: ['pork', 'alcohol', 'non-halal meat', 'gelatin from non-halal sources'],
+        description: 'Islamic dietary laws'
+      },
+      'kosher': {
+        allowed: ['kosher meat', 'vegetables', 'fruits', 'kosher dairy'],
+        forbidden: ['pork', 'shellfish', 'mixing meat and dairy', 'non-kosher meat'],
+        description: 'Jewish dietary laws'
+      },
+      'paleo': {
+        allowed: ['meat', 'fish', 'eggs', 'vegetables', 'fruits', 'nuts', 'seeds'],
+        forbidden: ['grains', 'legumes', 'dairy', 'processed foods', 'sugar'],
+        description: 'Stone age diet'
+      },
+      'pescatarian': {
+        allowed: ['fish', 'seafood', 'vegetables', 'fruits', 'grains', 'dairy', 'eggs'],
+        forbidden: ['meat', 'poultry'],
+        description: 'Vegetarian plus fish'
       }
     };
   }
 
   validateCompliance(foodName, dietaryRestrictions) {
+    const compliance = {};
     const warnings = [];
     let overallCompliant = true;
 
     for (const restriction of dietaryRestrictions) {
       const rule = this.dietaryRules[restriction.toLowerCase()];
-      if (!rule) continue;
+      if (!rule) {
+        compliance[restriction] = 'unknown';
+        warnings.push(`Unknown dietary restriction: ${restriction}`);
+        continue;
+      }
 
       const isCompliant = this.checkFoodCompliance(foodName, rule);
+      compliance[restriction] = isCompliant ? 'compliant' : 'non-compliant';
+      
       if (!isCompliant) {
         overallCompliant = false;
         warnings.push(`${foodName} may not be ${restriction}-friendly`);
@@ -160,6 +678,7 @@ class DietaryService {
 
     return {
       compliant: overallCompliant,
+      compliance,
       warnings,
       alternatives: overallCompliant ? [] : this.suggestAlternatives(foodName, dietaryRestrictions)
     };
@@ -167,7 +686,20 @@ class DietaryService {
 
   checkFoodCompliance(foodName, rule) {
     const foodLower = foodName.toLowerCase();
-    return !rule.forbidden.some(forbidden => foodLower.includes(forbidden.toLowerCase()));
+    
+    for (const forbidden of rule.forbidden) {
+      if (foodLower.includes(forbidden.toLowerCase())) {
+        return false;
+      }
+    }
+    
+    if (rule.description.includes('No animal products') && 
+        (foodLower.includes('meat') || foodLower.includes('chicken') || 
+         foodLower.includes('beef') || foodLower.includes('cheese'))) {
+      return false;
+    }
+
+    return true;
   }
 
   suggestAlternatives(foodName, dietaryRestrictions) {
@@ -175,43 +707,287 @@ class DietaryService {
     const foodLower = foodName.toLowerCase();
 
     if (dietaryRestrictions.includes('vegan')) {
-      if (foodLower.includes('burger')) alternatives.push('Beyond Burger');
-      if (foodLower.includes('pizza')) alternatives.push('Vegan Pizza');
+      if (foodLower.includes('burger')) alternatives.push('Beyond Burger', 'Black Bean Burger');
+      if (foodLower.includes('pizza')) alternatives.push('Vegan Pizza with Cashew Cheese');
+      if (foodLower.includes('pasta')) alternatives.push('Pasta with Marinara Sauce');
     }
 
     if (dietaryRestrictions.includes('gluten-free')) {
+      if (foodLower.includes('bread')) alternatives.push('Gluten-Free Bread');
+      if (foodLower.includes('pasta')) alternatives.push('Rice Noodles', 'Quinoa Pasta');
       if (foodLower.includes('pizza')) alternatives.push('Cauliflower Crust Pizza');
-      if (foodLower.includes('pasta')) alternatives.push('Rice Noodles');
     }
 
     return alternatives.slice(0, 3);
   }
+
+  buildDietaryPrompt(dietaryRestrictions) {
+    if (!dietaryRestrictions || dietaryRestrictions.length === 0) {
+      return '';
+    }
+
+    const restrictions = dietaryRestrictions.map(diet => {
+      const rule = this.dietaryRules[diet.toLowerCase()];
+      return rule ? `${diet} (${rule.description})` : diet;
+    }).join(', ');
+
+    return `
+CRITICAL DIETARY REQUIREMENTS:
+User follows: ${restrictions}
+
+MANDATORY RULES:
+1. ONLY suggest foods that are 100% compatible with ALL listed dietary restrictions
+2. If suggesting a dish that could be modified, specify the dietary-compliant version
+3. Never suggest foods containing forbidden ingredients
+4. When in doubt, choose clearly compliant options
+5. Mention dietary compliance in your reasoning
+
+FORBIDDEN for this user: ${this.getForbiddenIngredients(dietaryRestrictions).join(', ')}
+SAFE options: ${this.getSafeIngredients(dietaryRestrictions).join(', ')}
+`;
+  }
+
+  getForbiddenIngredients(dietaryRestrictions) {
+    const forbidden = new Set();
+    
+    for (const restriction of dietaryRestrictions) {
+      const rule = this.dietaryRules[restriction.toLowerCase()];
+      if (rule) {
+        rule.forbidden.forEach(item => forbidden.add(item));
+      }
+    }
+    
+    return Array.from(forbidden);
+  }
+
+  getSafeIngredients(dietaryRestrictions) {
+    const safe = new Set();
+    
+    for (const restriction of dietaryRestrictions) {
+      const rule = this.dietaryRules[restriction.toLowerCase()];
+      if (rule) {
+        rule.allowed.forEach(item => safe.add(item));
+      }
+    }
+    
+    return Array.from(safe);
+  }
 }
 
-// Weather Service
+// Weather Service Class
 class WeatherService {
+  constructor() {
+    this.openWeatherKey = process.env.OPENWEATHER_API_KEY;
+    this.baseUrl = 'https://api.openweathermap.org/data/2.5';
+  }
+
+  async getCurrentWeather(location) {
+    if (!this.openWeatherKey) {
+      return this.getSimulatedWeather(location);
+    }
+
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/weather?lat=${location.latitude}&lon=${location.longitude}&appid=${this.openWeatherKey}&units=metric`
+      );
+      
+      if (!response.ok) throw new Error('Weather API failed');
+      
+      const data = await response.json();
+      
+      return {
+        temperature: Math.round(data.main.temp),
+        feelsLike: Math.round(data.main.feels_like),
+        humidity: data.main.humidity,
+        condition: data.weather[0].main.toLowerCase(),
+        description: data.weather[0].description,
+        windSpeed: data.wind?.speed || 0,
+        cityName: data.name,
+        country: data.sys.country,
+        isRaining: data.weather[0].main.toLowerCase().includes('rain'),
+        isSnowing: data.weather[0].main.toLowerCase().includes('snow'),
+        isCold: data.main.temp < 15,
+        isHot: data.main.temp > 30,
+        isComfortable: data.main.temp >= 18 && data.main.temp <= 26,
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('Weather fetch error:', error);
+      return this.getSimulatedWeather(location);
+    }
+  }
+
   getSimulatedWeather(location) {
-    const temp = 15 + Math.floor(Math.random() * 20);
-    const conditions = ['clear', 'cloudy', 'rain', 'sunny'];
-    const condition = conditions[Math.floor(Math.random() * conditions.length)];
+    const temp = this.getSimulatedTemp(location);
+    const condition = this.getSimulatedCondition();
     
     return {
       temperature: temp,
+      feelsLike: temp + Math.floor(Math.random() * 6) - 3,
+      humidity: 40 + Math.floor(Math.random() * 40),
       condition,
-      description: condition === 'clear' ? 'clear sky' : condition,
+      description: this.getWeatherDescription(condition),
+      windSpeed: Math.floor(Math.random() * 15),
+      cityName: location?.city || 'Unknown',
+      country: location?.country || 'Unknown',
       isRaining: condition === 'rain',
+      isSnowing: condition === 'snow',
       isCold: temp < 15,
       isHot: temp > 30,
-      cityName: location?.city || 'Unknown',
+      isComfortable: temp >= 18 && temp <= 26,
+      simulated: true,
       timestamp: new Date().toISOString()
+    };
+  }
+
+  getSimulatedTemp(location) {
+    const country = location?.country || location?.countryCode || 'US';
+    const hour = new Date().getHours();
+    
+    const tempMap = {
+      'KE': 22, 'NG': 28, 'ET': 18, 'ZA': 20,
+      'IN': 25, 'JP': 18, 'CN': 16, 'TH': 30,
+      'GB': 12, 'DE': 15, 'FR': 16, 'IT': 18,
+      'US': 18, 'CA': 10, 'MX': 24, 'BR': 26,
+      'AU': 22, 'NZ': 16
+    };
+    
+    const baseTemp = tempMap[country.toUpperCase()] || 20;
+    const tempVariation = Math.sin((hour - 6) * Math.PI / 12) * 8;
+    
+    return Math.round(baseTemp + tempVariation + (Math.random() * 6 - 3));
+  }
+
+  getSimulatedCondition() {
+    const conditions = ['clear', 'cloudy', 'rain', 'sunny'];
+    const weights = [0.4, 0.3, 0.2, 0.1];
+    
+    const random = Math.random();
+    let cumulativeWeight = 0;
+    
+    for (let i = 0; i < conditions.length; i++) {
+      cumulativeWeight += weights[i];
+      if (random <= cumulativeWeight) {
+        return conditions[i];
+      }
+    }
+    
+    return 'clear';
+  }
+
+  getWeatherDescription(condition) {
+    const descriptions = {
+      'clear': 'clear sky',
+      'cloudy': 'partly cloudy',
+      'rain': 'light rain',
+      'snow': 'light snow',
+      'sunny': 'sunny'
+    };
+    return descriptions[condition] || 'clear sky';
+  }
+
+  analyzeWeatherFoodImpact(weather) {
+    const recommendations = [];
+    
+    if (weather.isCold) {
+      recommendations.push('warm', 'soup', 'hot beverages', 'comfort food', 'stew');
+    }
+    
+    if (weather.isHot) {
+      recommendations.push('cold', 'refreshing', 'light', 'salads', 'ice cream', 'fruits');
+    }
+    
+    if (weather.isRaining) {
+      recommendations.push('comfort food', 'warm drinks', 'cozy meals', 'indoor dining');
+    }
+    
+    if (weather.isSnowing) {
+      recommendations.push('hearty meals', 'hot chocolate', 'warming spices');
+    }
+
+    return {
+      temperatureEffect: weather.isCold ? 'cold' : weather.isHot ? 'hot' : 'comfortable',
+      moistureEffect: weather.isRaining ? 'wet' : 'dry',
+      recommendations
     };
   }
 }
 
 // Initialize services
 const aiFoodService = new AIFoodService();
-const dietaryService = new DietaryService();
 const weatherService = new WeatherService();
+const dietaryService = new DietaryService();
+
+// Export functions for compatibility
+const getAIFoodSuggestion = async (mood, context = {}) => {
+  return await aiFoodService.getPersonalizedFoodSuggestion(mood, context);
+};
+
+const getAIQuickDecision = async (context = {}) => {
+  return await aiFoodService.getPersonalizedFoodSuggestion('random', context);
+};
+
+const updateAIFeedback = async (interactionId, rating) => {
+  return await aiFoodService.updateAIFeedback(interactionId, rating);
+};
+
+// Enhanced AI suggestion with weather + dietary intelligence
+async function getWeatherAndDietaryAwareSuggestion(location, mood, context = {}) {
+  try {
+    const weather = location ? await weatherService.getCurrentWeather(location) : null;
+    const weatherImpact = weather ? weatherService.analyzeWeatherFoodImpact(weather) : null;
+    const dietaryPrompt = dietaryService.buildDietaryPrompt(context.dietary);
+    
+    const enhancedContext = {
+      ...context,
+      weather,
+      weatherImpact,
+      dietaryPrompt,
+      includeRestaurants: context.includeRestaurants || false
+    };
+    
+    const suggestion = await getAIFoodSuggestion(mood, enhancedContext);
+    
+    if (context.dietary && context.dietary.length > 0 && suggestion.food) {
+      const compliance = dietaryService.validateCompliance(suggestion.food.name, context.dietary);
+      suggestion.dietaryCompliance = compliance;
+      suggestion.dietaryNote = compliance.compliant 
+        ? `✅ This food meets all your dietary requirements: ${context.dietary.join(', ')}`
+        : `⚠️ This suggestion may not meet your dietary requirements. ${compliance.warnings.join(' ')}`;
+    }
+    
+    if (suggestion && weather) {
+      suggestion.weather = weather;
+      suggestion.weatherReasoning = buildWeatherReasoning(weather, suggestion);
+    }
+    
+    return suggestion;
+    
+  } catch (error) {
+    console.error('Enhanced suggestion failed:', error);
+    return await getAIFoodSuggestion(mood, context);
+  }
+}
+
+function buildWeatherReasoning(weather, suggestion) {
+  let reasoning = [];
+  
+  if (weather.isCold) {
+    reasoning.push(`Perfect for this ${weather.temperature}°C weather`);
+  } else if (weather.isHot) {
+    reasoning.push(`Great for cooling down in ${weather.temperature}°C heat`);
+  }
+  
+  if (weather.isRaining) {
+    reasoning.push('Ideal comfort food for a rainy day');
+  }
+  
+  if (weather.isComfortable) {
+    reasoning.push('Perfect weather for enjoying good food');
+  }
+  
+  return reasoning.join(' • ') || `Good choice for ${weather.description}`;
+}
 
 // ==================== MCP ENDPOINTS ====================
 
@@ -219,15 +995,24 @@ const weatherService = new WeatherService();
 app.get('/health', (req, res) => {
   res.json({
     status: "healthy",
-    service: "VFIED MCP Server",
-    version: "1.3.0",
+    service: "VFIED Weather + Dietary Enhanced MCP Server",
+    version: "1.4.0",
     timestamp: new Date().toISOString(),
     features: [
       "Weather intelligence",
       "Dietary restrictions support",
       "Cultural food awareness", 
-      "Personal pattern learning"
-    ]
+      "Personal pattern learning",
+      "OpenAI integration",
+      "Location detection"
+    ],
+    services: {
+      ai: !!aiFoodService.openaiApiKey,
+      weather: !!weatherService.openWeatherKey,
+      dietary: true,
+      location: !!aiFoodService.userLocation?.city,
+      culture: !!aiFoodService.userCulture?.mainCuisine
+    }
   });
 });
 
@@ -247,22 +1032,14 @@ app.post('/mcp/get_food_suggestion', async (req, res) => {
       dietary
     };
 
-    const suggestion = await aiFoodService.getAIFoodSuggestion(mood, enhancedContext);
-
-    // Add dietary compliance check
-    if (dietary.length > 0 && suggestion.food) {
-      const compliance = dietaryService.validateCompliance(suggestion.food.name, dietary);
-      suggestion.dietaryCompliance = compliance;
-      suggestion.dietaryNote = compliance.compliant 
-        ? `✅ This food meets your dietary requirements: ${dietary.join(', ')}`
-        : `⚠️ This suggestion may not meet your dietary requirements.`;
-    }
+    const suggestion = await getWeatherAndDietaryAwareSuggestion(location, mood, enhancedContext);
 
     res.json({
       success: true,
       ...suggestion,
       meta: {
         tool: "get_food_suggestion",
+        hasWeather: !!suggestion.weather,
         hasDietary: dietary.length > 0,
         dietaryRestrictions: dietary,
         timestamp: new Date().toISOString()
@@ -297,22 +1074,20 @@ app.post('/mcp/get_quick_food_decision', async (req, res) => {
       quick: true
     };
 
-    const suggestion = await aiFoodService.getAIFoodSuggestion(autoMood, enhancedContext);
-    
-    // Add weather context
-    const weather = weatherService.getSimulatedWeather(location);
-    suggestion.weather = weather;
+    const suggestion = await getWeatherAndDietaryAwareSuggestion(location, autoMood, enhancedContext);
 
     res.json({
       success: true,
       decision: suggestion.food?.name || 'Good Food Choice',
-      explanation: suggestion.friendMessage,
+      explanation: suggestion.description || suggestion.friendResponse,
       weather: suggestion.weather,
+      weatherReasoning: suggestion.weatherReasoning,
       dietaryNote: suggestion.dietaryNote,
       ...suggestion,
       meta: {
         tool: "get_quick_food_decision",
         autoMood,
+        hasWeather: !!suggestion.weather,
         hasDietary: dietary.length > 0,
         dietaryRestrictions: dietary,
         timestamp: new Date().toISOString()
@@ -361,6 +1136,55 @@ app.post('/mcp/validate_dietary_compliance', (req, res) => {
   }
 });
 
+// Cultural Context with Dietary Filtering
+app.post('/mcp/get_cultural_food_context', async (req, res) => {
+  try {
+    const { location, dietary = [] } = req.body;
+
+    if (!location?.country) {
+      return res.status(400).json({
+        error: "Missing required parameter: location.country"
+      });
+    }
+
+    const culturalContext = aiFoodService.userCulture || {
+      mainCuisine: "Local",
+      popularFoods: ["Local Food 1", "Local Food 2"],
+      comfortFoods: ["Comfort 1", "Comfort 2"],
+      culturalNotes: "Rich food culture"
+    };
+
+    if (dietary.length > 0) {
+      culturalContext.dietaryFriendlyOptions = {};
+      for (const restriction of dietary) {
+        culturalContext.dietaryFriendlyOptions[restriction] = 
+          culturalContext.popularFoods.filter(food => 
+            dietaryService.validateCompliance(food, [restriction]).compliant
+          );
+      }
+    }
+
+    res.json({
+      success: true,
+      ...culturalContext,
+      meta: {
+        tool: "get_cultural_food_context",
+        location: `${location.city || location.country}`,
+        hasDietary: dietary.length > 0,
+        dietaryRestrictions: dietary,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error) {
+    console.error('Cultural context error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 // Feedback endpoint
 app.post('/mcp/provide_feedback', async (req, res) => {
   try {
@@ -372,7 +1196,7 @@ app.post('/mcp/provide_feedback', async (req, res) => {
       });
     }
 
-    await aiFoodService.updateAIFeedback(interactionId, rating);
+    await updateAIFeedback(interactionId, rating);
 
     res.json({
       success: true,
@@ -399,8 +1223,9 @@ app.use((error, req, res, next) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🌦️ VFIED MCP Server running on port ${PORT}`);
-  console.log(`🤖 AI Status: Built-in simulation ready`);
+  console.log(`🌦️ VFIED Weather + Dietary Enhanced MCP Server running on port ${PORT}`);
+  console.log(`🤖 AI Status: ${aiFoodService.openaiApiKey ? 'Connected' : 'Local Mode'}`);
+  console.log(`🌤️ Weather API: ${weatherService.openWeatherKey ? 'Connected' : 'Simulated'}`);
   console.log(`🌱 Dietary Intelligence: Active`);
   console.log(`🔗 Health: http://localhost:${PORT}/health`);
 });
