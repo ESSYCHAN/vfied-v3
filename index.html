@@ -22,6 +22,198 @@
     <link rel="manifest" href="/manifest.json">
     
     <link rel="stylesheet" href="/src/style.css">
+    
+    <!-- Additional Styles for Settings -->
+    <style>
+    /* Quick Settings Styles */
+    .quick-settings {
+        position: relative;
+        margin-bottom: 1rem;
+    }
+
+    .settings-btn {
+        background: rgba(255, 255, 255, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        cursor: pointer;
+        backdrop-filter: blur(5px);
+        transition: all 0.3s ease;
+    }
+
+    .settings-btn:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateY(-1px);
+    }
+
+    .settings-panel {
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(20px);
+        border-radius: 15px;
+        padding: 1.5rem;
+        min-width: 300px;
+        max-width: 90vw;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        z-index: 1000;
+        margin-top: 0.5rem;
+    }
+
+    .settings-panel.hidden {
+        display: none;
+    }
+
+    .settings-panel h3 {
+        color: #2C3E50;
+        margin-bottom: 1rem;
+        font-size: 1.2rem;
+        text-align: center;
+    }
+
+    .setting-group {
+        margin-bottom: 1.5rem;
+    }
+
+    .setting-group label {
+        display: block;
+        color: #2C3E50;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+    }
+
+    .location-select, .dietary-select {
+        width: 100%;
+        padding: 0.75rem;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        font-size: 1rem;
+        background: white;
+        color: #2C3E50;
+        transition: border-color 0.3s ease;
+    }
+
+    .location-select:focus, .dietary-select:focus {
+        outline: none;
+        border-color: #667eea;
+    }
+
+    .dietary-checkboxes {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+
+    .dietary-checkboxes label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-weight: normal;
+        font-size: 0.9rem;
+        cursor: pointer;
+        padding: 0.5rem;
+        border-radius: 8px;
+        transition: background-color 0.2s ease;
+    }
+
+    .dietary-checkboxes label:hover {
+        background: rgba(102, 126, 234, 0.1);
+    }
+
+    .dietary-checkboxes input[type="checkbox"] {
+        cursor: pointer;
+    }
+
+    .custom-location {
+        margin-top: 0.5rem;
+        padding: 0.75rem;
+        border: 2px solid #ddd;
+        border-radius: 10px;
+        width: 100%;
+        font-size: 1rem;
+    }
+
+    .custom-location.hidden {
+        display: none;
+    }
+
+    .settings-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 1.5rem;
+    }
+
+    .save-btn, .close-btn {
+        flex: 1;
+        padding: 0.75rem;
+        border: none;
+        border-radius: 10px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .save-btn {
+        background: #667eea;
+        color: white;
+    }
+
+    .save-btn:hover {
+        background: #5a6fd8;
+        transform: translateY(-1px);
+    }
+
+    .close-btn {
+        background: #f8f9fa;
+        color: #2C3E50;
+        border: 1px solid #ddd;
+    }
+
+    .close-btn:hover {
+        background: #e9ecef;
+    }
+
+    /* Status indicators */
+    .current-settings {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+
+    .setting-tag {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 15px;
+        font-size: 0.8rem;
+        backdrop-filter: blur(5px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    @media (max-width: 480px) {
+        .settings-panel {
+            min-width: 280px;
+            padding: 1rem;
+        }
+        
+        .dietary-checkboxes {
+            grid-template-columns: 1fr;
+        }
+
+        .settings-actions {
+            flex-direction: column;
+        }
+    }
+    </style>
 </head>
 <body>
     <div id="app">
@@ -49,6 +241,59 @@
                 <p class="question">What should I eat?</p>
                 <div class="context-info" id="context-info">
                     🤖 Analyzing your situation...
+                </div>
+
+                <!-- Current Settings Display -->
+                <div class="current-settings" id="current-settings">
+                    <span class="setting-tag" id="location-tag">📍 Auto-detect</span>
+                    <span class="setting-tag hidden" id="dietary-tag">🌱 No restrictions</span>
+                </div>
+
+                <!-- Quick Settings -->
+                <div class="quick-settings">
+                    <button id="settings-btn" class="settings-btn">⚙️ Preferences</button>
+                    
+                    <div id="settings-panel" class="settings-panel hidden">
+                        <h3>🍽️ Food Preferences</h3>
+                        
+                        <!-- Location Override -->
+                        <div class="setting-group">
+                            <label>📍 Location:</label>
+                            <select id="location-select" class="location-select">
+                                <option value="">Auto-detect my location</option>
+                                <option value="london,uk">🏰 London, UK</option>
+                                <option value="nairobi,ke">🦁 Nairobi, Kenya</option>
+                                <option value="tokyo,jp">🗼 Tokyo, Japan</option>
+                                <option value="newyork,us">🗽 New York, USA</option>
+                                <option value="paris,fr">🗼 Paris, France</option>
+                                <option value="mumbai,in">🏙️ Mumbai, India</option>
+                                <option value="lagos,ng">🌆 Lagos, Nigeria</option>
+                                <option value="sydney,au">🏄 Sydney, Australia</option>
+                                <option value="custom">✏️ Custom location...</option>
+                            </select>
+                            <input id="custom-location" type="text" placeholder="Enter: City, Country" class="custom-location hidden">
+                        </div>
+
+                        <!-- Dietary Restrictions -->
+                        <div class="setting-group">
+                            <label>🌱 Dietary Restrictions:</label>
+                            <div class="dietary-checkboxes">
+                                <label><input type="checkbox" value="vegetarian"> 🌱 Vegetarian</label>
+                                <label><input type="checkbox" value="vegan"> 🥬 Vegan</label>
+                                <label><input type="checkbox" value="gluten-free"> 🌾 Gluten-Free</label>
+                                <label><input type="checkbox" value="dairy-free"> 🥛 Dairy-Free</label>
+                                <label><input type="checkbox" value="keto"> 🥩 Keto</label>
+                                <label><input type="checkbox" value="halal"> ☪️ Halal</label>
+                                <label><input type="checkbox" value="kosher"> ✡️ Kosher</label>
+                                <label><input type="checkbox" value="paleo"> 🦴 Paleo</label>
+                            </div>
+                        </div>
+
+                        <div class="settings-actions">
+                            <button id="save-settings" class="save-btn">💾 Save</button>
+                            <button id="close-settings" class="close-btn">❌ Close</button>
+                        </div>
+                    </div>
                 </div>
             </header>
 
@@ -114,23 +359,229 @@
             <!-- Bottom Safe Area -->
             <div class="bottom-safe-area"></div>
         </div>
-
-        <!-- Settings (Future) - Hidden for now -->
-        <div id="settings-panel" class="settings-panel hidden">
-            <div class="settings-content">
-                <h3>Quick Settings</h3>
-                <label class="setting-item">
-                    <input type="checkbox" id="include-restaurants"> 
-                    Show restaurant suggestions
-                </label>
-                <label class="setting-item">
-                    <input type="checkbox" id="cultural-priority" checked> 
-                    Prioritize local foods
-                </label>
-                <button id="close-settings" class="close-settings">Done</button>
-            </div>
-        </div>
     </div>
+
+    <!-- Settings JavaScript -->
+    <script>
+    console.log('⚙️ SETTINGS SYSTEM LOADING...');
+
+    // Settings state
+    let userSettings = {
+        location: null, // null = auto-detect
+        dietary: [],
+        customLocation: null
+    };
+
+    // Load settings from localStorage
+    function loadSettings() {
+        try {
+            const saved = localStorage.getItem('vfied_user_settings');
+            if (saved) {
+                userSettings = { ...userSettings, ...JSON.parse(saved) };
+                console.log('📂 Loaded settings:', userSettings);
+            }
+        } catch (error) {
+            console.error('Settings load error:', error);
+        }
+    }
+
+    // Save settings to localStorage
+    function saveSettings() {
+        try {
+            localStorage.setItem('vfied_user_settings', JSON.stringify(userSettings));
+            console.log('💾 Settings saved:', userSettings);
+        } catch (error) {
+            console.error('Settings save error:', error);
+        }
+    }
+
+    // Update settings display
+    function updateSettingsDisplay() {
+        const locationTag = document.getElementById('location-tag');
+        const dietaryTag = document.getElementById('dietary-tag');
+
+        // Update location display
+        if (userSettings.location) {
+            const locationMap = {
+                'london,uk': '🏰 London',
+                'nairobi,ke': '🦁 Nairobi', 
+                'tokyo,jp': '🗼 Tokyo',
+                'newyork,us': '🗽 New York',
+                'paris,fr': '🗼 Paris',
+                'mumbai,in': '🏙️ Mumbai',
+                'lagos,ng': '🌆 Lagos',
+                'sydney,au': '🏄 Sydney'
+            };
+            
+            locationTag.textContent = locationMap[userSettings.location] || 
+                (userSettings.customLocation ? `📍 ${userSettings.customLocation}` : '📍 Custom');
+        } else {
+            locationTag.textContent = '📍 Auto-detect';
+        }
+
+        // Update dietary display
+        if (userSettings.dietary.length > 0) {
+            const dietaryEmojis = {
+                'vegetarian': '🌱',
+                'vegan': '🥬', 
+                'gluten-free': '🌾',
+                'dairy-free': '🥛',
+                'keto': '🥩',
+                'halal': '☪️',
+                'kosher': '✡️',
+                'paleo': '🦴'
+            };
+            
+            const icons = userSettings.dietary.map(d => dietaryEmojis[d] || '🍽️').join('');
+            dietaryTag.textContent = `${icons} ${userSettings.dietary.length} restriction${userSettings.dietary.length > 1 ? 's' : ''}`;
+            dietaryTag.classList.remove('hidden');
+        } else {
+            dietaryTag.classList.add('hidden');
+        }
+    }
+
+    // Get current user settings for API calls
+    function getCurrentSettings() {
+        const settings = {
+            dietary: userSettings.dietary
+        };
+
+        // Add location if specified
+        if (userSettings.location && userSettings.location !== 'custom') {
+            const [city, country] = userSettings.location.split(',');
+            settings.location = {
+                city: city.charAt(0).toUpperCase() + city.slice(1),
+                country: country.toUpperCase()
+            };
+        } else if (userSettings.customLocation) {
+            const parts = userSettings.customLocation.split(',').map(s => s.trim());
+            if (parts.length >= 2) {
+                settings.location = {
+                    city: parts[0],
+                    country: parts[1]
+                };
+            }
+        }
+
+        return settings;
+    }
+
+    // Setup settings panel
+    function setupSettingsPanel() {
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsPanel = document.getElementById('settings-panel');
+        const saveBtn = document.getElementById('save-settings');
+        const closeBtn = document.getElementById('close-settings');
+        const locationSelect = document.getElementById('location-select');
+        const customLocationInput = document.getElementById('custom-location');
+
+        // Toggle settings panel
+        settingsBtn.addEventListener('click', () => {
+            const isHidden = settingsPanel.classList.contains('hidden');
+            if (isHidden) {
+                settingsPanel.classList.remove('hidden');
+                loadCurrentSettingsIntoPanel();
+            } else {
+                settingsPanel.classList.add('hidden');
+            }
+        });
+
+        // Handle custom location input
+        locationSelect.addEventListener('change', () => {
+            if (locationSelect.value === 'custom') {
+                customLocationInput.classList.remove('hidden');
+                customLocationInput.focus();
+            } else {
+                customLocationInput.classList.add('hidden');
+            }
+        });
+
+        // Save settings
+        saveBtn.addEventListener('click', () => {
+            saveSettingsFromPanel();
+            settingsPanel.classList.add('hidden');
+            updateSettingsDisplay();
+            
+            // Show feedback
+            const contextInfo = document.getElementById('context-info');
+            if (contextInfo) {
+                contextInfo.textContent = '✅ Settings saved! Ready for personalized suggestions.';
+            }
+        });
+
+        // Close settings
+        closeBtn.addEventListener('click', () => {
+            settingsPanel.classList.add('hidden');
+        });
+
+        // Close when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!settingsPanel.contains(e.target) && !settingsBtn.contains(e.target)) {
+                settingsPanel.classList.add('hidden');
+            }
+        });
+    }
+
+    // Load current settings into panel
+    function loadCurrentSettingsIntoPanel() {
+        const locationSelect = document.getElementById('location-select');
+        const customLocationInput = document.getElementById('custom-location');
+        const dietaryCheckboxes = document.querySelectorAll('.dietary-checkboxes input[type="checkbox"]');
+
+        // Load location
+        locationSelect.value = userSettings.location || '';
+        if (userSettings.location === 'custom' && userSettings.customLocation) {
+            customLocationInput.classList.remove('hidden');
+            customLocationInput.value = userSettings.customLocation;
+        } else {
+            customLocationInput.classList.add('hidden');
+        }
+
+        // Load dietary restrictions
+        dietaryCheckboxes.forEach(checkbox => {
+            checkbox.checked = userSettings.dietary.includes(checkbox.value);
+        });
+    }
+
+    // Save settings from panel
+    function saveSettingsFromPanel() {
+        const locationSelect = document.getElementById('location-select');
+        const customLocationInput = document.getElementById('custom-location');
+        const dietaryCheckboxes = document.querySelectorAll('.dietary-checkboxes input[type="checkbox"]');
+
+        // Save location
+        userSettings.location = locationSelect.value || null;
+        if (locationSelect.value === 'custom') {
+            userSettings.customLocation = customLocationInput.value.trim();
+        } else {
+            userSettings.customLocation = null;
+        }
+
+        // Save dietary restrictions
+        userSettings.dietary = Array.from(dietaryCheckboxes)
+            .filter(cb => cb.checked)
+            .map(cb => cb.value);
+
+        saveSettings();
+        console.log('✅ Settings updated:', userSettings);
+    }
+
+    // Initialize settings system
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('⚙️ Initializing settings system...');
+        loadSettings();
+        updateSettingsDisplay();
+        setupSettingsPanel();
+        
+        // Make settings available globally for the main app
+        window.vfiedUserSettings = {
+            get: getCurrentSettings,
+            update: updateSettingsDisplay
+        };
+        
+        console.log('✅ Settings system ready!');
+    });
+    </script>
 
     <!-- EMERGENCY BUTTON FIX - THIS WILL MAKE IT WORK -->
     <script>
@@ -183,6 +634,16 @@
             // Try to call main app function if available
             if (window.vfiedApp && window.vfiedApp.handleDecideClick) {
                 console.log('🚀 Calling main app handleDecideClick...');
+                
+                // Get user settings and pass them to the app
+                const userPrefs = window.vfiedUserSettings ? window.vfiedUserSettings.get() : {};
+                console.log('📋 Using user preferences:', userPrefs);
+                
+                // Add settings to app context
+                if (window.vfiedApp.userPreferences) {
+                    window.vfiedApp.userPreferences = userPrefs;
+                }
+                
                 window.vfiedApp.handleDecideClick();
             } else {
                 console.log('🎯 Main app not ready, showing fallback suggestion...');
@@ -466,41 +927,6 @@
             updateLocationStatus('📍 Location blocked - using general suggestions (click location icon to enable)');
         }
     }, 3000);
-
-    // Add a manual location button for troubleshooting
-    function addLocationButton() {
-        // Only add if not already present
-        if (document.getElementById('manual-location-btn')) return;
-        
-        const header = document.querySelector('.simple-header');
-        if (header) {
-            const locationBtn = document.createElement('button');
-            locationBtn.id = 'manual-location-btn';
-            locationBtn.textContent = '📍 Enable Location';
-            locationBtn.style.cssText = `
-                background: rgba(255,255,255,0.2);
-                border: 1px solid rgba(255,255,255,0.3);
-                color: white;
-                padding: 0.5rem 1rem;
-                border-radius: 20px;
-                font-size: 0.8rem;
-                cursor: pointer;
-                margin-top: 0.5rem;
-                backdrop-filter: blur(5px);
-            `;
-            
-            locationBtn.addEventListener('click', () => {
-                console.log('📍 Manual location request triggered');
-                forceLocationDetection();
-            });
-            
-            header.appendChild(locationBtn);
-            console.log('📍 Manual location button added');
-        }
-    }
-
-    // Add the manual button after a delay
-    setTimeout(addLocationButton, 6000);
     </script>
 
     <!-- Main App Script -->
@@ -624,14 +1050,18 @@
                     } else {
                         console.log('📋 Using fallback insights');
                         
-                        // Show fallback insights
+                        // Show fallback insights with user settings
+                        const userPrefs = window.vfiedUserSettings ? window.vfiedUserSettings.get() : {};
+                        
                         if (culturalNote) {
-                            culturalNote.innerHTML = '<strong>🌍 Cultural insight:</strong> This choice fits perfectly with local dining preferences!';
+                            const locationText = userPrefs.location ? ` in ${userPrefs.location.city}` : '';
+                            culturalNote.innerHTML = `<strong>🌍 Cultural insight:</strong> This choice fits perfectly with local dining preferences${locationText}!`;
                             culturalNote.style.display = 'block';
                         }
                         
                         if (personalNote) {
-                            personalNote.innerHTML = '<strong>🧠 Personal pattern:</strong> Based on your preferences, this is a great match.';
+                            const dietaryText = userPrefs.dietary.length > 0 ? ` and meets your ${userPrefs.dietary.join(', ')} requirements` : '';
+                            personalNote.innerHTML = `<strong>🧠 Personal pattern:</strong> Based on your preferences${dietaryText}, this is a great match.`;
                             personalNote.style.display = 'block';
                         }
                         
