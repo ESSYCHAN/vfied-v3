@@ -56,32 +56,49 @@ class AIFoodService {
   }
 
   async detectLocation() {
-    try {
-      console.log('📍 Detecting location...');
-      
-      // Get precise location
-      const position = await this.getCurrentPosition();
+    // Server-safe version - no browser geolocation
+    console.log('📍 Using server default location context (will be set from API requests)');
+    this.userLocation = { 
+      city: 'Unknown', 
+      country: 'Unknown',
+      countryCode: 'US' // Default fallback
+    };
+  }
+  
+
+  
+  // ADD this new method to your AIFoodService class:
+  setLocationFromRequest(location) {
+    if (location && location.city && location.country) {
       this.userLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracy: position.coords.accuracy,
+        city: location.city,
+        country: location.country,
+        countryCode: this.getCountryCode(location.country),
         timestamp: new Date().toISOString()
       };
-
-      // Reverse geocode for cultural context
-      const locationData = await this.reverseGeocode(this.userLocation);
-      this.userLocation = { ...this.userLocation, ...locationData };
+      console.log('📍 Location set from request:', this.userLocation.city, this.userLocation.country);
       
-      console.log('📍 Location detected:', this.userLocation.city, this.userLocation.country);
-      
-    } catch (error) {
-      console.log('📍 Using fallback location context');
-      this.userLocation = { 
-        city: 'Unknown', 
-        country: 'Unknown',
-        countryCode: 'US' // Default fallback
-      };
+      // Re-detect cultural context with the new location
+      this.detectCulturalContext();
     }
+  }
+  
+  // ADD this helper method to your AIFoodService class:
+  getCountryCode(country) {
+    const countryMap = {
+      'Kenya': 'KE',
+      'United Kingdom': 'GB', 
+      'UK': 'GB',
+      'United States': 'US',
+      'USA': 'US',
+      'Japan': 'JP',
+      'France': 'FR',
+      'Germany': 'DE',
+      'Nigeria': 'NG',
+      'India': 'IN',
+      'Australia': 'AU'
+    };
+    return countryMap[country] || 'US';
   }
 
   async getCurrentPosition() {
@@ -1319,6 +1336,10 @@ app.post('/mcp/get_food_suggestion', async (req, res) => {
 app.post('/mcp/get_quick_food_decision', async (req, res) => {
   try {
     const { location, dietary = [], context = {} } = req.body;
+
+    if (location) {
+      aiFoodService.setLocationFromRequest(location);
+    }
 
     const hour = new Date().getHours();
     let autoMood = 'random';
