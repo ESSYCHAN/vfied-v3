@@ -101,21 +101,6 @@ class AIFoodService {
     return countryMap[country] || 'US';
   }
 
-  async getCurrentPosition() {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Geolocation not supported'));
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000 // 5 minutes cache
-      });
-    });
-  }
-
   async reverseGeocode(location) {
     try {
       // Using OpenStreetMap Nominatim (free, no API key needed)
@@ -618,8 +603,9 @@ Be specific to ${context.location?.city || 'their location'} and current weather
 }
 
 // Dietary Intelligence Service (your existing sophisticated version)
-class DietaryService {
+class SmartDietaryService {
   constructor() {
+    this.openaiApiKey = process.env.OPENAI_API_KEY;
     this.dietaryRules = {
       'vegetarian': {
         allowed: ['vegetables', 'fruits', 'grains', 'legumes', 'dairy', 'eggs', 'nuts', 'seeds'],
@@ -640,11 +626,6 @@ class DietaryService {
         allowed: ['plant-based milk', 'dairy alternatives'],
         forbidden: ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'ice cream', 'whey', 'casein'],
         description: 'No dairy products'
-      },
-      'nut-free': {
-        allowed: ['seeds', 'legumes'],
-        forbidden: ['almonds', 'walnuts', 'pecans', 'cashews', 'pistachios', 'hazelnuts', 'brazil nuts', 'pine nuts'],
-        description: 'No tree nuts'
       },
       'keto': {
         allowed: ['meat', 'fish', 'eggs', 'low-carb vegetables', 'healthy fats', 'cheese'],
@@ -674,7 +655,70 @@ class DietaryService {
     };
   }
 
-  validateCompliance(foodName, dietaryRestrictions) {
+  // AI-POWERED COMPLIANCE CHECKER 🤖
+  async checkFoodComplianceAI(foodName, dietaryRestrictions) {
+    if (!this.openaiApiKey || !dietaryRestrictions?.length) {
+      return this.fallbackCompliance(foodName, dietaryRestrictions);
+    }
+
+    try {
+      const restrictionsText = dietaryRestrictions.map(diet => {
+        const rule = this.dietaryRules[diet.toLowerCase()];
+        return rule ? `${diet}: ${rule.description}` : diet;
+      }).join(', ');
+
+      const compliancePrompt = `
+You are a dietary compliance expert. Analyze if this food is compatible with the given dietary restrictions.
+
+FOOD: "${foodName}"
+DIETARY RESTRICTIONS: ${restrictionsText}
+
+Consider:
+- All ingredients typically found in this dish
+- Cooking methods and preparation
+- Common variations of this food
+- Cultural/regional differences in preparation
+- Hidden ingredients (stocks, gelatin, etc.)
+
+Examples:
+- "Nyama Choma" = grilled meat (NOT vegetarian/vegan)
+- "Ugali with Sukuma Wiki" = corn meal with greens (vegetarian/vegan friendly)
+- "Fish and Chips" = fish + potatoes (NOT vegetarian, OK for pescatarian)
+- "Pad Thai" = often contains fish sauce (NOT vegetarian unless specified)
+
+Respond with ONLY this JSON format:
+{
+  "compliant": true/false,
+  "reasoning": "detailed explanation of why it is/isn't compliant",
+  "warnings": ["specific issues if any"],
+  "alternatives": ["better options if not compliant"],
+  "confidence": 95
+}
+`;
+
+      const response = await this.callOpenAI(compliancePrompt);
+      const aiResult = JSON.parse(response);
+
+      console.log(`🤖 AI Dietary Check: ${foodName} for ${dietaryRestrictions.join(', ')} = ${aiResult.compliant ? '✅' : '❌'}`);
+      
+      return {
+        compliant: aiResult.compliant,
+        compliance: this.buildComplianceMap(dietaryRestrictions, aiResult.compliant),
+        warnings: aiResult.warnings || [],
+        alternatives: aiResult.alternatives || [],
+        reasoning: aiResult.reasoning,
+        confidence: aiResult.confidence || 85,
+        source: 'ai'
+      };
+
+    } catch (error) {
+      console.error('AI dietary compliance failed:', error);
+      return this.fallbackCompliance(foodName, dietaryRestrictions);
+    }
+  }
+
+  // Fallback to rule-based checking if AI fails
+  fallbackCompliance(foodName, dietaryRestrictions) {
     const compliance = {};
     const warnings = [];
     let overallCompliant = true;
@@ -687,7 +731,7 @@ class DietaryService {
         continue;
       }
 
-      const isCompliant = this.checkFoodCompliance(foodName, rule);
+      const isCompliant = this.checkFoodComplianceBasic(foodName, rule);
       compliance[restriction] = isCompliant ? 'compliant' : 'non-compliant';
       
       if (!isCompliant) {
@@ -700,42 +744,110 @@ class DietaryService {
       compliant: overallCompliant,
       compliance,
       warnings,
-      alternatives: overallCompliant ? [] : this.suggestAlternatives(foodName, dietaryRestrictions)
+      alternatives: overallCompliant ? [] : this.suggestAlternatives(foodName, dietaryRestrictions),
+      source: 'fallback'
     };
   }
 
-  checkFoodCompliance(foodName, rule) {
+  // Enhanced basic compliance with better meat detection
+  checkFoodComplianceBasic(foodName, rule) {
     const foodLower = foodName.toLowerCase();
     
+    // Check forbidden ingredients
     for (const forbidden of rule.forbidden) {
       if (foodLower.includes(forbidden.toLowerCase())) {
         return false;
       }
     }
     
-    if (rule.description.includes('No animal products') && 
-        (foodLower.includes('meat') || foodLower.includes('chicken') || 
-         foodLower.includes('beef') || foodLower.includes('cheese'))) {
-      return false;
+    // Enhanced meat detection for vegetarian/vegan
+    if (rule.description.includes('No meat') || rule.description.includes('No animal products')) {
+      const meatTerms = [
+        // English
+        'meat', 'chicken', 'beef', 'pork', 'lamb', 'goat', 'fish', 'seafood',
+        // Swahili/African
+        'nyama', 'choma', 'samaki', 'kuku', 'ng\'ombe',
+        // Common dishes that contain meat
+        'burger', 'sausage', 'bacon', 'ham', 'steak', 'ribs'
+      ];
+      
+      for (const term of meatTerms) {
+        if (foodLower.includes(term)) {
+          return false;
+        }
+      }
     }
 
     return true;
   }
 
+  buildComplianceMap(restrictions, isCompliant) {
+    const compliance = {};
+    restrictions.forEach(restriction => {
+      compliance[restriction] = isCompliant ? 'compliant' : 'non-compliant';
+    });
+    return compliance;
+  }
+
+  // Helper method to call OpenAI
+  async callOpenAI(prompt) {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.openaiApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini', // Cheaper and faster for simple compliance checks
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a dietary compliance expert who understands foods from all cultures and their ingredients. Always respond with valid JSON.'
+          },
+          {
+            role: 'user', 
+            content: prompt
+          }
+        ],
+        max_tokens: 300,
+        temperature: 0.1, // Low temperature for consistent results
+        response_format: { type: 'json_object' }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+  }
+
+  // Update your validateCompliance method to use AI
+  async validateCompliance(foodName, dietaryRestrictions) {
+    return await this.checkFoodComplianceAI(foodName, dietaryRestrictions);
+  }
+
+  // Keep existing methods for compatibility...
   suggestAlternatives(foodName, dietaryRestrictions) {
     const alternatives = [];
     const foodLower = foodName.toLowerCase();
 
-    if (dietaryRestrictions.includes('vegan')) {
-      if (foodLower.includes('burger')) alternatives.push('Beyond Burger', 'Black Bean Burger');
-      if (foodLower.includes('pizza')) alternatives.push('Vegan Pizza with Cashew Cheese');
-      if (foodLower.includes('pasta')) alternatives.push('Pasta with Marinara Sauce');
+    if (dietaryRestrictions.includes('vegetarian') || dietaryRestrictions.includes('vegan')) {
+      if (foodLower.includes('nyama') || foodLower.includes('choma')) {
+        alternatives.push('Ugali with Sukuma Wiki', 'Vegetable Samosas', 'Bean Stew');
+      }
+      if (foodLower.includes('burger')) {
+        alternatives.push('Beyond Burger', 'Black Bean Burger', 'Mushroom Burger');
+      }
+      if (foodLower.includes('chicken')) {
+        alternatives.push('Tofu Stir-fry', 'Chickpea Curry', 'Vegetable Biryani');
+      }
     }
 
     if (dietaryRestrictions.includes('gluten-free')) {
-      if (foodLower.includes('bread')) alternatives.push('Gluten-Free Bread');
+      if (foodLower.includes('bread')) alternatives.push('Gluten-Free Bread', 'Rice Cakes');
       if (foodLower.includes('pasta')) alternatives.push('Rice Noodles', 'Quinoa Pasta');
-      if (foodLower.includes('pizza')) alternatives.push('Cauliflower Crust Pizza');
     }
 
     return alternatives.slice(0, 3);
@@ -752,45 +864,48 @@ class DietaryService {
     }).join(', ');
 
     return `
-CRITICAL DIETARY REQUIREMENTS:
+🚨 CRITICAL DIETARY REQUIREMENTS 🚨
 User follows: ${restrictions}
 
 MANDATORY RULES:
 1. ONLY suggest foods that are 100% compatible with ALL listed dietary restrictions
-2. If suggesting a dish that could be modified, specify the dietary-compliant version
-3. Never suggest foods containing forbidden ingredients
-4. When in doubt, choose clearly compliant options
-5. Mention dietary compliance in your reasoning
+2. NEVER suggest dishes that contain forbidden ingredients
+3. If suggesting a cultural dish, ensure it's prepared in a compliant way
+4. When in doubt, choose clearly safe options
+5. Explain dietary compliance in your reasoning
 
-FORBIDDEN for this user: ${this.getForbiddenIngredients(dietaryRestrictions).join(', ')}
-SAFE options: ${this.getSafeIngredients(dietaryRestrictions).join(', ')}
+Examples of what NOT to suggest:
+${this.getForbiddenExamples(dietaryRestrictions).join(', ')}
+
+Safe alternatives to suggest:
+${this.getSafeExamples(dietaryRestrictions).join(', ')}
+
+VERIFY EVERY SUGGESTION AGAINST THESE RESTRICTIONS!
 `;
   }
 
-  getForbiddenIngredients(dietaryRestrictions) {
-    const forbidden = new Set();
-    
-    for (const restriction of dietaryRestrictions) {
-      const rule = this.dietaryRules[restriction.toLowerCase()];
-      if (rule) {
-        rule.forbidden.forEach(item => forbidden.add(item));
-      }
+  getForbiddenExamples(restrictions) {
+    const examples = [];
+    if (restrictions.includes('vegetarian') || restrictions.includes('vegan')) {
+      examples.push('Nyama Choma', 'Fish and Chips', 'Chicken Tikka', 'Beef Stew');
     }
-    
-    return Array.from(forbidden);
+    if (restrictions.includes('gluten-free')) {
+      examples.push('Regular Pasta', 'Pizza (with wheat crust)', 'Regular Bread');
+    }
+    if (restrictions.includes('dairy-free')) {
+      examples.push('Cheese Pizza', 'Ice Cream', 'Creamy Pasta');
+    }
+    return examples.length ? examples : ['foods with forbidden ingredients'];
   }
 
-  getSafeIngredients(dietaryRestrictions) {
-    const safe = new Set();
-    
-    for (const restriction of dietaryRestrictions) {
-      const rule = this.dietaryRules[restriction.toLowerCase()];
-      if (rule) {
-        rule.allowed.forEach(item => safe.add(item));
-      }
+  getSafeExamples(restrictions) {
+    if (restrictions.includes('vegetarian')) {
+      return ['Ugali with Vegetables', 'Vegetable Samosas', 'Dal (Lentil Curry)', 'Vegetable Biryani'];
     }
-    
-    return Array.from(safe);
+    if (restrictions.includes('vegan')) {
+      return ['Ugali with Sukuma Wiki', 'Vegetable Curry', 'Bean Stew', 'Fruit Salad'];
+    }
+    return ['compliant foods'];
   }
 }
 
@@ -936,7 +1051,7 @@ class WeatherService {
 // Initialize services
 const aiFoodService = new AIFoodService();
 const weatherService = new WeatherService();
-const dietaryService = new DietaryService();
+const smartDietaryService = new SmartDietaryService();
 
 // Export functions for compatibility
 const getAIFoodSuggestion = async (mood, context = {}) => {
@@ -969,7 +1084,7 @@ async function getWeatherAndDietaryAwareSuggestion(location, mood, context = {})
     const suggestion = await getAIFoodSuggestion(mood, enhancedContext);
     
     if (context.dietary && context.dietary.length > 0 && suggestion.food) {
-      const compliance = dietaryService.validateCompliance(suggestion.food.name, context.dietary);
+      const compliance = await smartDietaryService.validateCompliance(suggestion.food.name, context.dietary);
       suggestion.dietaryCompliance = compliance;
       suggestion.dietaryNote = compliance.compliant 
         ? `✅ This food meets all your dietary requirements: ${context.dietary.join(', ')}`
