@@ -1417,6 +1417,15 @@ app.post('/mcp/validate_dietary_compliance', (req, res) => {
   }
 });
 
+app.get('/debug/env', (req, res) => {
+  res.json({
+    hasOpenAI: !!process.env.OPENAI_API_KEY,
+    openAIKeyLength: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.length : 0,
+    openAIKeyStart: process.env.OPENAI_API_KEY ? process.env.OPENAI_API_KEY.substring(0, 8) : 'missing',
+    allEnvKeys: Object.keys(process.env).filter(key => key.includes('OPENAI'))
+  });
+});
+
 // Cultural Context with Dietary Filtering
 app.post('/mcp/get_cultural_food_context', async (req, res) => {
   try {
