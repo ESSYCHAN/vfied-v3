@@ -3,9 +3,36 @@ import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import 'dotenv/config';
+// Add these routes to your mcp-server.js BEFORE your existing endpoints
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Serve static HTML pages
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dashboard.html'));
+});
+
+app.get('/docs', (req, res) => {
+  res.sendFile(path.join(__dirname, 'docs.html'));
+});
+
+app.get('/demo', (req, res) => {
+  res.sendFile(path.join(__dirname, 'demo.html'));
+});
+
+// Serve static assets (if you add any CSS/JS files later)
+app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 const app = express();
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
+
 
 // Middleware
 app.use(cors({
