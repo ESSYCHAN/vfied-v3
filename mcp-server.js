@@ -1071,7 +1071,7 @@ async function getWeatherAndDietaryAwareSuggestion(location, mood, context = {})
   try {
     const weather = location ? await weatherService.getCurrentWeather(location) : null;
     const weatherImpact = weather ? weatherService.analyzeWeatherFoodImpact(weather) : null;
-    const dietaryPrompt = dietaryService.buildDietaryPrompt(context.dietary);
+    const dietaryPrompt = smartDietaryService.buildDietaryPrompt(context.dietary);
     
     const enhancedContext = {
       ...context,
@@ -1500,7 +1500,7 @@ app.post('/mcp/get_quick_food_decision', async (req, res) => {
 });
 
 // Dietary Compliance Validation
-app.post('/mcp/validate_dietary_compliance', (req, res) => {
+app.post('/mcp/validate_dietary_compliance', async (req, res) => {
   try {
     const { foodName, dietary } = req.body;
 
@@ -1510,7 +1510,7 @@ app.post('/mcp/validate_dietary_compliance', (req, res) => {
       });
     }
 
-    const validation = dietaryService.validateCompliance(foodName, dietary);
+    const validation = await smartDietaryService.validateCompliance(foodName, dietary);
 
     res.json({
       success: true,
@@ -1562,10 +1562,14 @@ app.post('/mcp/get_cultural_food_context', async (req, res) => {
     if (dietary.length > 0) {
       culturalContext.dietaryFriendlyOptions = {};
       for (const restriction of dietary) {
-        culturalContext.dietaryFriendlyOptions[restriction] = 
-          culturalContext.popularFoods.filter(food => 
-            dietaryService.validateCompliance(food, [restriction]).compliant
-          );
+        const friendlyFoods = [];
+        for (const food of culturalContext.popularFoods) {
+          const compliance = await smartDietaryService.validateCompliance(food, [restriction]);
+          if (compliance.compliant) {
+            friendlyFoods.push(food);
+          }
+        }
+        culturalContext.dietaryFriendlyOptions[restriction] = friendlyFoods;
       }
     }
 
