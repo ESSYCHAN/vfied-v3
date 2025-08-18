@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VFIED API Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #f8f9fa;
+            color: #333;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .header { 
+            background: white; 
+            padding: 2rem; 
+            border-radius: 12px; 
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .card { 
+            background: white; 
+            padding: 1.5rem; 
+            border-radius: 12px; 
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+        .usage-bar { 
+            background: #e9ecef; 
+            height: 8px; 
+            border-radius: 4px; 
+            overflow: hidden; 
+            margin: 1rem 0;
+        }
+        .usage-fill { 
+            background: linear-gradient(90deg, #28a745, #20c997); 
+            height: 100%; 
+            transition: width 0.3s ease;
+        }
+        .api-key { 
+            font-family: 'Monaco', 'Consolas', monospace; 
+            background: #f8f9fa; 
+            padding: 1rem; 
+            border-radius: 8px; 
+            border: 1px solid #dee2e6;
+            word-break: break-all;
+        }
+        .btn { 
+            background: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 0.75rem 1.5rem; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 0.9rem;
+            margin: 0.5rem 0.5rem 0.5rem 0;
+        }
+        .btn:hover { background: #0056b3; }
+        .btn.secondary { background: #6c757d; }
+        .btn.secondary:hover { background: #545b62; }
+        .status { 
+            display: inline-block; 
+            padding: 0.25rem 0.75rem; 
+            border-radius: 20px; 
+            font-size: 0.8rem; 
+            font-weight: 600;
+        }
+        .status.uploaded { background: #d4edda; color: #155724; }
+        .status.pending { background: #fff3cd; color: #856404; }
+        .textarea { 
+            width: 100%; 
+            min-height: 200px; 
+            padding: 1rem; 
+            border: 1px solid #dee2e6; 
+            border-radius: 8px; 
+            font-family: 'Monaco', 'Consolas', monospace;
+            font-size: 0.9rem;
+        }
+        .upload-zone {
+            border: 2px dashed #dee2e6;
+            padding: 2rem;
+            text-align: center;
+            border-radius: 8px;
+            margin: 1rem 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        .upload-zone:hover { border-color: #007bff; background: #f8f9ff; }
+        .log { 
+            background: #2d3748; 
+            color: #fff; 
+            padding: 1rem; 
+            border-radius: 8px; 
+            font-family: monospace; 
+            max-height: 300px; 
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+        .metric { text-align: center; }
+        .metric-value { font-size: 2rem; font-weight: bold; color: #007bff; }
+        .metric-label { color: #6c757d; margin-top: 0.5rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🍽️ VFIED API Dashboard</h1>
+            <p>Manage your cultural food intelligence API</p>
+        </div>
+
+        <!-- API Usage Overview -->
+        <div class="grid">
+            <div class="card">
+                <h3>📊 API Usage</h3>
+                <div class="metric">
+                    <div class="metric-value" id="usage-count">-</div>
+                    <div class="metric-label">Calls this month</div>
+                </div>
+                <div class="usage-bar">
+                    <div class="usage-fill" id="usage-bar" style="width: 0%"></div>
+                </div>
+                <p><span id="usage-percentage">0</span>% of <span id="usage-limit">-</span> monthly limit</p>
+                <p><strong>Plan:</strong> <span id="current-plan">-</span></p>
+            </div>
+
+            <div class="card">
+                <h3>📋 Menu Status</h3>
+                <div class="metric">
+                    <div class="status" id="menu-status">pending</div>
+                </div>
+                <p id="menu-info">No menu uploaded yet</p>
+                <button class="btn" onclick="showMenuUpload()">Upload Menu</button>
+                <button class="btn secondary" onclick="loadMenu()">View Current Menu</button>
+            </div>
+        </div>
+
+        <!-- API Key Section -->
+        <div class="card">
+            <h3>🔑 Your API Key</h3>
+            <div class="api-key" id="api-key-display">
+                Click "Show API Key" to reveal
+            </div>
+            <button class="btn" onclick="toggleApiKey()">Show API Key</button>
+            <button class="btn secondary" onclick="copyApiKey()">Copy to Clipboard</button>
+            <p style="margin-top: 1rem; color: #6c757d;">
+                <strong>Keep this secret!</strong> Use it in your Authorization header: <code>Bearer YOUR_API_KEY</code>
+            </p>
+        </div>
+
+        <!-- Menu Upload Section -->
+        <div class="card" id="menu-upload-section" style="display: none;">
+            <h3>📤 Upload Your Menu</h3>
+            <p>Upload your menu items to get personalized recommendations for your customers.</p>
+            
+            <div class="upload-zone" onclick="document.getElementById('csv-file').click()">
+                <p>📄 Click to upload CSV file</p>
+                <p style="color: #6c757d; font-size: 0.9rem;">or drag and drop here</p>
+                <input type="file" id="csv-file" accept=".csv" style="display: none;" onchange="handleFileUpload(event)">
+            </div>
+            
+            <p><strong>Or paste JSON directly:</strong></p>
+            <textarea class="textarea" id="menu-json" placeholder='[
+  {
+    "name": "Ugali Mayai",
+    "emoji": "🍳",
+    "country": "Kenya",
+    "country_code": "KE",
+    "category": "comfort",
+    "tags": ["vegetarian", "protein-rich"],
+    "price": "8.99",
+    "currency": "GBP"
+  }
+]'></textarea>
+            
+            <button class="btn" onclick="uploadMenu()">Upload Menu</button>
+            <button class="btn secondary" onclick="downloadTemplate()">Download CSV Template</button>
+            
+            <div class="log" id="upload-log" style="display: none;"></div>
+        </div>
+
+        <!-- API Testing Section -->
+        <div class="card">
+            <h3>🧪 Test Your API</h3>
+            <p>Test your API integration with live calls</p>
+            
+            <div style="margin: 1rem 0;">
+                <label><strong>Test Type:</strong></label><br>
+                <label><input type="radio" name="test-type" value="global" checked> Global Database</label>
+                <label><input type="radio" name="test-type" value="menu"> My Uploaded Menu</label>
+            </div>
+            
+            <div style="margin: 1rem 0;">
+                <label><strong>Mood:</strong></label>
+                <select id="test-mood">
+                    <option value="tired">Tired</option>
+                    <option value="celebrating">Celebrating</option>
+                    <option value="post-workout">Post-workout</option>
+                    <option value="stressed">Stressed</option>
+                    <option value="hungry">Hungry</option>
+                </select>
+            </div>
+            
+            <button class="btn" onclick="testAPI()">Test API Call</button>
+            
+            <div class="log" id="api-log"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentApiKey = 'demo_growth_key_456'; // Demo key
+        let apiKeyVisible = false;
+
+        // Load dashboard data on page load
+        window.addEventListener('load', () => {
+            loadDashboardData();
+        });
+
+        async function loadDashboardData() {
+            try {
+                const response = await fetch('/v1/analytics', {
+                    headers: { 'Authorization': `Bearer ${currentApiKey}` }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('usage-count').textContent = data.usage.current_period;
+                    document.getElementById('usage-limit').textContent = data.usage.limit.toLocaleString();
+                    document.getElementById('usage-percentage').textContent = data.usage.percentage;
+                    document.getElementById('usage-bar').style.width = data.usage.percentage + '%';
+                    document.getElementById('current-plan').textContent = data.plan;
+                    
+                    // Update menu status
+                    const menuStatus = document.getElementById('menu-status');
+                    const menuInfo = document.getElementById('menu-info');
+                    
+                    if (data.menu_status === 'uploaded') {
+                        menuStatus.textContent = 'uploaded';
+                        menuStatus.className = 'status uploaded';
+                        menuInfo.textContent = 'Menu successfully uploaded';
+                    } else {
+                        menuStatus.textContent = 'not uploaded';
+                        menuStatus.className = 'status pending';
+                        menuInfo.textContent = 'Upload your menu to enable personalized recommendations';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load dashboard data:', error);
+            }
+        }
+
+        function toggleApiKey() {
+            const display = document.getElementById('api-key-display');
+            const button = event.target;
+            
+            if (apiKeyVisible) {
+                display.textContent = 'Click "Show API Key" to reveal';
+                button.textContent = 'Show API Key';
+                apiKeyVisible = false;
+            } else {
+                display.textContent = currentApiKey;
+                button.textContent = 'Hide API Key';
+                apiKeyVisible = true;
+            }
+        }
+
+        function copyApiKey() {
+            if (apiKeyVisible) {
+                navigator.clipboard.writeText(currentApiKey);
+                alert('API key copied to clipboard!');
+            } else {
+                alert('Please show the API key first');
+            }
+        }
+
+        function showMenuUpload() {
+            const section = document.getElementById('menu-upload-section');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        async function uploadMenu() {
+            const jsonText = document.getElementById('menu-json').value;
+            const logElement = document.getElementById('upload-log');
+            
+            try {
+                const menu = JSON.parse(jsonText);
+                
+                logElement.style.display = 'block';
+                logElement.textContent = 'Uploading menu...';
+                
+                const response = await fetch('/v1/menus', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ menu })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    logElement.innerHTML = `✅ Success! Uploaded ${result.summary.accepted} items\nMenu version: ${result.menu_version}`;
+                    loadDashboardData(); // Refresh dashboard
+                } else {
+                    logElement.innerHTML = `❌ Error: ${result.error}`;
+                }
+                
+            } catch (error) {
+                logElement.style.display = 'block';
+                logElement.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function testAPI() {
+            const testType = document.querySelector('input[name="test-type"]:checked').value;
+            const mood = document.getElementById('test-mood').value;
+            const logElement = document.getElementById('api-log');
+            
+            const requestBody = {
+                location: { city: 'London', country: 'United Kingdom', country_code: 'GB' },
+                mood_text: mood,
+                dietary: ['vegetarian']
+            };
+            
+            if (testType === 'menu') {
+                requestBody.menu_source = 'my_uploaded_menu';
+            }
+            
+            logElement.textContent = 'Testing API call...';
+            
+            try {
+                const response = await fetch('/v1/recommend', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentApiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const result = await response.json();
+                logElement.innerHTML = `✅ API Response:\n${JSON.stringify(result, null, 2)}`;
+                
+            } catch (error) {
+                logElement.innerHTML = `❌ Error: ${error.message}`;
+            }
+        }
+
+        async function loadMenu() {
+            try {
+                const response = await fetch('/v1/menus', {
+                    headers: { 'Authorization': `Bearer ${currentApiKey}` }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const menuJson = document.getElementById('menu-json');
+                    menuJson.value = JSON.stringify(data.menu, null, 2);
+                    showMenuUpload();
+                }
+            } catch (error) {
+                alert('Failed to load menu: ' + error.message);
+            }
+        }
+
+        function downloadTemplate() {
+            const csvContent = `name,emoji,country,country_code,category,tags,price,currency
+Ugali Mayai,🍳,Kenya,KE,comfort,"vegetarian,protein-rich",8.99,GBP
+Jollof Rice,🍚,Nigeria,NG,comfort,"rice,spicy",12.50,GBP
+Fish and Chips,🐟,United Kingdom,GB,comfort,"fish,fried",15.00,GBP`;
+            
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'vfied-menu-template.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'text/csv') {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    // Convert CSV to JSON (simplified)
+                    alert('CSV upload feature coming soon! Please use JSON format for now.');
+                };
+                reader.readAsText(file);
+            }
+        }
+    </script>
+</body>
+</html>

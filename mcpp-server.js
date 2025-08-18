@@ -1,8 +1,10 @@
-// VFIED MCP Server - Complete with Weather + Dietary Intelligence + Menu Upload System + MCP Protocol
+// VFIED MCP Server - Complete with Weather + Dietary Intelligence + MCP Protocol
 import express from 'express';
 import cors from 'cors';
-import crypto from 'crypto';
 import 'dotenv/config';
+// import express from 'express';
+import crypto from 'crypto';
+
 
 const app = express();
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
@@ -19,44 +21,10 @@ app.use(cors({
     /^https:\/\/.*\.vercel\.app$/
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
-
-// Add timing middleware for performance tracking
-app.use((req, res, next) => {
-  req.startTime = Date.now();
-  next();
-});
-
-// ==================== MENU UPLOAD SYSTEM ====================
-
-// In-memory storage for now (move to Firebase later)
-const vendorMenus = new Map(); // vendorId -> { items: [], version: string, updatedAt: Date }
-const apiKeys = new Map(); // apiKey -> { vendorId, plan, usage, limit }
-
-// API Key authentication middleware
-function authenticateApiKey(req, res, next) {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) return res.status(401).json({ error: 'Missing API key' });
-    const apiKey = authHeader.substring(7);
-    const keyData = apiKeys.get(apiKey);
-    if (!keyData) return res.status(401).json({ error: 'Invalid API key' });
-    req.apiKey = keyData;
-    next();
-  }
-  function countUsage(req, res, next) {
-    const k = req.apiKey;
-    if (k.usage >= k.limit) return res.status(429).json({ error: 'Monthly limit exceeded. Upgrade your plan.' });
-    k.usage++;
-    next();
-  }
-  
-  // Apply usage counting only to expensive calls:
-  app.post('/v1/recommend', authenticateApiKey, countUsage, async (req,res)=>{ /* unchanged body */ });
-
-// ==================== AI FOOD SERVICE ====================
 
 // Sophisticated AI Food Service (with OpenAI + Weather + Cultural Intelligence)
 class AIFoodService {
@@ -99,22 +67,25 @@ class AIFoodService {
     };
   }
   
+
+  
+  // ADD this new method to your AIFoodService class:
   setLocationFromRequest(location) {
-    if (!location) return;
-    // Accept either city/country or just coordinates
-    this.userLocation = {
-      city: location.city || this.userLocation?.city || 'Unknown',
-      country: location.country || this.userLocation?.country || 'Unknown',
-      countryCode: this.getCountryCode(location.country || this.userLocation?.country || 'US'),
-      latitude: typeof location.latitude === 'number' ? location.latitude : this.userLocation?.latitude,
-      longitude: typeof location.longitude === 'number' ? location.longitude : this.userLocation?.longitude,
-      timestamp: new Date().toISOString()
-    };
-    console.log('📍 Location set from request:', this.userLocation);
-    // Kick off culture refresh (don’t block)
-    this.detectCulturalContext();
+    if (location && location.city && location.country) {
+      this.userLocation = {
+        city: location.city,
+        country: location.country,
+        countryCode: this.getCountryCode(location.country),
+        timestamp: new Date().toISOString()
+      };
+      console.log('📍 Location set from request:', this.userLocation.city, this.userLocation.country);
+      
+      // Re-detect cultural context with the new location
+      this.detectCulturalContext();
+    }
   }
   
+  // ADD this helper method to your AIFoodService class:
   getCountryCode(country) {
     const countryMap = {
       'Kenya': 'KE',
@@ -467,19 +438,23 @@ Be specific to ${context.location?.city || 'their location'} and current weather
   }
 
   async getWeatherContext() {
-    if (!this.weatherApiKey) return this.getSimulatedWeather();
+    if (!this.weatherApiKey) {
+      return this.getSimulatedWeather();
+    }
+  
     try {
-      const lat = this.userLocation?.latitude;
-      const lon = this.userLocation?.longitude;
-      if (typeof lat !== 'number' || typeof lon !== 'number') {
-        // No coords → simulate rather than failing
+      if (!this.userLocation?.lat) {
         return this.getSimulatedWeather();
       }
+  
       const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${this.weatherApiKey}&units=metric`
+        `https://api.openweathermap.org/data/2.5/weather?lat=${this.userLocation.lat}&lon=${this.userLocation.lng}&appid=${this.weatherApiKey}&units=metric`
       );
+      
       if (!response.ok) throw new Error('Weather API failed');
+      
       const data = await response.json();
+      
       return {
         temperature: Math.round(data.main.temp),
         feelsLike: Math.round(data.main.feels_like),
@@ -493,8 +468,8 @@ Be specific to ${context.location?.city || 'their location'} and current weather
         isComfortable: data.main.temp >= 18 && data.main.temp <= 26,
         timestamp: new Date().toISOString()
       };
-    } catch (e) {
-      console.error('Weather fetch error:', e);
+    } catch (error) {
+      console.error('Weather fetch error:', error);
       return this.getSimulatedWeather();
     }
   }
@@ -628,8 +603,6 @@ Be specific to ${context.location?.city || 'their location'} and current weather
     return { success: true };
   }
 }
-
-// ==================== DIETARY INTELLIGENCE SERVICE ====================
 
 // Dietary Intelligence Service (your existing sophisticated version)
 class SmartDietaryService {
@@ -938,8 +911,6 @@ VERIFY EVERY SUGGESTION AGAINST THESE RESTRICTIONS!
   }
 }
 
-// ==================== WEATHER SERVICE ====================
-
 // Weather Service Class
 class WeatherService {
   constructor() {
@@ -1079,159 +1050,10 @@ class WeatherService {
   }
 }
 
-// ==================== VENDOR MENU SYSTEM HELPER FUNCTIONS ====================
-
-function validateMenuItem(item) {
-  const errors = [];
-  
-  if (!item.name) errors.push('name is required');
-  if (!item.country_code || !/^[A-Z]{2}$/.test(item.country_code)) {
-    errors.push('country_code must be ISO 3166-1 alpha-2 (e.g., "KE", "GB")');
-  }
-  
-  return {
-    valid: errors.length === 0,
-    errors
-  };
-}
-
-function generateMenuItemId(name) {
-  return name.toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .substring(0, 30) + '_' + Math.random().toString(36).substr(2, 6);
-}
-
-function normalizeMoods(moodText, moodIds) {
-  const moodMap = {
-    'tired': 'TIRED',
-    'exhausted': 'TIRED',
-    'stressed': 'STRESSED',
-    'celebrating': 'CELEBRATING',
-    'happy': 'CELEBRATING',
-    'post-workout': 'POST_WORKOUT',
-    'hungry': 'HUNGRY',
-    'sick': 'SICK',
-    'hangover': 'HUNGOVER'
-  };
-  
-  const fromText = moodText ? 
-    Object.keys(moodMap).filter(key => moodText.toLowerCase().includes(key)).map(key => moodMap[key]) :
-    [];
-  
-  return Array.from(new Set([...moodIds, ...fromText]));
-}
-
-async function getPersonalizedMenuRecommendation(vendorId, context) {
-  const vendorMenu = vendorMenus.get(vendorId);
-  
-  if (!vendorMenu || vendorMenu.items.length === 0) {
-    return {
-      error: 'No menu uploaded',
-      message: 'Upload your menu first to get personalized recommendations'
-    };
-  }
-  
-  // Filter available items
-  let availableItems = vendorMenu.items.filter(item => 
-    !item.availability || item.availability === 'in_stock'
-  );
-  
-  // Apply dietary filters
-  if (context.dietary.includes('vegetarian')) {
-    availableItems = availableItems.filter(item => 
-      item.tags?.includes('vegetarian') || 
-      !item.tags?.some(tag => ['meat', 'chicken', 'beef', 'pork'].includes(tag))
-    );
-  }
-  
-  if (context.dietary.includes('vegan')) {
-    availableItems = availableItems.filter(item => 
-      item.tags?.includes('vegan') ||
-      item.suitability?.vegan
-    );
-  }
-  
-  // Simple mood-based scoring
-  const scoredItems = availableItems.map(item => {
-    let score = 50; // Base score
-    
-    // Mood scoring
-    if (context.mood_text?.includes('tired') && item.tags?.includes('comfort')) score += 30;
-    if (context.mood_text?.includes('celebrating') && item.tags?.includes('special')) score += 25;
-    if (context.mood_text?.includes('workout') && item.tags?.includes('protein')) score += 35;
-    
-    // Random factor for variety
-    score += Math.random() * 20;
-    
-    return { ...item, score };
-  });
-  
-  // Sort by score and pick the best
-  scoredItems.sort((a, b) => b.score - a.score);
-  const selectedItem = scoredItems[0];
-  
-  if (!selectedItem) {
-    return {
-      error: 'No suitable items',
-      message: 'No menu items match your preferences. Try adjusting your dietary restrictions.'
-    };
-  }
-  
-  return {
-    food: {
-      name: selectedItem.name,
-      emoji: selectedItem.emoji || '🍽️',
-      country: selectedItem.country || 'Local',
-      country_code: selectedItem.country_code,
-      category: selectedItem.category || 'comfort',
-      menu_item_id: selectedItem.menu_item_id,
-      price: selectedItem.price,
-      menu_link: selectedItem.menu_link
-    },
-    friend_message: `Perfect choice from your menu! ${selectedItem.name} is exactly what you need right now.`,
-    reasoning: `Selected from your uploaded menu based on your ${context.mood_text} mood and dietary preferences.`,
-    cultural_note: `This ${selectedItem.country || 'local'} dish fits perfectly with your current situation.`,
-    availability_note: `Available now from your menu`,
-    alternatives: scoredItems.slice(1, 3).map(item => ({
-      name: item.name,
-      emoji: item.emoji || '🍽️',
-      reason: 'Another great option from your menu'
-    })),
-    confidence: Math.min(95, 70 + (selectedItem.score - 50))
-  };
-}
-
-// Create demo API keys (run this once to set up test accounts)
-function createDemoApiKeys() {
-  // Free tier demo
-  apiKeys.set('demo_free_key_123', {
-    vendorId: 'demo_restaurant_1',
-    plan: 'free',
-    usage: 0,
-    limit: 1000
-  });
-  
-  // Growth tier demo
-  apiKeys.set('demo_growth_key_456', {
-    vendorId: 'demo_restaurant_2', 
-    plan: 'growth',
-    usage: 0,
-    limit: 50000
-  });
-  
-  console.log('🔑 Demo API keys created');
-}
-
-// ==================== SERVICE INITIALIZATION ====================
-
 // Initialize services
 const aiFoodService = new AIFoodService();
 const weatherService = new WeatherService();
 const smartDietaryService = new SmartDietaryService();
-
-// Initialize demo data
-createDemoApiKeys();
 
 // Export functions for compatibility
 const getAIFoodSuggestion = async (mood, context = {}) => {
@@ -1303,243 +1125,6 @@ function buildWeatherReasoning(weather, suggestion) {
   
   return reasoning.join(' • ') || `Good choice for ${weather.description}`;
 }
-function toArray(val) {
-    if (!val) return [];
-    if (Array.isArray(val)) return val.filter(Boolean).map(String);
-    if (typeof val === 'string') return val.split(/[;,]/).map(s => s.trim()).filter(Boolean);
-    return [];
-  }
-  function toBool(val) {
-    if (typeof val === 'boolean') return val;
-    if (typeof val === 'string') return ['1','true','yes','y'].includes(val.toLowerCase());
-    if (typeof val === 'number') return val === 1;
-    return false;
-  }
-  function normalizeMenuItem(raw, vendorId) {
-    const item = { ...raw };
-    item.vendor_id = vendorId;
-    item.menu_item_id = item.menu_item_id || generateMenuItemId(item.name || 'item');
-    item.country_code = (item.country_code || '').toUpperCase();
-    item.tags = toArray(item.tags);
-    item.allergens = typeof item.allergens === 'string' ? item.allergens : (item.allergens || '');
-    item.availability = item.availability || 'in_stock';
-    if (!item.suitability) {
-      item.suitability = {
-        vegetarian: toBool(item.vegetarian),
-        vegan: toBool(item.vegan),
-        gluten_free: toBool(item.gluten_free),
-        halal_friendly: toBool(item.halal_friendly),
-        kosher_friendly: toBool(item.kosher_friendly)
-      };
-    }
-    if (!item.macros) {
-      const { kcal, protein_g, carbs_g, fat_g } = item;
-      if (kcal || protein_g || carbs_g || fat_g) {
-        item.macros = {
-          kcal: Number(kcal) || 0,
-          protein_g: Number(protein_g) || 0,
-          carbs_g: Number(carbs_g) || 0,
-          fat_g: Number(fat_g) || 0
-        };
-      }
-    }
-    item.uploaded_at = new Date().toISOString();
-    return item;
-  }
-  function bumpMenuVersion(vendorId) {
-    const v = vendorMenus.get(vendorId);
-    const next = `v_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
-    if (v) vendorMenus.set(vendorId, { ...v, version: next, updatedAt: new Date() });
-    return next;
-  }
-  
-// ==================== VENDOR MENU UPLOAD ENDPOINTS ====================
-
-// Menu upload endpoint - THE MONEY MAKER
-app.post('/v1/menus', authenticateApiKey, async (req, res) => {
-    try {
-      const { menu, mode = 'snapshot', dry_run = false } = req.body || {};
-      const vendorId = req.apiKey.vendorId;
-      if (!Array.isArray(menu)) return res.status(400).json({ error: 'Menu must be an array of items' });
-  
-      const current = vendorMenus.get(vendorId) || { items: [], version: null, updatedAt: null, itemCount: 0 };
-      const byId = new Map(current.items.map(i => [i.menu_item_id, i]));
-      const accepted = [], errors = [];
-  
-      for (const raw of menu) {
-        const v = validateMenuItem(raw);
-        if (!v.valid) { errors.push({ name: raw.name || raw.menu_item_id || 'unnamed', errors: v.errors }); continue; }
-        accepted.push(normalizeMenuItem(raw, vendorId));
-      }
-  
-      if (dry_run) {
-        return res.json({
-          success: errors.length === 0,
-          summary: { accepted: accepted.length, rejected: errors.length, total: menu.length },
-          mode,
-          would_create: accepted.filter(i => !byId.has(i.menu_item_id)).length,
-          would_update: accepted.filter(i => byId.has(i.menu_item_id)).length,
-          would_archive: mode === 'snapshot' ? current.items.filter(i => !accepted.find(n => n.menu_item_id === i.menu_item_id)).length : 0,
-          errors
-        });
-      }
-  
-      let nextItems;
-      if (mode === 'snapshot') {
-        const incomingIds = new Set(accepted.map(i => i.menu_item_id));
-        const archived = current.items
-          .filter(i => !incomingIds.has(i.menu_item_id))
-          .map(i => ({ ...i, availability: 'unavailable', status: 'archived', archived_at: new Date().toISOString() }));
-        const mergedMap = new Map([...archived, ...accepted].map(i => [i.menu_item_id, i]));
-        nextItems = [...mergedMap.values()];
-      } else {
-        const merged = new Map(current.items.map(i => [i.menu_item_id, i]));
-        for (const n of accepted) merged.set(n.menu_item_id, { ...merged.get(n.menu_item_id), ...n });
-        nextItems = [...merged.values()];
-      }
-  
-      const menuVersion = `v_${Date.now()}`;
-      vendorMenus.set(vendorId, { items: nextItems, version: menuVersion, updatedAt: new Date(), itemCount: nextItems.length });
-  
-      res.json({
-        success: errors.length === 0,
-        summary: { accepted: accepted.length, rejected: errors.length, total: menu.length },
-        mode,
-        menu_version: menuVersion,
-        errors: errors.length ? errors : undefined,
-        processing_time_ms: Date.now() - req.startTime
-      });
-    } catch (error) {
-      console.error('Menu upload error:', error);
-      res.status(500).json({ error: 'Menu upload failed', details: error.message });
-    }
-  });
-
-// Quick availability updates
-app.patch('/v1/menus/availability', authenticateApiKey, async (req, res) => {
-    try {
-      const { updates = [] } = req.body || {};
-      const vendorId = req.apiKey.vendorId;
-      const vendorMenu = vendorMenus.get(vendorId);
-      if (!vendorMenu) return res.status(404).json({ error: 'No menu found. Upload a menu first.' });
-  
-      let updated = 0;
-      const byId = new Map(vendorMenu.items.map(i => [i.menu_item_id, i]));
-      for (const u of updates) {
-        const it = byId.get(u.menu_item_id);
-        if (!it) continue;
-        if (u.availability) it.availability = u.availability;
-        if (u.price !== undefined) it.price = u.price;
-        if (u.kcal || u.protein_g || u.carbs_g || u.fat_g) {
-          it.macros = {
-            ...(it.macros || {}),
-            kcal: u.kcal ?? it.macros?.kcal ?? 0,
-            protein_g: u.protein_g ?? it.macros?.protein_g ?? 0,
-            carbs_g: u.carbs_g ?? it.macros?.carbs_g ?? 0,
-            fat_g: u.fat_g ?? it.macros?.fat_g ?? 0
-          };
-        }
-        updated++;
-      }
-      const version = bumpMenuVersion(vendorId);
-      res.json({ success: true, updated, total_updates_requested: updates.length, menu_version: version });
-    } catch (error) {
-      res.status(500).json({ error: 'Availability update failed', details: error.message });
-    }
-  });
-
-// Enhanced recommendation with menu support
-app.post('/v1/recommend', authenticateApiKey, async (req, res) => {
-  try {
-    const {
-      location,
-      mood_text,
-      mood_ids = [],
-      dietary = [],
-      menu_source = 'global_database',
-      budget = 'medium'
-    } = req.body;
-    
-    const vendorId = req.apiKey.vendorId;
-    let recommendation;
-    
-    if (menu_source === 'my_uploaded_menu') {
-      // Use vendor's uploaded menu
-      recommendation = await getPersonalizedMenuRecommendation(vendorId, {
-        location,
-        mood_text,
-        mood_ids,
-        dietary,
-        budget
-      });
-    } else {
-      // Use your existing AI service
-      recommendation = await getAIFoodSuggestion(mood_text || 'hungry', {
-        location,
-        dietary,
-        budget
-      });
-    }
-    
-    res.json({
-      success: true,
-      request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      ...recommendation,
-      context: {
-        resolved_moods: normalizeMoods(mood_text, mood_ids),
-        dietary,
-        location,
-        source: menu_source === 'my_uploaded_menu' ? 'uploaded_menu' : 'global_database'
-      },
-      processing_time_ms: Date.now() - req.startTime
-    });
-    
-  } catch (error) {
-    console.error('Recommendation error:', error);
-    res.status(500).json({ error: 'Recommendation failed', details: error.message });
-  }
-});
-
-// Get vendor's menu (for dashboard)
-app.get('/v1/menus', authenticateApiKey, (req, res) => {
-  const vendorId = req.apiKey.vendorId;
-  const vendorMenu = vendorMenus.get(vendorId);
-  
-  if (!vendorMenu) {
-    return res.json({
-      success: true,
-      menu: [],
-      version: null,
-      item_count: 0
-    });
-  }
-  
-  res.json({
-    success: true,
-    menu: vendorMenu.items,
-    version: vendorMenu.version,
-    item_count: vendorMenu.itemCount,
-    updated_at: vendorMenu.updatedAt
-  });
-});
-
-// Usage analytics for customer dashboard
-app.get('/v1/analytics', authenticateApiKey, (req, res) => {
-  const vendorId = req.apiKey.vendorId;
-  const keyData = req.apiKey;
-  
-  res.json({
-    success: true,
-    usage: {
-      current_period: keyData.usage,
-      limit: keyData.limit,
-      percentage: Math.round((keyData.usage / keyData.limit) * 100)
-    },
-    plan: keyData.plan,
-    vendor_id: vendorId,
-    menu_status: vendorMenus.has(vendorId) ? 'uploaded' : 'not_uploaded'
-  });
-});
 
 // ==================== MCP PROTOCOL ENDPOINTS ====================
 
@@ -1552,129 +1137,138 @@ app.post('/mcp/initialize', (req, res) => {
     },
     serverInfo: {
       name: "vfied-food-intelligence",
-      version: "1.5.0"
+      version: "1.4.0"
     }
   });
 });
 
 // MCP Tools List - Tells OpenAI what tools are available
 app.post('/mcp/tools/list', (req, res) => {
-    res.json({
-      tools: [
-        {
-          name: "get_quick_food_decision",
-          description: "Get instant food decision based on location, weather, and dietary restrictions",
-          inputSchema: {
-            type: "object",
-            properties: {
-              location: {
-                type: "object",
-                properties: {
-                  city: { type: "string" },
-                  country: { type: "string" },
-                  latitude: { type: "number" },
-                  longitude: { type: "number" }
-                }
+  res.json({
+    tools: [
+      {
+        name: "get_quick_food_decision",
+        description: "Get instant food decision based on location, weather, and dietary restrictions",
+        inputSchema: {
+          type: "object",
+          properties: {
+            location: {
+              type: "object",
+              properties: {
+                city: { type: "string" },
+                country: { type: "string" },
+                latitude: { type: "number" },
+                longitude: { type: "number" }
+              }
+            },
+            dietary: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: ["vegetarian", "vegan", "gluten-free", "dairy-free", "keto", "halal", "kosher", "nut-free", "paleo", "pescatarian"]
               },
-              dietary: {
-                type: "array",
-                items: {
-                  type: "string",
-                  enum: ["vegetarian","vegan","gluten-free","dairy-free","keto","halal","kosher","nut-free","paleo","pescatarian"]
-                }
-              },
-              context: {
-                type: "object",
-                properties: {
-                  budget: { type: "string", enum: ["low","medium","high"] },
-                  social: { type: "string", enum: ["solo","couple","group","family"] },
-                  includeRestaurants: { type: "boolean" }
-                }
+              description: "Dietary restrictions"
+            },
+            context: {
+              type: "object",
+              properties: {
+                budget: { type: "string", enum: ["low", "medium", "high"] },
+                social: { type: "string", enum: ["solo", "couple", "group", "family"] },
+                includeRestaurants: { type: "boolean" }
               }
             }
           }
-        },
-        {
-          name: "get_food_suggestion",
-          description: "Personalized food suggestion based on mood, weather, location, and dietary needs",
-          inputSchema: {
-            type: "object",
-            properties: {
-              mood: { type: "string", enum: ["tired","stressed","celebrating","healthy","hungry","lazy","energetic"] },
-              location: {
-                type: "object",
-                properties: {
-                  city: { type: "string" },
-                  country: { type: "string" },
-                  latitude: { type: "number" },
-                  longitude: { type: "number" }
-                }
-              },
-              dietary: {
-                type: "array",
-                items: {
-                  type: "string",
-                  enum: ["vegetarian","vegan","gluten-free","dairy-free","keto","halal","kosher","nut-free","paleo","pescatarian"]
-                }
-              },
-              context: {
-                type: "object",
-                properties: {
-                  budget: { type: "string", enum: ["low","medium","high"] },
-                  social: { type: "string", enum: ["solo","couple","group","family"] },
-                  includeRestaurants: { type: "boolean" }
-                }
-              }
-            },
-            required: ["mood"]
-          }
-        },
-        {
-          name: "validate_dietary_compliance",
-          description: "Check if a food item complies with specific dietary restrictions",
-          inputSchema: {
-            type: "object",
-            properties: {
-              foodName: { type: "string" },
-              dietary: {
-                type: "array",
-                items: {
-                  type: "string",
-                  enum: ["vegetarian","vegan","gluten-free","dairy-free","keto","halal","kosher","nut-free","paleo","pescatarian"]
-                }
-              }
-            },
-            required: ["foodName","dietary"]
-          }
-        },
-        {
-          name: "get_cultural_food_context",
-          description: "Get cultural food context and recommendations for a specific location",
-          inputSchema: {
-            type: "object",
-            properties: {
-              location: {
-                type: "object",
-                properties: {
-                  city: { type: "string" },
-                  country: { type: "string" }
-                },
-                required: ["country"]
-              },
-              dietary: {
-                type: "array",
-                items: {
-                  type: "string",
-                  enum: ["vegetarian","vegan","gluten-free","dairy-free","keto","halal","kosher","nut-free","paleo","pescatarian"]
-                }
-              }
-            },
-            required: ["location"]
-          }
         }
-      ]
-    });
+      },
+      {
+        name: "get_food_suggestion",
+        description: "Get personalized food suggestion based on mood, weather, location, and dietary needs",
+        inputSchema: {
+          type: "object",
+          properties: {
+            mood: {
+              type: "string",
+              enum: ["tired", "stressed", "celebrating", "healthy", "hungry", "lazy", "energetic"],
+              description: "Current mood"
+            },
+            location: {
+              type: "object",
+              properties: {
+                city: { type: "string" },
+                country: { type: "string" },
+                latitude: { type: "number" },
+                longitude: { type: "number" }
+              }
+            },
+            dietary: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: ["vegetarian", "vegan", "gluten-free", "dairy-free", "keto", "halal", "kosher", "nut-free", "paleo", "pescatarian"]
+              }
+            },
+            context: {
+              type: "object",
+              properties: {
+                budget: { type: "string" },
+                social: { type: "string" },
+                includeRestaurants: { type: "boolean" }
+              }
+            }
+          },
+          required: ["mood"]
+        }
+      },
+      {
+        name: "validate_dietary_compliance",
+        description: "Check if a food item complies with specific dietary restrictions",
+        inputSchema: {
+          type: "object",
+          properties: {
+            foodName: {
+              type: "string",
+              description: "Name of the food to validate"
+            },
+            dietary: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: ["vegetarian", "vegan", "gluten-free", "dairy-free", "keto", "halal", "kosher", "nut-free", "paleo", "pescatarian"]
+              }
+            }
+          },
+          required: ["foodName", "dietary"]
+        }
+      },
+      {
+        name: "get_cultural_food_context",
+        description: "Get cultural food context and recommendations for a specific location",
+        inputSchema: {
+          type: "object",
+          properties: {
+            location: {
+              type: "object",
+              properties: {
+                city: { type: "string" },
+                country: { type: "string" }
+              },
+              required: ["country"]
+            },
+            dietary: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: ["vegetarian", "vegan", "gluten-free", "dairy-free", "keto", "halal", "kosher", "nut-free", "paleo", "pescatarian"]
+              }
+            }
+          },
+          required: ["location"]
+        }
+      }
+    ]
   });
+});
+
 // MCP Tools Call - Executes the actual tool calls
 app.post('/mcp/tools/call', async (req, res) => {
   try {
@@ -1793,8 +1387,8 @@ app.post('/mcp/ping', (req, res) => {
 app.get('/health', (req, res) => {
   res.json({
     status: "healthy",
-    service: "VFIED Weather + Dietary Enhanced MCP Server with Menu Upload System",
-    version: "1.5.0",
+    service: "VFIED Weather + Dietary Enhanced MCP Server",
+    version: "1.4.0",
     timestamp: new Date().toISOString(),
     features: [
       "Weather intelligence",
@@ -1803,10 +1397,7 @@ app.get('/health', (req, res) => {
       "Personal pattern learning",
       "OpenAI integration",
       "Location detection",
-      "MCP Protocol Support",
-      "Vendor menu upload system",
-      "API key authentication",
-      "Usage analytics"
+      "MCP Protocol Support"
     ],
     services: {
       ai: !!aiFoodService.openaiApiKey,
@@ -1814,14 +1405,7 @@ app.get('/health', (req, res) => {
       dietary: true,
       location: !!aiFoodService.userLocation?.city,
       culture: !!aiFoodService.userCulture?.mainCuisine,
-      mcp: true,
-      menuSystem: true,
-      authentication: true
-    },
-    vendor_system: {
-      total_vendors: apiKeys.size,
-      total_menus: vendorMenus.size,
-      demo_keys_available: true
+      mcp: true
     }
   });
 });
@@ -1950,7 +1534,6 @@ app.post('/mcp/validate_dietary_compliance', async (req, res) => {
   }
 });
 
-// Debug endpoint for environment variables
 app.get('/debug/env', (req, res) => {
   res.json({
     hasOpenAI: !!process.env.OPENAI_API_KEY,
@@ -2051,17 +1634,12 @@ app.use((error, req, res, next) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🌦️ VFIED Enhanced MCP Server with Menu Upload System running on port ${PORT}`);
+  console.log(`🌦️ VFIED Weather + Dietary Enhanced MCP Server running on port ${PORT}`);
   console.log(`🤖 AI Status: ${aiFoodService.openaiApiKey ? 'Connected' : 'Local Mode'}`);
   console.log(`🌤️ Weather API: ${weatherService.openWeatherKey ? 'Connected' : 'Simulated'}`);
   console.log(`🌱 Dietary Intelligence: Active`);
   console.log(`🔗 MCP Protocol: Active`);
-  console.log(`📋 Menu Upload System: Active`);
-  console.log(`🔑 API Authentication: Active`);
-  console.log(`📊 Analytics: Active`);
   console.log(`🔗 Health: http://localhost:${PORT}/health`);
-  console.log(`🍽️ Menu Endpoints: /v1/menus (POST/GET), /v1/recommend (POST)`);
-  console.log(`📈 Analytics Endpoint: /v1/analytics (GET)`);
 });
 
-export default app; 
+export default app;
