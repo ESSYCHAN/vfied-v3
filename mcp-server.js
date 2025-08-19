@@ -1034,45 +1034,61 @@ class WeatherService {
     }
   }
 
+  getSimulatedTemp(location) {
+    const country = location?.country || location?.countryCode || 'US';
+    const hour = new Date().getHours();
+    const month = new Date().getMonth(); // 0-11
+    
+    // More realistic base temperatures by country and season
+    const tempMap = {
+      'GB': month >= 5 && month <= 8 ? 22 : 12,  // UK: 22°C summer, 12°C winter
+      'UK': month >= 5 && month <= 8 ? 22 : 12,
+      'KE': 22,  // Kenya relatively stable
+      'NG': 28,  // Nigeria hot
+      'US': month >= 5 && month <= 8 ? 25 : 15,  // US varies more
+      'FR': month >= 5 && month <= 8 ? 24 : 8,   // France
+      'DE': month >= 5 && month <= 8 ? 23 : 5    // Germany
+    };
+    
+    const baseTemp = tempMap[country.toUpperCase()] || 20;
+    const tempVariation = Math.sin((hour - 6) * Math.PI / 12) * 6;
+    const randomVariation = (Math.random() * 4) - 2;
+    
+    return Math.round(baseTemp + tempVariation + randomVariation);
+  }
+
   getSimulatedWeather(location) {
-    const temp = this.getSimulatedTemp(location);
-    const condition = this.getSimulatedCondition();
+    // Option A: Use realistic temps for major cities
+    const realisticTemps = {
+      'London': 24,    // Your actual temp!
+      'Nairobi': 20,
+      'New York': 28,
+      'Paris': 26,
+      'Berlin': 23
+    };
+    
+    const city = location?.city;
+    const temp = realisticTemps[city] || this.getSimulatedTemp(location); // 👈 Calls Function 1
+    
+    const condition = temp > 25 ? 'sunny' : temp < 15 ? 'cloudy' : 'partly cloudy';
     
     return {
-      temperature: temp,
-      feelsLike: temp + Math.floor(Math.random() * 6) - 3,
+      temperature: temp,                    // 👈 From Function 1 or realistic temps
+      feelsLike: temp + Math.floor(Math.random() * 4) - 2,
       humidity: 40 + Math.floor(Math.random() * 40),
       condition,
-      description: this.getWeatherDescription(condition),
+      description: condition,
       windSpeed: Math.floor(Math.random() * 15),
-      cityName: location?.city || 'Unknown',
+      cityName: city || 'Unknown',
       country: location?.country || 'Unknown',
-      isRaining: condition === 'rain',
-      isSnowing: condition === 'snow',
+      isRaining: false,
+      isSnowing: false,
       isCold: temp < 15,
       isHot: temp > 30,
       isComfortable: temp >= 18 && temp <= 26,
       simulated: true,
       timestamp: new Date().toISOString()
     };
-  }
-
-  getSimulatedTemp(location) {
-    const country = location?.country || location?.countryCode || 'US';
-    const hour = new Date().getHours();
-    
-    const tempMap = {
-      'KE': 22, 'NG': 28, 'ET': 18, 'ZA': 20,
-      'IN': 25, 'JP': 18, 'CN': 16, 'TH': 30,
-      'GB': 12, 'DE': 15, 'FR': 16, 'IT': 18,
-      'US': 18, 'CA': 10, 'MX': 24, 'BR': 26,
-      'AU': 22, 'NZ': 16
-    };
-    
-    const baseTemp = tempMap[country.toUpperCase()] || 20;
-    const tempVariation = Math.sin((hour - 6) * Math.PI / 12) * 8;
-    
-    return Math.round(baseTemp + tempVariation + (Math.random() * 6 - 3));
   }
 
   getSimulatedCondition() {
