@@ -16,7 +16,17 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
-
+const CITY_COORDINATES = {
+    'London': { latitude: 51.5074, longitude: -0.1278 },
+    'Mumbai': { latitude: 19.0760, longitude: 72.8777 },
+    'Berlin': { latitude: 52.5200, longitude: 13.4050 },
+    'Seoul': { latitude: 37.5665, longitude: 126.9780 },
+    'Tokyo': { latitude: 35.6762, longitude: 139.6503 },
+    'Cairo': { latitude: 30.0444, longitude: 31.2357 },
+    'Nairobi': { latitude: -1.2921, longitude: 36.8219 },
+    'New York': { latitude: 40.7128, longitude: -74.0060 },
+    'Paris': { latitude: 48.8566, longitude: 2.3522 }
+  };
 
 
 // Middleware
@@ -149,6 +159,8 @@ class AIFoodService {
       countryCode: 'US' // Default fallback
     };
   }
+
+  
   
   setLocationFromRequest(location) {
     if (!location) return;
@@ -2293,99 +2305,135 @@ app.get('/health', (req, res) => {
 
 // Main Food Suggestion with Dietary Support
 app.post('/mcp/get_food_suggestion', async (req, res) => {
-  try {
-    const { mood, location, dietary = [], context = {} } = req.body;
-
-    if (!mood) {
-      return res.status(400).json({
-        error: "Missing required parameter: mood"
+    try {
+      const { mood, location, dietary = [], context = {} } = req.body;
+  
+      if (!mood) {
+        return res.status(400).json({
+          error: "Missing required parameter: mood"
+        });
+      }
+  
+      // 🔥 Use smart mood detection
+      const resolvedMoods = await resolveMoods(mood, [], aiFoodService.openaiApiKey);
+      const primaryMood = resolvedMoods.join(' and ');
+  
+      const enhancedContext = {
+        ...context,
+        dietary,
+        resolvedMoods // Pass to AI for better understanding
+      };
+  
+      const suggestion = await getWeatherAndDietaryAwareSuggestion(location, primaryMood, enhancedContext);
+  
+      res.json({
+        success: true,
+        ...suggestion,
+        meta: {
+          tool: "get_food_suggestion",
+          originalMood: mood,
+          resolvedMoods: resolvedMoods, // Show what was detected
+          hasWeather: !!suggestion.weather,
+          hasDietary: dietary.length > 0,
+          dietaryRestrictions: dietary,
+          timestamp: new Date().toISOString()
+        }
+      });
+  
+    } catch (error) {
+      console.error('Food suggestion error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
       });
     }
-
-    const enhancedContext = {
-      ...context,
-      dietary
-    };
-
-    const suggestion = await getWeatherAndDietaryAwareSuggestion(location, mood, enhancedContext);
-
-    res.json({
-      success: true,
-      ...suggestion,
-      meta: {
-        tool: "get_food_suggestion",
-        hasWeather: !!suggestion.weather,
-        hasDietary: dietary.length > 0,
-        dietaryRestrictions: dietary,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-  } catch (error) {
-    console.error('Food suggestion error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
+  });
 
 // Quick Weather + Dietary Decision
 app.post('/mcp/get_quick_food_decision', async (req, res) => {
-  try {
-    const { location, dietary = [], context = {} } = req.body;
+    try {
+      const { location, dietary = [], context = {} } = req.body;
 
-    if (location) {
-      aiFoodService.setLocationFromRequest({
-        city: location?.city || 'London',
-        country: location?.country || 'UK', 
-        countryCode: location?.country_code || 'GB'
-      });
-      
-    }
-
-    const hour = new Date().getHours();
-    let autoMood = 'random';
-    
-    if (hour >= 6 && hour <= 10) autoMood = 'tired';
-    else if (hour >= 11 && hour <= 15) autoMood = 'hungry';
-    else if (hour >= 17 && hour <= 22) autoMood = 'tired';
-    else autoMood = 'lazy';
-
-    const enhancedContext = {
-      ...context,
-      dietary,
-      quick: true
-    };
-
-    const suggestion = await getWeatherAndDietaryAwareSuggestion(location, autoMood, enhancedContext);
-
-    res.json({
-      success: true,
-      decision: suggestion.food?.name || 'Good Food Choice',
-      explanation: suggestion.description || suggestion.friendResponse,
-      weather: suggestion.weather,
-      weatherReasoning: suggestion.weatherReasoning,
-      dietaryNote: suggestion.dietaryNote,
-      ...suggestion,
-      meta: {
-        tool: "get_quick_food_decision",
-        autoMood,
-        hasWeather: !!suggestion.weather,
-        hasDietary: dietary.length > 0,
-        dietaryRestrictions: dietary,
-        timestamp: new Date().toISOString()
+  
+      if (location) {
+        aiFoodService.setLocationFromRequest = function(location) {
+        if (!location) return;
+        
+        const coords = CITY_COORDINATES[location.city] || {};
+        
+        
+        this.userLocation = {
+            city: location.city || this.userLocation?.city || 'Unknown',
+            country: location.country || this.userLocation?.country || 'Unknown',
+            countryCode: this.getCountryCode(location.country || this.userLocation?.country || 'US'),
+            latitude: location.latitude || coords.latitude || this.userLocation?.latitude,
+            longitude: location.longitude || coords.longitude || this.userLocation?.longitude,
+            timestamp: new Date().toISOString()
+        };
+        
+        console.log('📍 Location set from request:', this.userLocation);
+        this.detectCulturalContext();
+        };
       }
-    });
-
-  } catch (error) {
-    console.error('Quick decision error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
+  
+      const hour = new Date().getHours();
+      let autoMood = 'random';
+      
+      if (hour >= 6 && hour <= 10) autoMood = 'tired';
+      else if (hour >= 11 && hour <= 15) autoMood = 'hungry';
+      else if (hour >= 17 && hour <= 22) autoMood = 'tired';
+      else autoMood = 'lazy';
+  
+      const enhancedContext = {
+        ...context,
+        dietary,
+        quick: true,
+        // 🔥 ADD: Explicit dietary emphasis for better AI compliance
+        dietaryConstraints: dietary.length > 0 ? `MUST BE STRICTLY ${dietary.join(' AND ').toUpperCase()}` : null
+      };
+  
+      let suggestion = await getWeatherAndDietaryAwareSuggestion(location, autoMood, enhancedContext);
+  
+      // 🔥 ADD: Validate compliance and retry if needed
+      if (dietary.length > 0 && suggestion.food?.name) {
+        try {
+          const compliance = await smartDietaryService.validateCompliance(suggestion.food.name, dietary);
+          if (!compliance.compliant) {
+            console.warn(`Quick suggestion "${suggestion.food.name}" not compliant, using fallback`);
+            suggestion = getFallbackRecommendation(location, autoMood, dietary);
+          }
+          suggestion.dietaryCompliance = compliance;
+        } catch (e) {
+          console.warn('Compliance check failed in quick decision');
+        }
+      }
+  
+      res.json({
+        success: true,
+        decision: suggestion.food?.name || 'Good Food Choice',
+        explanation: suggestion.description || suggestion.friendResponse,
+        weather: suggestion.weather,
+        weatherReasoning: suggestion.weatherReasoning,
+        dietaryNote: suggestion.dietaryNote,
+        ...suggestion,
+        meta: {
+          tool: "get_quick_food_decision",
+          autoMood,
+          hasWeather: !!suggestion.weather,
+          hasDietary: dietary.length > 0,
+          dietaryRestrictions: dietary,
+          timestamp: new Date().toISOString()
+        }
+      });
+  
+    } catch (error) {
+      console.error('Quick decision error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  });
 
 // Dietary Compliance Validation
 app.post('/mcp/validate_dietary_compliance', async (req, res) => {
@@ -2432,56 +2480,72 @@ app.get('/debug/env', (req, res) => {
 
 // Cultural Context with Dietary Filtering
 app.post('/mcp/get_cultural_food_context', async (req, res) => {
-  try {
-    const { location, dietary = [] } = req.body;
-
-    if (!location?.country) {
-      return res.status(400).json({
-        error: "Missing required parameter: location.country"
+    try {
+      const { location, dietary = [] } = req.body;
+  
+      if (!location?.country) {
+        return res.status(400).json({
+          error: "Missing required parameter: location.country"
+        });
+      }
+  
+      // 🔥 FIX: Ensure we detect culture for the RIGHT country
+      const tempLocation = {
+        city: location.city || 'Unknown',
+        country: location.country,
+        countryCode: aiFoodService.getCountryCode(location.country) // Fix country code mapping
+      };
+      
+      // Force cultural detection for the specific location
+      aiFoodService.setLocationFromRequest(tempLocation);
+      await aiFoodService.detectCulturalContext(); // Wait for it to complete
+      
+      const culturalContext = aiFoodService.userCulture || {
+        mainCuisine: `${location.country} cuisine`,
+        popularFoods: ["Local dishes"],
+        comfortFoods: ["Traditional comfort foods"],
+        culturalNotes: `Rich ${location.country} food culture`
+      };
+  
+      // Apply dietary filtering if requested
+      if (dietary.length > 0) {
+        culturalContext.dietaryFriendlyOptions = {};
+        for (const restriction of dietary) {
+          const friendlyFoods = [];
+          for (const food of culturalContext.popularFoods || []) {
+            try {
+              const compliance = await smartDietaryService.validateCompliance(food, [restriction]);
+              if (compliance.compliant) {
+                friendlyFoods.push(food);
+              }
+            } catch (e) {
+              // Skip if validation fails
+            }
+          }
+          culturalContext.dietaryFriendlyOptions[restriction] = friendlyFoods;
+        }
+      }
+  
+      res.json({
+        success: true,
+        location: `${location.city || location.country}`,
+        ...culturalContext,
+        meta: {
+          tool: "get_cultural_food_context",
+          hasDietary: dietary.length > 0,
+          dietaryRestrictions: dietary,
+          timestamp: new Date().toISOString()
+        }
+      });
+  
+    } catch (error) {
+      console.error('Cultural context error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
       });
     }
-
-    const culturalContext = aiFoodService.userCulture || {
-      mainCuisine: "Local",
-      popularFoods: ["Local Food 1", "Local Food 2"],
-      comfortFoods: ["Comfort 1", "Comfort 2"],
-      culturalNotes: "Rich food culture"
-    };
-
-    if (dietary.length > 0) {
-      culturalContext.dietaryFriendlyOptions = {};
-      for (const restriction of dietary) {
-        const friendlyFoods = [];
-        for (const food of culturalContext.popularFoods) {
-          const compliance = await smartDietaryService.validateCompliance(food, [restriction]);
-          if (compliance.compliant) {
-            friendlyFoods.push(food);
-          }
-        }
-        culturalContext.dietaryFriendlyOptions[restriction] = friendlyFoods;
-      }
-    }
-
-    res.json({
-      success: true,
-      ...culturalContext,
-      meta: {
-        tool: "get_cultural_food_context",
-        location: `${location.city || location.country}`,
-        hasDietary: dietary.length > 0,
-        dietaryRestrictions: dietary,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-  } catch (error) {
-    console.error('Cultural context error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-});
+  });
 
 // Feedback endpoint
 app.post('/mcp/provide_feedback', async (req, res) => {
@@ -2634,23 +2698,129 @@ export const validateRequest = (schema) => (req, res, next) => {
   };
 
 // Helper functions
-function textToMoodIds(text = '') {
+async function smartMoodDetection(moodText, openaiApiKey) {
+    if (!moodText || !openaiApiKey) {
+      return []; // Fallback to empty if no AI available
+    }
+  
+    try {
+      const moodPrompt = `
+  You are a mood detection expert. Map the user's mood description to the closest supported mood IDs.
+  
+  USER MOOD: "${moodText}"
+  
+  SUPPORTED MOODS:
+  - TIRED (exhausted, sleepy, drained, worn out)
+  - STRESSED (overwhelmed, pressure, tense, anxious, worried)
+  - CELEBRATING (excited, triumphant, happy, party, birthday, win)
+  - HUNGRY (starving, famished, peckish, craving food)
+  - POST_WORKOUT (after gym, post exercise, need protein)
+  - SICK (ill, unwell, under weather, recovering)
+  - FOCUSED (concentrated, working, productive, studying)
+  - RELAX (chill, unwind, calm, cozy, laid-back, comfortable)
+  - ADVENTUROUS (try something new, explore, experimental)
+  
+  EXAMPLES:
+  - "cozy" → ["RELAX"]
+  - "tired but excited" → ["TIRED", "CELEBRATING"]
+  - "need comfort food" → ["RELAX", "HUNGRY"]
+  - "just finished workout" → ["POST_WORKOUT"]
+  - "stressed at work" → ["STRESSED", "FOCUSED"]
+  - "feeling under the weather" → ["SICK"]
+  
+  Map the user's mood to 1-3 most relevant mood IDs. Respond with ONLY a JSON array:
+  ["MOOD1", "MOOD2"]
+  `;
+  
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openaiApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', // Fast and cheap for simple tasks
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a mood detection expert. Always respond with valid JSON array of mood IDs.'
+            },
+            {
+              role: 'user', 
+              content: moodPrompt
+            }
+          ],
+          max_tokens: 50, // Very short response needed
+          temperature: 0.1, // Low for consistency
+          response_format: { type: 'json_object' }
+        })
+      });
+  
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+  
+      const data = await response.json();
+      const aiResponse = data.choices[0].message.content;
+      
+      // Parse the AI response
+      const parsed = JSON.parse(aiResponse);
+      
+      // Handle both array format and object format
+      if (Array.isArray(parsed)) {
+        return parsed;
+      } else if (parsed.moods && Array.isArray(parsed.moods)) {
+        return parsed.moods;
+      } else {
+        return [];
+      }
+  
+    } catch (error) {
+      console.warn('Smart mood detection failed:', error.message);
+      return fallbackMoodDetection(moodText); // Fallback to regex
+    }
+  }
+
+  function fallbackMoodDetection(text = '') {
     const t = text.toLowerCase();
     const map = [
-      [/post[-\s]?workout|gym|workout/, 'POST_WORKOUT'],
-      [/tired|exhausted|fatigued/, 'TIRED'],
-      [/stress|anxious|overwhelmed/, 'STRESSED'],
-      [/celebrat|party|birthday|win/, 'CELEBRATING'],
-      [/healthy|clean|light/, 'HEALTHY'],
-      [/hungry|starving|ravenous/, 'HUNGRY'],
-      [/lazy|couch|chill/, 'LAZY'],
-      [/energetic|pumped|hype/, 'ENERGETIC'],
-      [/sick|flu|cold/, 'SICK'],
-      [/hangover|hungover/, 'HUNGOVER']
+      [/post[-\s]?workout|gym|workout|exercise/, 'POST_WORKOUT'],
+      [/tired|exhausted|fatigued|sleepy|worn out/, 'TIRED'],
+      [/stress|anxious|overwhelmed|worried|tense/, 'STRESSED'],
+      [/celebrat|party|birthday|win|excited|triumph|happy/, 'CELEBRATING'],
+      [/hungry|starving|ravenous|famished|peckish/, 'HUNGRY'],
+      [/sick|flu|cold|ill|unwell|under.?weather/, 'SICK'],
+      [/focus|work|productive|studying|concentrated/, 'FOCUSED'],
+      [/relax|chill|unwind|calm|cozy|laid.?back|comfort/, 'RELAX'],
+      [/adventure|explore|new|experimental|try/, 'ADVENTUROUS']
     ];
-    const out = new Set();
-    for (const [re, id] of map) if (re.test(t)) out.add(id);
-    return [...out];
+    
+    const detected = new Set();
+    for (const [regex, moodId] of map) {
+      if (regex.test(t)) {
+        detected.add(moodId);
+      }
+    }
+    
+    return [...detected];
+  }
+  
+
+  async function resolveMoods(mood_text, mood_ids = [], openaiApiKey) {
+    let resolvedMoods = [...(mood_ids || [])];
+    
+    if (mood_text) {
+      // Try smart AI detection first, fallback to regex
+      const detectedMoods = await smartMoodDetection(mood_text, openaiApiKey);
+      resolvedMoods = [...new Set([...resolvedMoods, ...detectedMoods])];
+    }
+    
+    // Ensure we have at least one mood
+    if (resolvedMoods.length === 0) {
+      resolvedMoods = ['HUNGRY']; // Default fallback
+    }
+    
+    return resolvedMoods;
   }
   
   function calculateConfidence(food, moods = [], opts = {}) {
@@ -2805,43 +2975,39 @@ app.post('/v1/quick_decision',
     const startTime = Date.now();
     
     try {
-      const { 
-        location, 
-        mood_text, 
-        mood_ids, 
-        dietary = [], 
-        budget, 
-        social, 
-        menu_source = 'global_database' 
-      } = req.body;
+        const { 
+          location, 
+          mood_text, 
+          mood_ids, 
+          dietary = [], 
+          budget, 
+          social, 
+          menu_source = 'global_database' 
+        } = req.body;
+    
+        // Set location for AI service if provided
+        if (location) {
+          aiFoodService.setLocationFromRequest(location);
+        }
+    
+        // 🔥 Use smart mood detection
+        const resolvedMoods = await resolveMoods(mood_text, mood_ids, aiFoodService.openaiApiKey);
+        const primaryMood = resolvedMoods.join(' and ');
+    
+        const enhancedContext = {
+          location,
+          dietary,
+          budget,
+          social,
+          quick: false,
+          includeRestaurants: true,
+          culturalPriority: true,
+          resolvedMoods, // Pass to AI
+          dietaryConstraints: dietary.length > 0 ? `MUST BE ${dietary.join(' AND ').toUpperCase()}` : null
+        };
   
-      // Set location for AI service if provided
-      if (location) {
-        aiFoodService.setLocationFromRequest(location);
-      }
-  
-      // Merge mood_text into mood_ids
-      let resolvedMoods = [...(mood_ids || [])];
-      if (mood_text) {
-        const textMoods = textToMoodIds(mood_text);
-        resolvedMoods = [...new Set([...resolvedMoods, ...textMoods])];
-      }
-  
-      // Enhanced context for AI with better dietary emphasis
-      const enhancedContext = {
-        location,
-        dietary,
-        budget,
-        social,
-        quick: false,
-        includeRestaurants: true,
-        culturalPriority: true,
-        // Fixed: Add explicit dietary constraint with proper template literal
-        dietaryConstraints: dietary.length > 0 ? `MUST BE ${dietary.join(' AND ').toUpperCase()}` : null
-      };
-  
-      // Get recommendation with proper mood handling
-      const primaryMood = resolvedMoods.length > 0 ? resolvedMoods.join(' and ') : 'hungry';
+    //   // Get recommendation with proper mood handling
+    //   const primaryMood = resolvedMoods.length > 0 ? resolvedMoods.join(' and ') : 'hungry';
   
       let recommendation;
       try {
