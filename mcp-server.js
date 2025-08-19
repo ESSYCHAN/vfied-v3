@@ -1835,10 +1835,10 @@ function toArray(val) {
 // ==================== VENDOR MENU UPLOAD ENDPOINTS ====================
 
 // Menu upload endpoint - THE MONEY MAKER
-app.post('/v1/menus', optionalAuth, async (req, res) => {
+app.post('/v1/menus', async (req, res) => {
     try {
         const { menu, mode = 'snapshot', dry_run = false } = req.body || {};
-        const vendorId = req.apiKey?.vendorId || `public_vendor_${Date.now()}`;
+        const vendorId = `public_vendor_${Date.now()}`;
 
       if (!Array.isArray(menu)) return res.status(400).json({ error: 'Menu must be an array of items' });
   
