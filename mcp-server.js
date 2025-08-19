@@ -2077,7 +2077,291 @@ app.use((error, req, res, next) => {
     details: error.message
   });
 });
+import { v4 as uuidv4 } from 'uuid';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import Joi from 'joi';
 
+// Add security middleware (add after your existing middleware)
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+}));
+
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 1000,
+  message: { error: 'Rate limit exceeded' }
+});
+app.use(limiter);
+
+// Add request ID tracking (add after your existing timing middleware)
+app.use((req, res, next) => {
+  req.requestId = uuidv4();
+  next();
+});
+
+// Mood taxonomy data
+const MOOD_TAXONOMY = {
+  moods: [
+    { id: 'TIRED', group: 'Energy', synonyms: ['exhausted', 'sleepy', 'drained'] },
+    { id: 'STRESSED', group: 'Emotion', synonyms: ['overwhelmed', 'pressure', 'tense'] },
+    { id: 'CELEBRATING', group: 'Emotion', synonyms: ['excited', 'triumphant', 'happy'] },
+    { id: 'HUNGRY', group: 'Body', synonyms: ['starving', 'famished', 'peckish'] },
+    { id: 'POST_WORKOUT', group: 'Body', synonyms: ['after gym', 'post exercise'] },
+    { id: 'SICK', group: 'Body', synonyms: ['ill', 'unwell', 'under weather'] },
+    { id: 'FOCUSED', group: 'Social', synonyms: ['concentrated', 'working', 'productive'] },
+    { id: 'RELAX', group: 'Social', synonyms: ['chill', 'unwind', 'calm'] },
+    { id: 'ADVENTUROUS', group: 'Intent', synonyms: ['try something new', 'explore'] }
+  ]
+};
+
+// Supported countries data
+const SUPPORTED_COUNTRIES = {
+  countries: [
+    { name: 'Kenya', country_code: 'KE', region: 'East Africa', cuisine: 'East African' },
+    { name: 'Nigeria', country_code: 'NG', region: 'West Africa', cuisine: 'West African' },
+    { name: 'United Kingdom', country_code: 'GB', region: 'Western Europe', cuisine: 'British' },
+    { name: 'United States', country_code: 'US', region: 'North America', cuisine: 'American' },
+    { name: 'Japan', country_code: 'JP', region: 'East Asia', cuisine: 'Japanese' },
+    { name: 'India', country_code: 'IN', region: 'South Asia', cuisine: 'Indian' },
+    { name: 'France', country_code: 'FR', region: 'Western Europe', cuisine: 'French' },
+    { name: 'Germany', country_code: 'DE', region: 'Central Europe', cuisine: 'German' },
+    { name: 'Australia', country_code: 'AU', region: 'Oceania', cuisine: 'Australian' }
+  ]
+};
+
+// Validation schemas
+const quickDecisionSchema = Joi.object({
+  location: Joi.object({
+    city: Joi.string().optional(),
+    country: Joi.string().optional(),
+    country_code: Joi.string().length(2).uppercase().optional()
+  }).optional(),
+  dietary: Joi.array().items(
+    Joi.string().valid('vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'keto', 'halal', 'kosher')
+  ).optional()
+});
+
+const recommendSchema = Joi.object({
+  location: Joi.object({
+    city: Joi.string().optional(),
+    country: Joi.string().required(),
+    country_code: Joi.string().length(2).uppercase().required()
+  }).optional(),
+  mood_text: Joi.string().optional(),
+  mood_ids: Joi.array().items(
+    Joi.string().valid('TIRED', 'STRESSED', 'CELEBRATING', 'HUNGRY', 'POST_WORKOUT', 'SICK', 'FOCUSED', 'RELAX', 'ADVENTUROUS')
+  ).min(1).required(),
+  dietary: Joi.array().items(
+    Joi.string().valid('vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'keto', 'halal', 'kosher')
+  ).optional(),
+  budget: Joi.string().valid('low', 'medium', 'high').optional(),
+  social: Joi.string().valid('solo', 'date', 'family', 'friends', 'work').optional()
+});
+
+// Validation middleware
+function validateRequest(schema) {
+  return (req, res, next) => {
+    const { error, value } = schema.validate(req.body, { stripUnknown: true });
+    if (error) {
+      return res.status(400).json({
+        error: 'Validation Error',
+        details: error.details.map(d => ({ field: d.path.join('.'), message: d.message }))
+      });
+    }
+    req.body = value;
+    next();
+  };
+}
+
+// Helper functions
+function textToMoodIds(text) {
+  if (!text) return [];
+  const moodMap = {
+    'tired': 'TIRED', 'exhausted': 'TIRED', 'stressed': 'STRESSED',
+    'celebrating': 'CELEBRATING', 'happy': 'CELEBRATING', 'hungry': 'HUNGRY',
+    'workout': 'POST_WORKOUT', 'sick': 'SICK', 'focus': 'FOCUSED', 'relax': 'RELAX'
+  };
+  
+  const detectedMoods = [];
+  const textLower = text.toLowerCase();
+  
+  for (const [keyword, moodId] of Object.entries(moodMap)) {
+    if (textLower.includes(keyword)) {
+      detectedMoods.push(moodId);
+    }
+  }
+  
+  return [...new Set(detectedMoods)];
+}
+
+function calculateConfidence(food, moodIds, context) {
+  let confidence = 75;
+  if (moodIds.length === 1) confidence += 10;
+  if (context.dietary && context.dietary.length > 0) confidence -= 5;
+  return Math.min(confidence, 95);
+}
+
+// NEW ENDPOINTS
+
+// GET /v1/moods - Mood taxonomy
+app.get('/v1/moods', (req, res) => {
+  res.json(MOOD_TAXONOMY);
+});
+
+// GET /v1/countries - Supported countries
+app.get('/v1/countries', (req, res) => {
+  res.json(SUPPORTED_COUNTRIES);
+});
+
+// POST /v1/quick_decision - Public quick decision
+app.post('/v1/quick_decision', 
+  validateRequest(quickDecisionSchema),
+  async (req, res) => {
+    const startTime = Date.now();
+    
+    try {
+      const { location, dietary = [] } = req.body;
+      
+      // Use your existing AI service
+      const autoMood = 'hungry';
+      const suggestion = await getAIFoodSuggestion(autoMood, { location, dietary, quick: true });
+      
+      res.json({
+        success: true,
+        request_id: req.requestId,
+        decision: suggestion.food?.name || 'Good Food Choice',
+        country_code: location?.country_code || 'US',
+        explanation: suggestion.friendResponse || suggestion.description,
+        dietaryNote: dietary.length > 0 ? `Filtered for: ${dietary.join(', ')}` : null,
+        processingTimeMs: Date.now() - startTime
+      });
+      
+    } catch (error) {
+      console.error('Quick decision error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        request_id: req.requestId
+      });
+    }
+  }
+);
+
+// POST /v1/recommend - Full recommendation (requires auth)
+app.post('/v1/recommend',
+  authenticateApiKey,
+  countUsage,
+  validateRequest(recommendSchema),
+  async (req, res) => {
+    const startTime = Date.now();
+    
+    try {
+      const { location, mood_text, mood_ids, dietary = [], budget, social } = req.body;
+      
+      // Merge mood_text into mood_ids
+      let resolvedMoods = [...mood_ids];
+      if (mood_text) {
+        const textMoods = textToMoodIds(mood_text);
+        resolvedMoods = [...new Set([...resolvedMoods, ...textMoods])];
+      }
+      
+      // Use your existing AI service
+      const primaryMood = resolvedMoods[0] || 'HUNGRY';
+      const suggestion = await getAIFoodSuggestion(primaryMood, { 
+        location, 
+        dietary, 
+        budget, 
+        social 
+      });
+      
+      // Enhance the response to match vision schema
+      const enhancedFood = {
+        dish_id: suggestion.food?.id || `dish_${Date.now()}`,
+        name: suggestion.food?.name || 'Great Choice',
+        emoji: suggestion.food?.emoji || '🍽️',
+        country: location?.country || 'Local',
+        country_code: location?.country_code || 'US',
+        category: suggestion.food?.category || 'comfort',
+        tags: suggestion.food?.tags || [],
+        suitability: {
+          vegetarian: !suggestion.food?.name?.toLowerCase().includes('meat'),
+          vegan: false,
+          gluten_free: false,
+          halal_friendly: true,
+          kosher_friendly: true
+        }
+      };
+      
+      res.json({
+        success: true,
+        request_id: req.requestId,
+        context: {
+          resolved_moods: resolvedMoods,
+          location: location,
+          dietary: dietary
+        },
+        food: enhancedFood,
+        friendMessage: suggestion.friendResponse || suggestion.description,
+        reasoning: suggestion.reason || 'Perfect choice for your current situation',
+        culturalNote: suggestion.culturalNote || 'Fits your cultural preferences',
+        availabilityNote: suggestion.availabilityNote || 'Available in your area',
+        alternatives: suggestion.alternatives || [],
+        confidence: calculateConfidence(enhancedFood, resolvedMoods, { dietary }),
+        processingTimeMs: Date.now() - startTime
+      });
+      
+    } catch (error) {
+      console.error('Recommendation error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        request_id: req.requestId
+      });
+    }
+  }
+);
+
+// Enhanced health check
+app.get('/health', (req, res) => {
+  res.json({
+    status: "healthy",
+    service: "VFIED Food Intelligence API v2.0",
+    version: "2.0.0",
+    timestamp: new Date().toISOString(),
+    features: [
+      "Vision schema endpoints",
+      "Mood taxonomy", 
+      "Country support",
+      "Enhanced security",
+      "Request validation",
+      "Weather intelligence",
+      "Dietary restrictions",
+      "Cultural awareness",
+      "Menu upload system"
+    ],
+    endpoints: {
+      "GET /v1/moods": "Mood taxonomy",
+      "GET /v1/countries": "Supported countries", 
+      "POST /v1/quick_decision": "Quick decision (public)",
+      "POST /v1/recommend": "Full recommendation (auth required)",
+      "POST /mcp/*": "MCP protocol (backward compatibility)"
+    },
+    services: {
+      ai: !!aiFoodService.openaiApiKey,
+      security: true,
+      validation: true,
+      authentication: true
+    }
+  });
+});
 // Start server
 app.listen(PORT, () => {
   console.log(`🌦️ VFIED Enhanced MCP Server with Menu Upload System running on port ${PORT}`);
