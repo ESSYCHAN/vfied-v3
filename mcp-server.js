@@ -16,6 +16,7 @@ const app = express();
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
 
 
+
 // Middleware
 app.use(cors({
   origin: [
@@ -1834,10 +1835,11 @@ function toArray(val) {
 // ==================== VENDOR MENU UPLOAD ENDPOINTS ====================
 
 // Menu upload endpoint - THE MONEY MAKER
-app.post('/v1/menus', authenticateApiKey, async (req, res) => {
+app.post('/v1/menus', optionalAuth, async (req, res) => {
     try {
-      const { menu, mode = 'snapshot', dry_run = false } = req.body || {};
-      const vendorId = req.apiKey.vendorId;
+        const { menu, mode = 'snapshot', dry_run = false } = req.body || {};
+        const vendorId = req.apiKey?.vendorId || `public_vendor_${Date.now()}`;
+
       if (!Array.isArray(menu)) return res.status(400).json({ error: 'Menu must be an array of items' });
   
       const current = vendorMenus.get(vendorId) || { items: [], version: null, updatedAt: null, itemCount: 0 };
@@ -2620,6 +2622,7 @@ const recommendSchema = Joi.object({
   social: Joi.string().valid('solo', 'date', 'family', 'friends', 'work').optional()
 });
 
+
 // Validation middleware
 function validateRequest(schema) {
   return (req, res, next) => {
@@ -2638,14 +2641,19 @@ function validateRequest(schema) {
 // Helper functions
 function textToMoodIds(text) {
   if (!text) return [];
+  
   const moodMap = {
-    'tired': 'TIRED', 'exhausted': 'TIRED', 'stressed': 'STRESSED',
-    'celebrating': 'CELEBRATING', 'happy': 'CELEBRATING', 'hungry': 'HUNGRY',
-    'workout': 'POST_WORKOUT', 'sick': 'SICK', 'focus': 'FOCUSED', 'relax': 'RELAX'
+    'tired': 'TIRED', 'exhausted': 'TIRED', 'sleepy': 'TIRED',
+    'stressed': 'STRESSED', 'anxious': 'ANXIOUS', 'worried': 'ANXIOUS',
+    'celebrating': 'CELEBRATING', 'happy': 'HAPPY', 'excited': 'CELEBRATING',
+    'hungry': 'HUNGRY', 'starving': 'HUNGRY', 'craving': 'CRAVING',
+    'sick': 'SICK', 'unwell': 'SICK', 'hungover': 'HUNGOVER',
+    'workout': 'POST_WORKOUT', 'gym': 'POST_WORKOUT', 'exercise': 'POST_WORKOUT',
+    'focused': 'FOCUSED', 'work': 'FOCUSED', 'relax': 'RELAX', 'chill': 'RELAX'
   };
   
-  const detectedMoods = [];
   const textLower = text.toLowerCase();
+  const detectedMoods = [];
   
   for (const [keyword, moodId] of Object.entries(moodMap)) {
     if (textLower.includes(keyword)) {
@@ -2657,11 +2665,12 @@ function textToMoodIds(text) {
 }
 
 function calculateConfidence(food, moodIds, context) {
-  let confidence = 75;
-  if (moodIds.length === 1) confidence += 10;
-  if (context.dietary && context.dietary.length > 0) confidence -= 5;
-  return Math.min(confidence, 95);
-}
+    let confidence = 75;
+    if (moodIds.length === 1) confidence += 10;
+    if (context.dietary && context.dietary.length > 0) confidence -= 5;
+    if (food.country && food.country !== 'Local') confidence += 5;
+    return Math.min(confidence, 95);
+  }
 
 // NEW ENDPOINTS
 
@@ -2677,153 +2686,207 @@ app.get('/v1/countries', (req, res) => {
 
 // POST /v1/quick_decision - Public quick decision
 app.post('/v1/quick_decision', 
-  validateRequest(quickDecisionSchema),
-  async (req, res) => {
-    const startTime = Date.now();
-    
-    try {
-      const { location, dietary = [] } = req.body;
+    validateRequest(quickDecisionSchema),
+    async (req, res) => {
+      const startTime = Date.now();
       
-      // Use your existing AI service
-      const autoMood = 'hungry';
-      const suggestion = await getAIFoodSuggestion(autoMood, { location, dietary, quick: true });
-      
-      res.json({
-        success: true,
-        request_id: req.requestId,
-        decision: suggestion.food?.name || 'Good Food Choice',
-        country_code: location?.country_code || 'US',
-        explanation: suggestion.friendResponse || suggestion.description,
-        dietaryNote: dietary.length > 0 ? `Filtered for: ${dietary.join(', ')}` : null,
-        processingTimeMs: Date.now() - startTime
-      });
-      
-    } catch (error) {
-      console.error('Quick decision error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-        request_id: req.requestId
-      });
-    }
-  }
-);
-// Add this debug endpoint temporarily
-app.get('/debug/test-ai', async (req, res) => {
-    try {
-      console.log('Testing OpenAI key...');
-      console.log('Key exists:', !!process.env.OPENAI_API_KEY);
-      console.log('Key length:', process.env.OPENAI_API_KEY?.length);
-      
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [{ role: 'user', content: 'Say "API key works"' }],
-          max_tokens: 10
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        res.json({ 
-          success: true, 
-          message: 'OpenAI key is valid!',
-          response: data.choices[0].message.content
+      try {
+        const { location, dietary = [] } = req.body;
+        
+        // Use your existing AI service
+        const autoMood = 'hungry';
+        const suggestion = await getAIFoodSuggestion(autoMood, { 
+          location, 
+          dietary, 
+          quick: true 
         });
-      } else {
-        res.json({ 
-          success: false, 
-          error: data.error?.message || 'Unknown error',
-          status: response.status
+        
+        res.json({
+          success: true,
+          request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          decision: suggestion.food?.name || 'Good Food Choice',
+          country_code: location?.country_code || 'US',
+          explanation: suggestion.friendResponse || suggestion.description,
+          dietaryNote: dietary.length > 0 ? `Filtered for: ${dietary.join(', ')}` : null,
+          weather: suggestion.weather,
+          weatherReasoning: suggestion.weatherReasoning,
+          processingTimeMs: Date.now() - startTime
+        });
+        
+      } catch (error) {
+        console.error('Quick decision error:', error);
+        res.status(500).json({
+          success: false,
+          error: 'Internal server error',
+          request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         });
       }
-      
-    } catch (error) {
-      res.json({ 
-        success: false, 
-        error: error.message 
-      });
     }
-  });
+  );
+
+  app.post('/v1/enhanced_recommend', 
+    validateRequest(recommendSchema),
+    async (req, res) => {
+      const startTime = Date.now();
+      
+      try {
+        const { location, mood_text, mood_ids, dietary = [], budget, social, goal } = req.body;
+        
+        // Set location for AI service
+        if (location) {
+          aiFoodService.setLocationFromRequest(location);
+        }
+        
+        // Merge mood_text into mood_ids
+        let resolvedMoods = [...mood_ids];
+        if (mood_text) {
+          const textMoods = textToMoodIds(mood_text);
+          resolvedMoods = [...new Set([...resolvedMoods, ...textMoods])];
+        }
+        
+        // Enhanced context for AI
+        const enhancedContext = {
+          location,
+          dietary,
+          budget,
+          social,
+          goal,
+          quick: false,
+          includeRestaurants: true,
+          culturalPriority: true
+        };
+        
+        // Get AI recommendation
+        const primaryMood = resolvedMoods[0] || 'HUNGRY';
+        const suggestion = await getWeatherAndDietaryAwareSuggestion(location, primaryMood, enhancedContext);
+        
+        // Format comprehensive response
+        res.json({
+          success: true,
+          request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          context: {
+            resolved_moods: resolvedMoods,
+            location: location,
+            dietary: dietary,
+            source: 'enhanced_public'
+          },
+          food: {
+            dish_id: suggestion.food?.id || `dish_${Date.now()}`,
+            name: suggestion.food?.name || 'Perfect Choice',
+            emoji: suggestion.food?.emoji || '🍽️',
+            country: location?.country || suggestion.food?.country || 'Local',
+            country_code: location?.country_code || suggestion.food?.country_code || 'US',
+            category: suggestion.food?.category || 'comfort',
+            type: suggestion.food?.type || 'Local cuisine',
+            description: suggestion.description || suggestion.friendResponse
+          },
+          friendMessage: suggestion.friendResponse || suggestion.description,
+          reasoning: suggestion.reason || suggestion.reasoning,
+          culturalNote: suggestion.culturalNote,
+          personalNote: suggestion.personalNote,
+          weatherNote: suggestion.weatherReasoning,
+          availabilityNote: suggestion.availabilityNote,
+          alternatives: suggestion.alternatives || [],
+          confidence: suggestion.confidence || 85,
+          dietaryCompliance: suggestion.dietaryCompliance,
+          dietaryNote: suggestion.dietaryNote,
+          weather: suggestion.weather,
+          interactionId: suggestion.interactionId,
+          processingTimeMs: Date.now() - startTime,
+          meta: {
+            hasWeather: !!suggestion.weather,
+            hasDietary: dietary.length > 0,
+            dietaryRestrictions: dietary,
+            timestamp: new Date().toISOString()
+          }
+        });
+        
+      } catch (error) {
+        console.error('Enhanced recommendation error:', error);
+        res.status(500).json({
+          success: false,
+          error: 'Internal server error',
+          request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        });
+      }
+    }
+  );
+
 // POST /v1/recommend - Full recommendation (requires auth)
 app.post('/v1/recommend',
-  authenticateApiKey,
-  countUsage,
-  validateRequest(recommendSchema),
-  async (req, res) => {
-    const startTime = Date.now();
-    
-    try {
-      const { location, mood_text, mood_ids, dietary = [], budget, social } = req.body;
+//     authenticateApiKey,           // ❌ REMOVE THIS LINE
+//   countUsage,                   // ❌ REMOVE THIS LINE  
+    validateRequest(recommendSchema),  // ✅ Keep validation
+    async (req, res) => {
+      const startTime = Date.now();
       
-      // Merge mood_text into mood_ids
-      let resolvedMoods = [...mood_ids];
-      if (mood_text) {
-        const textMoods = textToMoodIds(mood_text);
-        resolvedMoods = [...new Set([...resolvedMoods, ...textMoods])];
-      }
-      
-      // Use your existing AI service
-      const primaryMood = resolvedMoods[0] || 'HUNGRY';
-      const suggestion = await getAIFoodSuggestion(primaryMood, { 
-        location, 
-        dietary, 
-        budget, 
-        social 
-      });
-      
-      // Enhance the response to match vision schema
-      const enhancedFood = {
-        dish_id: suggestion.food?.id || `dish_${Date.now()}`,
-        name: suggestion.food?.name || 'Great Choice',
-        emoji: suggestion.food?.emoji || '🍽️',
-        country: location?.country || 'Local',
-        country_code: location?.country_code || 'US',
-        category: suggestion.food?.category || 'comfort',
-        tags: suggestion.food?.tags || [],
-        suitability: {
-          vegetarian: !suggestion.food?.name?.toLowerCase().includes('meat'),
-          vegan: false,
-          gluten_free: false,
-          halal_friendly: true,
-          kosher_friendly: true
+      try {
+        const { location, mood_text, mood_ids, dietary = [], budget, social } = req.body;
+        
+        // Merge mood_text into mood_ids
+        let resolvedMoods = [...mood_ids];
+        if (mood_text) {
+          const textMoods = textToMoodIds(mood_text);
+          resolvedMoods = [...new Set([...resolvedMoods, ...textMoods])];
         }
-      };
-      
-      res.json({
-        success: true,
-        request_id: req.requestId,
-        context: {
-          resolved_moods: resolvedMoods,
-          location: location,
-          dietary: dietary
-        },
-        food: enhancedFood,
-        friendMessage: suggestion.friendResponse || suggestion.description,
-        reasoning: suggestion.reason || 'Perfect choice for your current situation',
-        culturalNote: suggestion.culturalNote || 'Fits your cultural preferences',
-        availabilityNote: suggestion.availabilityNote || 'Available in your area',
-        alternatives: suggestion.alternatives || [],
-        confidence: calculateConfidence(enhancedFood, resolvedMoods, { dietary }),
-        processingTimeMs: Date.now() - startTime
-      });
-      
-    } catch (error) {
-      console.error('Recommendation error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Internal server error',
-        request_id: req.requestId
-      });
+        
+        // Use your existing AI service
+        const primaryMood = resolvedMoods[0] || 'HUNGRY';
+        const suggestion = await getAIFoodSuggestion(primaryMood, { 
+          location, 
+          dietary, 
+          budget, 
+          social 
+        });
+        
+        // Enhance the response to match vision schema
+        const enhancedFood = {
+          dish_id: suggestion.food?.id || `dish_${Date.now()}`,
+          name: suggestion.food?.name || 'Great Choice',
+          emoji: suggestion.food?.emoji || '🍽️',
+          country: location?.country || 'Local',
+          country_code: location?.country_code || 'US',
+          category: suggestion.food?.category || 'comfort',
+          tags: suggestion.food?.tags || [],
+          suitability: {
+            vegetarian: !suggestion.food?.name?.toLowerCase().includes('meat'),
+            vegan: false,
+            gluten_free: false,
+            halal_friendly: true,
+            kosher_friendly: true
+          }
+        };
+        
+        res.json({
+          success: true,
+          request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          context: {
+            resolved_moods: resolvedMoods,
+            location: location,
+            dietary: dietary,
+            source: 'public_access'
+          },
+          food: enhancedFood,
+          friendMessage: suggestion.friendResponse || suggestion.description,
+          reasoning: suggestion.reason || 'Perfect choice for your current situation',
+          culturalNote: suggestion.culturalNote || 'Fits your cultural preferences',
+          availabilityNote: suggestion.availabilityNote || 'Available in your area',
+          alternatives: suggestion.alternatives || [],
+          confidence: calculateConfidence(enhancedFood, resolvedMoods, { dietary }),
+          processingTimeMs: Date.now() - startTime
+        });
+        
+      } catch (error) {
+        console.error('Recommendation error:', error);
+        res.status(500).json({
+          success: false,
+          error: 'Internal server error',
+          request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        });
+      }
     }
-  }
-);
+  );
+  
 
 // Enhanced health check
 app.get('/health', (req, res) => {
