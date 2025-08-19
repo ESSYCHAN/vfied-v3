@@ -15,6 +15,7 @@ const __dirname = path.dirname(__filename);
 // Serve static HTML pages
 
 const app = express();
+
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
 class SmartGeocodingService {
     constructor() {
@@ -70,6 +71,7 @@ class SmartGeocodingService {
   }
   const smartGeocoding = new SmartGeocodingService();  
 
+  app.set('trust proxy', 1);
 // Middleware
 app.use(cors({
   origin: [
@@ -85,6 +87,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
+
 app.use(express.json());
 
 // Add timing middleware for performance tracking
@@ -92,6 +96,27 @@ app.use((req, res, next) => {
   req.startTime = Date.now();
   next();
 });
+
+// Add security middleware 
+app.use(helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "https:"],
+      },
+    },
+  }));
+  
+  // NOW the rate limiter will work correctly:
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 1000,
+    message: { error: 'Rate limit exceeded' }
+  });
+  app.use(limiter);
+
 
 // Serve static HTML pages - ADD THESE ROUTES RIGHT HERE
 app.get('/', (req, res) => {
@@ -2679,23 +2704,6 @@ import rateLimit from 'express-rate-limit';
 import Joi from 'joi';
 
 // Add security middleware (add after your existing middleware)
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:"],
-    },
-  },
-}));
-
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000,
-  message: { error: 'Rate limit exceeded' }
-});
-app.use(limiter);
 
 // Add request ID tracking (add after your existing timing middleware)
 app.use((req, res, next) => {
