@@ -16,18 +16,59 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
-const CITY_COORDINATES = {
-    'London': { latitude: 51.5074, longitude: -0.1278 },
-    'Mumbai': { latitude: 19.0760, longitude: 72.8777 },
-    'Berlin': { latitude: 52.5200, longitude: 13.4050 },
-    'Seoul': { latitude: 37.5665, longitude: 126.9780 },
-    'Tokyo': { latitude: 35.6762, longitude: 139.6503 },
-    'Cairo': { latitude: 30.0444, longitude: 31.2357 },
-    'Nairobi': { latitude: -1.2921, longitude: 36.8219 },
-    'New York': { latitude: 40.7128, longitude: -74.0060 },
-    'Paris': { latitude: 48.8566, longitude: 2.3522 }
-  };
-
+class SmartGeocodingService {
+    constructor() {
+      this.cache = new Map();
+      this.cacheExpiry = 24 * 60 * 60 * 1000; // 24 hours
+    }
+  
+    async getCoordinates(cityName, countryName = null) {
+      const cacheKey = `${cityName.toLowerCase()},${(countryName || '').toLowerCase()}`;
+      
+      // Check cache first
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.cacheExpiry) {
+        console.log(`🎯 Cache hit for ${cityName}: ${cached.latitude}, ${cached.longitude}`);
+        return cached;
+      }
+  
+      try {
+        const coords = await this.geocodeWithNominatim(cityName, countryName);
+        if (coords) {
+          const result = { ...coords, timestamp: Date.now() };
+          this.cache.set(cacheKey, result);
+          console.log(`✅ Geocoded ${cityName}: ${coords.latitude}, ${coords.longitude}`);
+          return result;
+        }
+      } catch (error) {
+        console.warn(`Geocoding failed for ${cityName}:`, error.message);
+      }
+  
+      return null;
+    }
+  
+    async geocodeWithNominatim(cityName, countryName) {
+      const query = countryName ? `${cityName}, ${countryName}` : cityName;
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+      
+      const response = await fetch(url, {
+        headers: { 'User-Agent': 'VFIED-Smart-Geocoding/1.0' }
+      });
+  
+      if (!response.ok) throw new Error('Nominatim failed');
+  
+      const data = await response.json();
+      if (data.length === 0) throw new Error('No results');
+  
+      const result = data[0];
+      return {
+        latitude: parseFloat(result.lat),
+        longitude: parseFloat(result.lon),
+        source: 'nominatim'
+      };
+    }
+  }
+  const smartGeocoding = new SmartGeocodingService();  
 
 // Middleware
 app.use(cors({
@@ -164,18 +205,48 @@ class AIFoodService {
   
   setLocationFromRequest(location) {
     if (!location) return;
-    // Accept either city/country or just coordinates
+    
+    console.log(`🌍 Smart location processing: ${location.city}, ${location.country}`);
+    
+    // Set basic location info immediately
     this.userLocation = {
       city: location.city || this.userLocation?.city || 'Unknown',
       country: location.country || this.userLocation?.country || 'Unknown',
       countryCode: this.getCountryCode(location.country || this.userLocation?.country || 'US'),
-      latitude: typeof location.latitude === 'number' ? location.latitude : this.userLocation?.latitude,
-      longitude: typeof location.longitude === 'number' ? location.longitude : this.userLocation?.longitude,
+      latitude: location.latitude || null,
+      longitude: location.longitude || null,
       timestamp: new Date().toISOString()
     };
-    console.log('📍 Location set from request:', this.userLocation);
-    // Kick off culture refresh (don’t block)
-    this.detectCulturalContext();
+  
+    // 🧠 Smart coordinate lookup (async, don't block)
+    this.smartGeocodeLookup(location.city, location.country);
+    
+    console.log('📍 Location set:', {
+      city: this.userLocation.city,
+      country: this.userLocation.country,
+      hasCoords: !!(this.userLocation.latitude && this.userLocation.longitude)
+    });
+    
+    // Detect culture immediately
+    if (this.userLocation.city !== 'Unknown') {
+      this.detectCulturalContext();
+    }
+  }
+  async smartGeocodeLookup(cityName, countryName) {
+    if (!cityName || cityName === 'Unknown') return;
+    
+    try {
+      console.log(`🔍 Geocoding: ${cityName}, ${countryName}`);
+      const coords = await smartGeocoding.getCoordinates(cityName, countryName);
+      
+      if (coords) {
+        this.userLocation.latitude = coords.latitude;
+        this.userLocation.longitude = coords.longitude;
+        console.log(`✅ Coordinates found: ${coords.latitude}, ${coords.longitude}`);
+      }
+    } catch (error) {
+      console.warn(`❌ Geocoding failed for ${cityName}:`, error.message);
+    }
   }
   
   getCountryCode(country) {
@@ -1011,34 +1082,41 @@ class WeatherService {
   }
 
   async getCurrentWeather(location) {
+    // Try smart geocoding if no coordinates
+    if (!location.latitude || !location.longitude) {
+      if (location.city && location.city !== 'Unknown') {
+        try {
+          const coords = await smartGeocoding.getCoordinates(location.city, location.country);
+          if (coords) {
+            location = { ...location, ...coords };
+            console.log(`✅ Geocoded for weather: ${coords.latitude}, ${coords.longitude}`);
+          }
+        } catch (error) {
+          console.warn('Geocoding for weather failed:', error.message);
+        }
+      }
+    }
+  
+    if (!location.latitude || !location.longitude) {
+      console.log('🌍 No coordinates, using simulated weather');
+      return this.getSimulatedWeather(location);
+    }
+  
     if (!this.openWeatherKey) {
       return this.getSimulatedWeather(location);
     }
   
     try {
-      // 🔥 FIX: Check for coordinates properly
-      const lat = location?.latitude;
-      const lon = location?.longitude;
-      
-      if (typeof lat !== 'number' || typeof lon !== 'number') {
-        console.log(`🌍 No valid coordinates for weather (lat: ${lat}, lon: ${lon}), using simulation`);
-        return this.getSimulatedWeather(location);
-      }
-  
-      console.log(`🌤️ Fetching real weather for coordinates: ${lat}, ${lon}`);
-      
       const response = await fetch(
-        `${this.baseUrl}/weather?lat=${lat}&lon=${lon}&appid=${this.openWeatherKey}&units=metric`,
-        { timeout: 8000 } // Add timeout
+        `${this.baseUrl}/weather?lat=${location.latitude}&lon=${location.longitude}&appid=${this.openWeatherKey}&units=metric`
       );
       
       if (!response.ok) {
-        console.error(`Weather API Error: ${response.status} ${response.statusText}`);
         throw new Error(`Weather API failed: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('✅ Real weather data retrieved successfully');
+      console.log(`✅ Real weather: ${data.main.temp}°C, ${data.weather[0].description}`);
       
       return {
         temperature: Math.round(data.main.temp),
@@ -1046,16 +1124,12 @@ class WeatherService {
         humidity: data.main.humidity,
         condition: data.weather[0].main.toLowerCase(),
         description: data.weather[0].description,
-        windSpeed: data.wind?.speed || 0,
-        cityName: data.name,
-        country: data.sys.country,
         isRaining: data.weather[0].main.toLowerCase().includes('rain'),
-        isSnowing: data.weather[0].main.toLowerCase().includes('snow'),
         isCold: data.main.temp < 15,
         isHot: data.main.temp > 30,
         isComfortable: data.main.temp >= 18 && data.main.temp <= 26,
         timestamp: new Date().toISOString(),
-        source: 'openweather'
+        source: 'openweather-real'
       };
     } catch (error) {
       console.error('Weather fetch error:', error);
