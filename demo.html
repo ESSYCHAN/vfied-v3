@@ -729,6 +729,197 @@ button {
 .close-btn {
   pointer-events: auto !important;
   cursor: pointer !important;
+}/* Mood Section */
+.mood-section {
+    margin: 1.5rem 0;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 15px;
+    backdrop-filter: blur(5px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.mood-section h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.1rem;
+    text-align: center;
+    opacity: 0.9;
+}
+
+/* Quick Mood Buttons */
+.mood-quick-options {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.mood-quick-btn {
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 0.5rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(5px);
+}
+
+.mood-quick-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+/* Mood Input */
+.mood-input-container {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.mood-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-size: 0.9rem;
+    backdrop-filter: blur(5px);
+}
+
+.mood-input::placeholder {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.mood-detect-btn {
+    background: linear-gradient(145deg, #667eea, #764ba2);
+    border: none;
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.mood-detect-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* Detected Moods */
+.detected-moods {
+    animation: fadeIn 0.3s ease;
+}
+
+.detected-moods.hidden {
+    display: none;
+}
+
+.mood-result {
+    background: rgba(255, 255, 255, 0.15);
+    padding: 1rem;
+    border-radius: 10px;
+    text-align: center;
+    backdrop-filter: blur(5px);
+}
+
+.mood-tags {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.mood-tag {
+    background: rgba(102, 126, 234, 0.3);
+    color: white;
+    padding: 0.25rem 0.75rem;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    border: 1px solid rgba(102, 126, 234, 0.5);
+}
+
+.use-mood-btn {
+    background: linear-gradient(145deg, #27AE60, #229954);
+    border: none;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.5rem;
+    transition: all 0.3s ease;
+}
+
+.use-mood-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(39, 174, 96, 0.3);
+}
+
+/* Mood Context in Suggestion */
+.mood-context {
+    background: rgba(102, 126, 234, 0.2);
+    padding: 0.75rem;
+    border-radius: 10px;
+    margin-bottom: 1rem;
+    text-align: center;
+    border: 1px solid rgba(102, 126, 234, 0.3);
+    backdrop-filter: blur(5px);
+}
+
+.mood-context.hidden {
+    display: none;
+}
+
+.mood-match {
+    font-size: 0.9rem;
+    color: white;
+}
+
+/* Error states */
+.mood-error {
+    background: rgba(220, 53, 69, 0.2);
+    color: white;
+    padding: 0.75rem;
+    border-radius: 10px;
+    text-align: center;
+    border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.mood-loading {
+    text-align: center;
+    padding: 0.75rem;
+    color: rgba(255, 255, 255, 0.8);
+    font-style: italic;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .mood-quick-options {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .mood-quick-btn {
+        width: 100%;
+        max-width: 200px;
+    }
+    
+    .mood-input-container {
+        flex-direction: column;
+    }
+    
+    .mood-detect-btn {
+        width: 100%;
+    }
 }
     </style>
 </head>
@@ -754,23 +945,51 @@ button {
             
             <!-- Simple Header -->
             <header class="simple-header">
-                <h1 class="app-title">VFIED</h1>
-                <p class="question">What should I eat?</p>
-                <div class="context-info" id="context-info">
-                    🤖 Analyzing your situation...
-                </div>
-
-                <!-- Current Settings Display -->
-                <div class="current-settings" id="current-settings">
-                    <span class="setting-tag" id="location-tag">📍 Auto-detect</span>
-                    <span class="setting-tag hidden" id="dietary-tag">🌱 No restrictions</span>
-                </div>
-
-                <!-- Quick Settings -->
-                <div class="quick-settings">
-                    <button id="settings-btn" class="settings-btn">⚙️ Preferences</button>
-                </div>
-            </header>
+              <h1 class="app-title">VFIED</h1>
+              <p class="question">What should I eat?</p>
+              <div class="context-info" id="context-info">
+                  🤖 Analyzing your situation...
+              </div>
+          
+              <!-- Current Settings Display -->
+              <div class="current-settings" id="current-settings">
+                  <span class="setting-tag" id="location-tag">📍 Auto-detect</span>
+                  <span class="setting-tag hidden" id="dietary-tag">🌱 No restrictions</span>
+              </div>
+          
+              <!-- Quick Settings -->
+              <div class="quick-settings">
+                  <button id="settings-btn" class="settings-btn">⚙️ Preferences</button>
+              </div>
+          
+              <!-- 🆕 ADD THIS MOOD SECTION HERE -->
+              <div class="mood-section" id="mood-section">
+                  <h3>🧠 How are you feeling?</h3>
+                  
+                  <!-- Quick Mood Options -->
+                  <div class="mood-quick-options">
+                      <button class="mood-quick-btn" onclick="quickMood('tired')">😴 Tired</button>
+                      <button class="mood-quick-btn" onclick="quickMood('stressed')">😰 Stressed</button>
+                      <button class="mood-quick-btn" onclick="quickMood('celebrating')">🎉 Celebrating</button>
+                      <button class="mood-quick-btn" onclick="quickMood('post-workout')">💪 Post-workout</button>
+                      <button class="mood-quick-btn" onclick="quickMood('hungry')">🤤 Hungry</button>
+                  </div>
+          
+                  <!-- Custom Mood Input -->
+                  <div class="mood-input-container">
+                      <input 
+                          type="text" 
+                          id="mood-input" 
+                          placeholder="Or describe your mood... (e.g., tired but celebrating, stressed and need comfort)"
+                          class="mood-input"
+                      >
+                      <button id="detect-mood-btn" class="mood-detect-btn">✨ Detect</button>
+                  </div>
+          
+                  <!-- Detected Moods Display -->
+                  <div id="detected-moods" class="detected-moods hidden"></div>
+              </div>
+          </header>
 
             <!-- Settings Overlay (moved outside header) -->
             <div id="settings-overlay" class="settings-overlay"></div>
@@ -829,6 +1048,11 @@ button {
                 <!-- Quick Suggestion Display -->
                 <div id="suggestion-result" class="suggestion-result hidden">
                     <div class="suggestion-card">
+                      <div id="mood-context" class="mood-context hidden">
+                        <div class="mood-match" id="mood-match-text">
+                            🧠 <strong>Mood Match:</strong> Perfect for when you're feeling...
+                        </div>
+                    </div>
                         <div class="food-emoji" id="result-emoji">🍕</div>
                         <div class="food-info">
                             <h2 class="food-name" id="result-name">Pizza Night!</h2>

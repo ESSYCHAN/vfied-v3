@@ -1,4 +1,4 @@
-// VFIED One-Button Experience - FIXED SETTINGS INTEGRATION
+// VFIED One-Button Experience - COMPLETE WITH MOOD DETECTION INTEGRATION
 
 // Keep AI intelligence but make it optional
 import { 
@@ -17,6 +17,512 @@ import {
   getUserFoodStats 
 } from './services/foodService.js';
 
+// 🚀 FAST MCP SERVER CONFIGURATION
+const MCP_CONFIG = {
+  baseUrl: import.meta.env.VITE_MCP_SERVER_URL || 'http://localhost:3001',
+  timeout: 5000, // 5 second timeout for fast responses
+  retries: 2,
+  cache: new Map(), // Response caching
+  cacheTimeout: 5 * 60 * 1000 // 5 minutes
+};
+
+// 🧠 MOOD DETECTION GLOBAL VARIABLES
+let currentMood = null;
+let moodHistory = [];
+
+// 🚀 OPTIMIZED API CALLER WITH CACHING
+class FastMCPClient {
+  constructor() {
+    this.cache = new Map();
+    this.pendingRequests = new Map();
+  }
+
+  async call(endpoint, data, options = {}) {
+    const cacheKey = this.getCacheKey(endpoint, data);
+    
+    // Check cache first
+    if (!options.skipCache && this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() - cached.timestamp < MCP_CONFIG.cacheTimeout) {
+        console.log(`🚀 Cache hit for ${endpoint}`);
+        return cached.data;
+      }
+      this.cache.delete(cacheKey);
+    }
+
+    // Prevent duplicate requests
+    if (this.pendingRequests.has(cacheKey)) {
+      console.log(`⏳ Waiting for pending ${endpoint}`);
+      return await this.pendingRequests.get(cacheKey);
+    }
+
+    // Make the request
+    const requestPromise = this.makeRequest(endpoint, data, options);
+    this.pendingRequests.set(cacheKey, requestPromise);
+
+    try {
+      const result = await requestPromise;
+      
+      // Cache successful responses
+      if (result && !options.skipCache) {
+        this.cache.set(cacheKey, {
+          data: result,
+          timestamp: Date.now()
+        });
+      }
+      
+      return result;
+    } finally {
+      this.pendingRequests.delete(cacheKey);
+    }
+  }
+
+  async makeRequest(endpoint, data, options) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), MCP_CONFIG.timeout);
+
+    try {
+      const response = await fetch(`${MCP_CONFIG.baseUrl}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers
+        },
+        body: JSON.stringify(data),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`MCP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('MCP request timeout - server too slow');
+      }
+      throw error;
+    }
+  }
+
+  getCacheKey(endpoint, data) {
+    return `${endpoint}_${JSON.stringify(data)}`;
+  }
+
+  clearCache() {
+    this.cache.clear();
+    console.log('🧹 MCP cache cleared');
+  }
+}
+
+// 🚀 FAST MCP CLIENT INSTANCE
+const mcpClient = new FastMCPClient();
+
+// 🧠 MOOD DETECTION FUNCTIONS
+
+// QUICK MOOD SELECTION
+function quickMood(mood) {
+    const moodInput = document.getElementById('mood-input');
+    const moodMap = {
+        'tired': '😴 feeling exhausted and need energy',
+        'stressed': '😰 feeling overwhelmed and need comfort',
+        'celebrating': '🎉 celebrating something special',
+        'post-workout': '💪 just finished working out',
+        'hungry': '🤤 really hungry and need to eat'
+    };
+    
+    if (moodInput) {
+        moodInput.value = moodMap[mood] || mood;
+        moodInput.style.background = 'rgba(255, 255, 255, 0.25)';
+        
+        // Auto-detect after setting
+        setTimeout(() => {
+            detectMoodFromText();
+        }, 300);
+    }
+}
+
+// 🧠 MOOD DETECTION FUNCTION
+async function detectMoodFromText(text = null) {
+    const moodInput = document.getElementById('mood-input');
+    const detectedMoodsDiv = document.getElementById('detected-moods');
+    
+    const moodText = text || moodInput?.value?.trim();
+    
+    if (!moodText) {
+        showMoodError('Please enter how you\'re feeling first');
+        return;
+    }
+
+    try {
+        // Show loading state
+        if (detectedMoodsDiv) {
+            detectedMoodsDiv.classList.remove('hidden');
+            detectedMoodsDiv.innerHTML = '<div class="mood-loading">🧠 AI analyzing your mood...</div>';
+        }
+
+        console.log('🧠 Detecting mood for:', moodText);
+
+        // 🚀 CALL YOUR MCP SERVER FOR MOOD DETECTION
+        const moodResult = await callMoodDetection(moodText);
+        
+        // Display detected moods
+        displayDetectedMoods(moodResult);
+        
+        // Store current mood for decision making
+        currentMood = {
+            text: moodText,
+            detected: moodResult.moods,
+            timestamp: Date.now(),
+            suggestion: moodResult.suggestion // Bonus: we already have a suggestion!
+        };
+        
+        // Add to mood history
+        moodHistory.unshift(currentMood);
+        if (moodHistory.length > 10) moodHistory.pop();
+        
+        console.log('🧠 Mood detected:', currentMood);
+        
+    } catch (error) {
+        console.error('Mood detection failed:', error);
+        showMoodError('Mood detection failed. Using fallback...');
+        
+        // Fallback to simple mood detection
+        currentMood = {
+            text: moodText,
+            detected: simpleMoodFallback(moodText),
+            timestamp: Date.now()
+        };
+        
+        displayDetectedMoods({ moods: currentMood.detected, confidence: 70 });
+    }
+}
+
+// 🚀 CALL MCP SERVER FOR MOOD DETECTION
+async function callMoodDetection(moodText) {
+    try {
+        const userPrefs = getCurrentSettings();
+        
+        const response = await fetch(`${MCP_CONFIG.baseUrl}/v1/recommend`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                location: userPrefs.location || {
+                    city: 'London',
+                    country: 'United Kingdom',
+                    country_code: 'GB'
+                },
+                mood_text: moodText, // 🎯 This triggers OpenAI mood detection on server
+                dietary: userPrefs.dietary || [],
+                budget: 'medium',
+                menu_source: 'global_database'
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Mood API error: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        return {
+            moods: result.context?.resolved_moods || ['HUNGRY'],
+            suggestion: result, // Bonus: we get the food suggestion too!
+            confidence: result.confidence || 85
+        };
+
+    } catch (error) {
+        console.error('MCP mood detection failed:', error);
+        throw error;
+    }
+}
+
+// 📱 DISPLAY DETECTED MOODS
+function displayDetectedMoods(moodResult) {
+    const detectedMoodsDiv = document.getElementById('detected-moods');
+    if (!detectedMoodsDiv) return;
+
+    const moodEmojis = {
+        'TIRED': '😴',
+        'STRESSED': '😰', 
+        'CELEBRATING': '🎉',
+        'HUNGRY': '🤤',
+        'POST_WORKOUT': '💪',
+        'SICK': '🤒',
+        'FOCUSED': '🎯',
+        'RELAX': '😌',
+        'ADVENTUROUS': '🌟'
+    };
+
+    const moodTags = moodResult.moods.map(mood => {
+        const emoji = moodEmojis[mood] || '😊';
+        return `<span class="mood-tag">${emoji} ${mood.toLowerCase()}</span>`;
+    }).join('');
+
+    detectedMoodsDiv.innerHTML = `
+        <div class="mood-result">
+            <strong>🧠 AI detected your mood:</strong>
+            <div class="mood-tags">${moodTags}</div>
+            <div style="margin: 0.5rem 0; font-size: 0.9rem; opacity: 0.8;">
+                Confidence: ${moodResult.confidence}%
+            </div>
+            <button class="use-mood-btn" onclick="useMoodForDecision()">
+                🎯 Get food suggestion for this mood
+            </button>
+        </div>
+    `;
+}
+
+// 🎯 USE DETECTED MOOD FOR FOOD DECISION
+function useMoodForDecision() {
+    if (!currentMood) {
+        showMoodError('No mood detected yet');
+        return;
+    }
+
+    // Update button text to show we're using mood
+    const buttonText = document.getElementById('button-text');
+    const buttonSubtitle = document.querySelector('.button-subtitle');
+    
+    if (buttonText) buttonText.textContent = 'USING YOUR MOOD';
+    if (buttonSubtitle) buttonSubtitle.textContent = `For: ${currentMood.text}`;
+
+    // Clear the mood input to show we're using it
+    const moodInput = document.getElementById('mood-input');
+    if (moodInput) {
+        moodInput.style.background = 'rgba(40, 167, 69, 0.3)';
+        moodInput.style.borderColor = 'rgba(40, 167, 69, 0.6)';
+    }
+
+    // Update context info
+    window.vfiedAppInstance?.updateContextInfo(`🧠 Using your mood: ${currentMood.detected.join(', ')}`);
+
+    // If we already have a suggestion from mood detection, use it!
+    if (currentMood.suggestion) {
+        console.log('🎯 Using suggestion from mood detection:', currentMood.suggestion);
+        showMoodAwareSuggestion(currentMood.suggestion);
+    } else {
+        // Trigger decision with mood context
+        handleMoodDecision();
+    }
+}
+
+// 🚀 HANDLE MOOD-AWARE DECISION
+async function handleMoodDecision() {
+    if (!currentMood) return;
+
+    try {
+        console.log('🧠 Getting mood-aware suggestion...');
+        
+        // Show thinking state
+        const button = document.getElementById('decide-button');
+        if (button) button.classList.add('thinking');
+        
+        const userPrefs = getCurrentSettings();
+        
+        const response = await fetch(`${MCP_CONFIG.baseUrl}/v1/recommend`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                location: userPrefs.location,
+                mood_text: currentMood.text, // 🧠 Natural language mood
+                mood_ids: currentMood.detected, // 🎯 Pre-detected mood IDs
+                dietary: userPrefs.dietary || [],
+                budget: 'medium',
+                social: 'solo',
+                menu_source: 'global_database'
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`MCP suggestion failed: ${response.status}`);
+        }
+
+        const suggestion = await response.json();
+        
+        console.log('🧠 Mood-aware suggestion received:', suggestion);
+        
+        // Show the suggestion
+        setTimeout(() => {
+            showMoodAwareSuggestion(suggestion);
+            
+            // Reset button
+            const button = document.getElementById('decide-button');
+            if (button) button.classList.remove('thinking');
+            resetButtonText();
+        }, 1500);
+
+    } catch (error) {
+        console.error('Mood-aware decision failed:', error);
+        showMoodError('Failed to get mood-aware suggestion');
+        
+        // Reset button
+        const button = document.getElementById('decide-button');
+        if (button) button.classList.remove('thinking');
+        resetButtonText();
+    }
+}
+
+// 📱 SHOW MOOD-AWARE SUGGESTION
+function showMoodAwareSuggestion(suggestion) {
+    // Show regular suggestion first
+    if (window.vfiedAppInstance) {
+        window.vfiedAppInstance.currentSuggestion = suggestion;
+        window.vfiedAppInstance.showSuggestion(suggestion);
+    }
+
+    // Add mood context to the display
+    if (currentMood) {
+        const moodContext = document.getElementById('mood-context');
+        const moodMatchText = document.getElementById('mood-match-text');
+        
+        if (moodContext && moodMatchText) {
+            moodMatchText.innerHTML = `🧠 <strong>Mood Match:</strong> Perfect for when you're ${currentMood.text}`;
+            moodContext.classList.remove('hidden');
+        }
+    }
+
+    // Update context info
+    window.vfiedAppInstance?.updateContextInfo('🎉 Perfect mood-aware suggestion ready!');
+}
+
+// 🔧 HELPER FUNCTIONS
+function showMoodError(message) {
+    const detectedMoodsDiv = document.getElementById('detected-moods');
+    if (detectedMoodsDiv) {
+        detectedMoodsDiv.classList.remove('hidden');
+        detectedMoodsDiv.innerHTML = `<div class="mood-error">⚠️ ${message}</div>`;
+        
+        setTimeout(() => {
+            detectedMoodsDiv.classList.add('hidden');
+        }, 3000);
+    }
+}
+
+function simpleMoodFallback(text) {
+    const moodMap = {
+        'tired': ['TIRED'],
+        'stress': ['STRESSED'],
+        'celebrat': ['CELEBRATING'],
+        'hungry': ['HUNGRY'],
+        'workout': ['POST_WORKOUT'],
+        'sick': ['SICK'],
+        'focus': ['FOCUSED'],
+        'relax': ['RELAX'],
+        'adventure': ['ADVENTUROUS']
+    };
+
+    const lowerText = text.toLowerCase();
+    for (const [key, moods] of Object.entries(moodMap)) {
+        if (lowerText.includes(key)) {
+            return moods;
+        }
+    }
+    return ['HUNGRY'];
+}
+
+function resetButtonText() {
+    const buttonText = document.getElementById('button-text');
+    const buttonSubtitle = document.querySelector('.button-subtitle');
+    
+    if (buttonText) buttonText.textContent = 'DECIDE FOR ME';
+    if (buttonSubtitle) buttonSubtitle.textContent = "I'll figure it out for you";
+}
+
+function getCurrentSettings() {
+    // Get settings from the app instance or default
+    return window.vfiedAppInstance?.userPreferences || {};
+}
+
+// 🚀 OPTIMIZED MCP API FUNCTIONS
+async function getAIQuickDecisionFast(context = {}) {
+  try {
+    console.log('🚀 Fast MCP quick decision...');
+    const startTime = Date.now();
+
+    const payload = {
+      location: context.location,
+      dietary: context.dietary || [],
+      userId: context.userId || 'anonymous',
+      context: {
+        includeRestaurants: context.includeRestaurants,
+        quick: true,
+        budget: context.budget || 'medium',
+        timeConstraint: 'quick'
+      }
+    };
+
+    const result = await mcpClient.call('/mcp/get_quick_food_decision', payload);
+    
+    const duration = Date.now() - startTime;
+    console.log(`⚡ MCP response in ${duration}ms`);
+
+    return {
+      ...result,
+      source: 'mcp-fast',
+      responseTime: duration,
+      interactionId: result.interactionId || `fast_${Date.now()}`
+    };
+
+  } catch (error) {
+    console.error('❌ Fast MCP failed:', error);
+    throw error; // Let caller handle fallback
+  }
+}
+
+async function getAIFoodSuggestionFast(mood, context = {}) {
+  try {
+    console.log(`🚀 Fast MCP suggestion for mood: ${mood}`);
+    const startTime = Date.now();
+
+    const payload = {
+      mood,
+      location: context.location,
+      context: {
+        ...context,
+        mcpRequest: true
+      },
+      userId: context.userId || 'anonymous'
+    };
+
+    const result = await mcpClient.call('/mcp/get_food_suggestion', payload);
+    
+    const duration = Date.now() - startTime;
+    console.log(`⚡ MCP suggestion in ${duration}ms`);
+
+    return {
+      ...result,
+      source: 'mcp-fast',
+      responseTime: duration
+    };
+
+  } catch (error) {
+    console.error('❌ Fast MCP suggestion failed:', error);
+    throw error;
+  }
+}
+
+async function updateAIFeedbackFast(interactionId, rating) {
+  try {
+    await mcpClient.call('/mcp/provide_feedback', {
+      interactionId,
+      rating
+    }, { skipCache: true }); // Don't cache feedback
+    
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Feedback failed:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 class VFIEDOneButtonApp {
   constructor() {
     this.currentSuggestion = null;
@@ -26,13 +532,21 @@ class VFIEDOneButtonApp {
     this.stats = { totalDecisions: 0, timeSaved: 0 };
     this.includeRestaurants = true;
     this.culturalPriority = true;
-    this.userPreferences = {}; // Add this to store user preferences
+    this.userPreferences = {};
+    
+    // 🚀 PERFORMANCE TRACKING
+    this.performanceMetrics = {
+      avgResponseTime: 0,
+      successRate: 0,
+      totalRequests: 0,
+      cacheHits: 0
+    };
     
     this.init();
   }
 
   async init() {
-    console.log('🚀 VFIED One-Button App initializing...');
+    console.log('🚀 VFIED Fast MCP App with Mood Detection initializing...');
     
     // Load user preferences first
     this.loadUserPreferences();
@@ -42,7 +556,47 @@ class VFIEDOneButtonApp {
     await this.initializeAI();
     await this.startApp();
     
-    console.log('✅ One-Button Experience Ready!');
+    // 🚀 PRELOAD COMMON REQUESTS
+    this.preloadCommonResponses();
+    
+    console.log('✅ Fast MCP Experience with Mood Detection Ready!');
+  }
+
+  // 🚀 PRELOAD OPTIMIZATION
+  async preloadCommonResponses() {
+    if (!this.useAI) return;
+    
+    try {
+      console.log('🚀 Preloading common responses...');
+      
+      // Preload quick decision with current settings
+      const context = {
+        dietary: this.userPreferences.dietary || [],
+        budget: this.userPreferences.budget || 'medium',
+        location: this.getEffectiveLocation()
+      };
+      
+      // Fire and forget - this populates the cache
+      getAIQuickDecisionFast(context).catch(() => {
+        // Ignore preload failures
+      });
+      
+    } catch (error) {
+      // Ignore preload errors
+    }
+  }
+
+  getEffectiveLocation() {
+    if (this.userPreferences.location) {
+      return this.userPreferences.location;
+    }
+    
+    // Default locations for preloading
+    return {
+      city: 'London',
+      country: 'United Kingdom',
+      countryCode: 'GB'
+    };
   }
 
   // NEW: Load user preferences from settings
@@ -69,6 +623,9 @@ class VFIEDOneButtonApp {
     this.userPreferences = { ...this.userPreferences, ...newPreferences };
     console.log('⚙️ Updated app preferences:', this.userPreferences);
     
+    // 🚀 CLEAR CACHE WHEN PREFERENCES CHANGE
+    mcpClient.clearCache();
+    
     // Trigger AI service to refresh with new settings
     if (this.useAI) {
       this.refreshAIContext();
@@ -86,6 +643,10 @@ class VFIEDOneButtonApp {
       }
       
       this.updateContextWithAI();
+      
+      // 🚀 PRELOAD WITH NEW SETTINGS
+      this.preloadCommonResponses();
+      
     } catch (error) {
       console.error('Error refreshing AI context:', error);
     }
@@ -94,7 +655,17 @@ class VFIEDOneButtonApp {
   async initializeAI() {
     if (this.useAI) {
       try {
-        this.updateContextInfo('🤖 Waking up AI intelligence...');
+        this.updateContextInfo('🤖 Connecting to fast AI intelligence...');
+        
+        // 🚀 QUICK HEALTH CHECK
+        const healthStart = Date.now();
+        await fetch(`${MCP_CONFIG.baseUrl}/health`, { 
+          method: 'GET',
+          signal: AbortSignal.timeout(2000) // 2 second timeout
+        });
+        const healthTime = Date.now() - healthStart;
+        
+        console.log(`✅ MCP server responding in ${healthTime}ms`);
         
         // Wait for AI to initialize with location and culture
         await this.waitForAIReady();
@@ -105,7 +676,7 @@ class VFIEDOneButtonApp {
         console.log('🌟 AI fully ready with cultural awareness');
       } catch (error) {
         console.warn('⚠️ AI in hybrid mode:', error);
-        this.updateContextInfo('🤖 AI ready (hybrid mode)');
+        this.updateContextInfo('🤖 AI ready (offline mode)');
         this.useAI = 'hybrid';
       }
     } else {
@@ -115,7 +686,7 @@ class VFIEDOneButtonApp {
 
   async waitForAIReady() {
     let attempts = 0;
-    const maxAttempts = 20; // 10 seconds max
+    const maxAttempts = 10; // Reduced from 20 for faster startup
     
     while (attempts < maxAttempts) {
       try {
@@ -135,7 +706,7 @@ class VFIEDOneButtonApp {
         console.log('AI service not ready yet...');
       }
       
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 300)); // Reduced from 500ms
       attempts++;
     }
     
@@ -258,6 +829,9 @@ class VFIEDOneButtonApp {
       insightsToggle.addEventListener('click', () => this.toggleInsights());
     }
 
+    // 🧠 MOOD DETECTION EVENT LISTENERS
+    this.setupMoodEventListeners();
+
     // Keyboard shortcut - spacebar
     document.addEventListener('keydown', (e) => {
       if (e.code === 'Space' && !this.isThinking) {
@@ -275,6 +849,32 @@ class VFIEDOneButtonApp {
     console.log('🎯 Event listeners ready');
   }
 
+  // 🧠 SETUP MOOD EVENT LISTENERS
+  setupMoodEventListeners() {
+    const moodInput = document.getElementById('mood-input');
+    const detectBtn = document.getElementById('detect-mood-btn');
+    
+    if (detectBtn) {
+      detectBtn.addEventListener('click', () => detectMoodFromText());
+    }
+    
+    if (moodInput) {
+      moodInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          detectMoodFromText();
+        }
+      });
+      
+      // Auto-detect on longer text
+      moodInput.addEventListener('input', this.debounce((e) => {
+        const text = e.target.value.trim();
+        if (text.length > 15) {
+          detectMoodFromText(text);
+        }
+      }, 1500));
+    }
+  }
+
   initializeUI() {
     this.updateStats();
     this.updateAIStatus();
@@ -282,7 +882,7 @@ class VFIEDOneButtonApp {
     // Hide loading screen after delay
     setTimeout(() => {
       this.hideLoadingScreen();
-    }, 2000);
+    }, 1500); // Reduced from 2000ms
     
     this.updateContextInfo('🤖 Initializing your personal food intelligence...');
   }
@@ -304,7 +904,7 @@ class VFIEDOneButtonApp {
         button.style.transform = 'scale(1)';
         // Ensure it's clickable after animation
         button.style.pointerEvents = 'auto';
-      }, 500);
+      }, 300); // Reduced from 500ms
     }
   }
 
@@ -338,6 +938,7 @@ class VFIEDOneButtonApp {
     }
   }
 
+  // 🚀 OPTIMIZED DECISION HANDLER WITH MOOD INTEGRATION
   async handleDecideClick() {
     console.log('🤖 handleDecideClick called!');
     
@@ -351,14 +952,37 @@ class VFIEDOneButtonApp {
     // Start thinking animation
     this.startThinking();
     
+    const startTime = Date.now();
+    
     try {
       let suggestion;
       
       if (this.useAI) {
-        console.log('🤖 Getting AI-powered suggestion with user preferences...');
-        this.updateButtonState('🤖 AI THINKING...', 'Analyzing your situation...');
+        console.log('🚀 Getting FAST MCP suggestion with user preferences...');
         
-        // IMPORTANT: Include user preferences in context
+        // 🧠 CHECK IF WE HAVE MOOD CONTEXT
+        if (currentMood && currentMood.suggestion) {
+          console.log('🧠 Using cached mood suggestion');
+          this.currentSuggestion = currentMood.suggestion;
+          this.showSuggestion(currentMood.suggestion);
+          this.stopThinking();
+          
+          // Add mood context
+          if (currentMood) {
+            const moodContext = document.getElementById('mood-context');
+            const moodMatchText = document.getElementById('mood-match-text');
+            
+            if (moodContext && moodMatchText) {
+              moodMatchText.innerHTML = `🧠 <strong>Mood Match:</strong> Perfect for when you're ${currentMood.text}`;
+              moodContext.classList.remove('hidden');
+            }
+          }
+          return;
+        }
+        
+        this.updateButtonState('🚀 AI THINKING...', 'Analyzing your situation...');
+        
+        // OPTIMIZED: Include user preferences in context
         const context = {
           includeRestaurants: this.includeRestaurants,
           culturalPriority: this.culturalPriority,
@@ -366,13 +990,56 @@ class VFIEDOneButtonApp {
           // ADD USER PREFERENCES
           dietary: this.userPreferences.dietary || [],
           budget: this.userPreferences.budget || 'medium',
-          userId: 'user_' + Date.now()
+          location: this.getEffectiveLocation(),
+          userId: 'user_' + Date.now(),
+          // 🧠 ADD MOOD IF AVAILABLE
+          mood: currentMood
         };
         
         console.log('📋 Using context with preferences:', context);
         
-        suggestion = await getAIQuickDecision(context);
-        this.currentInteractionId = suggestion.interactionId;
+        // Create payload for MCP server
+        const payload = {
+          location: context.location || {
+            city: 'London',
+            country: 'United Kingdom',
+            country_code: 'GB'
+          },
+          dietary: context.dietary || [],
+          budget: context.budget || 'medium',
+          menu_source: 'global_database'
+        };
+
+        // 🧠 ADD MOOD IF AVAILABLE
+        if (context.mood) {
+          payload.mood_text = context.mood.text;
+          payload.mood_ids = context.mood.detected;
+          console.log('🧠 Including mood in request:', context.mood);
+        }
+
+        try {
+          // 🚀 TRY FAST MCP FIRST
+          const response = await fetch(`${MCP_CONFIG.baseUrl}/v1/recommend`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            throw new Error(`MCP server error: ${response.status}`);
+          }
+
+          suggestion = await response.json();
+          this.currentInteractionId = suggestion.interactionId || Date.now().toString();
+          console.log(`⚡ Fast MCP completed in ${Date.now() - startTime}ms`);
+        } catch (mcpError) {
+          console.warn('⚠️ Fast MCP failed, trying fallback AI:', mcpError);
+          // Fallback to original AI service
+          suggestion = await getAIQuickDecision(context);
+          this.currentInteractionId = suggestion.interactionId;
+        }
       } else {
         console.log('🎯 Using local decision engine...');
         this.updateButtonState('🎯 THINKING...', 'Deciding for you...');
@@ -381,14 +1048,32 @@ class VFIEDOneButtonApp {
       
       this.currentSuggestion = suggestion;
       
-      // Show suggestion after thinking delay
+      // Update performance metrics
+      this.updatePerformanceMetrics(Date.now() - startTime, true);
+      
+      // Show suggestion after minimal thinking delay
+      const thinkingTime = suggestion.responseTime > 500 ? 500 : 1000; // Adaptive timing
       setTimeout(() => {
         this.showSuggestion(suggestion);
         this.stopThinking();
-      }, 1500 + Math.random() * 1000); // 1.5-2.5 second thinking
+        
+        // 🧠 ADD MOOD CONTEXT IF AVAILABLE
+        if (currentMood) {
+          const moodContext = document.getElementById('mood-context');
+          const moodMatchText = document.getElementById('mood-match-text');
+          
+          if (moodContext && moodMatchText) {
+            moodMatchText.innerHTML = `🧠 <strong>Mood Match:</strong> Perfect for when you're ${currentMood.text}`;
+            moodContext.classList.remove('hidden');
+          }
+        }
+      }, thinkingTime);
       
     } catch (error) {
       console.error('Decision error:', error);
+      
+      // Update performance metrics
+      this.updatePerformanceMetrics(Date.now() - startTime, false);
       
       // Fallback to local service
       try {
@@ -399,13 +1084,29 @@ class VFIEDOneButtonApp {
         setTimeout(() => {
           this.showSuggestion(suggestion);
           this.stopThinking();
-        }, 1000);
+        }, 800); // Faster fallback
       } catch (fallbackError) {
         console.error('Fallback error:', fallbackError);
         this.showError('Oops! Try again in a moment.');
         this.stopThinking();
       }
     }
+  }
+
+  // 🚀 PERFORMANCE TRACKING
+  updatePerformanceMetrics(responseTime, success) {
+    this.performanceMetrics.totalRequests++;
+    
+    if (success) {
+      const prevAvg = this.performanceMetrics.avgResponseTime;
+      const count = this.performanceMetrics.totalRequests;
+      this.performanceMetrics.avgResponseTime = (prevAvg * (count - 1) + responseTime) / count;
+      this.performanceMetrics.successRate = this.performanceMetrics.successRate + (100 - this.performanceMetrics.successRate) / count;
+    } else {
+      this.performanceMetrics.successRate = this.performanceMetrics.successRate * 0.9; // Decay on failure
+    }
+    
+    console.log('📊 Performance:', this.performanceMetrics);
   }
 
   startThinking() {
@@ -422,7 +1123,8 @@ class VFIEDOneButtonApp {
     try {
       const { location } = getAILocationContext();
       const locationText = location?.city || 'your area';
-      this.updateContextInfo(`🧠 Analyzing ${locationText}, weather, and your preferences...`);
+      const moodText = currentMood ? ` and your ${currentMood.text}` : '';
+      this.updateContextInfo(`🧠 Analyzing ${locationText}, weather${moodText}...`);
     } catch (error) {
       this.updateContextInfo('🧠 Analyzing your location, weather, and preferences...');
     }
@@ -477,7 +1179,7 @@ class VFIEDOneButtonApp {
     // Update suggestion display
     if (resultEmoji) resultEmoji.textContent = suggestion.food?.emoji || '🍽️';
     if (resultName) resultName.textContent = suggestion.food?.name || 'Great Choice!';
-    if (resultDescription) resultDescription.textContent = suggestion.description || suggestion.friendResponse || 'Perfect choice for you!';
+    if (resultDescription) resultDescription.textContent = suggestion.friendMessage || suggestion.description || 'Perfect choice for you!';
     
     // Show restaurant info if available
     if (restaurantInfo && suggestion.restaurants && suggestion.restaurants.length > 0) {
@@ -505,17 +1207,19 @@ class VFIEDOneButtonApp {
       suggestionResult.style.transition = 'all 0.5s ease';
       suggestionResult.style.opacity = '1';
       suggestionResult.style.transform = 'translateY(0)';
-    }, 100);
+    }, 50); // Faster animation
     
     // Update context to show success with effective location
     try {
       const { location } = getAILocationContext();
       const locationText = location?.city || 'your location';
-      const contextMessage = suggestion.source === 'ai' || suggestion.source === 'mcp'
-        ? `🤖 AI analyzed ${locationText}, weather, and your preferences`
-        : '🎯 Smart local suggestion ready';
+      const sourceText = suggestion.source === 'mcp-fast' ? '⚡ Fast AI' : 
+                        suggestion.source === 'mcp' ? '🤖 AI' : 
+                        suggestion.source === 'ai' ? '🤖 AI' : '🎯 Smart local';
       
-      this.updateContextInfo(contextMessage);
+      const responseTime = suggestion.responseTime ? ` (${suggestion.responseTime}ms)` : '';
+      const moodText = currentMood ? ' with mood intelligence' : '';
+      this.updateContextInfo(`${sourceText} analyzed ${locationText}${responseTime}${moodText}`);
     } catch (error) {
       this.updateContextInfo('🎯 Smart suggestion ready');
     }
@@ -548,12 +1252,16 @@ class VFIEDOneButtonApp {
       // Show dietary-aware fallback
       const dietaryText = this.userPreferences.dietary && this.userPreferences.dietary.length > 0 
         ? ` and meets your ${this.userPreferences.dietary.join(', ')} requirements` : '';
-      personalNote.innerHTML = `<strong>🧠 Personal pattern:</strong> Based on your preferences${dietaryText}, this is a great match.`;
+      const moodText = currentMood ? ` Perfect for your ${currentMood.text} mood.` : '';
+      personalNote.innerHTML = `<strong>🧠 Personal pattern:</strong> Based on your preferences${dietaryText}.${moodText}`;
       personalNote.style.display = 'block';
     }
     
     if (weatherNote && suggestion.reason) {
       weatherNote.innerHTML = `<strong>🎯 Why this works:</strong> ${suggestion.reason}`;
+      weatherNote.style.display = 'block';
+    } else if (weatherNote && suggestion.reasoning) {
+      weatherNote.innerHTML = `<strong>🎯 Why this works:</strong> ${suggestion.reasoning}`;
       weatherNote.style.display = 'block';
     } else if (weatherNote && suggestion.weatherNote) {
       weatherNote.innerHTML = `<strong>🌤️ Weather factor:</strong> ${suggestion.weatherNote}`;
@@ -589,7 +1297,8 @@ class VFIEDOneButtonApp {
     try {
       // Record positive feedback
       if (this.useAI && this.currentInteractionId) {
-        await updateAIFeedback(this.currentInteractionId, 5);
+        // 🚀 USE FAST FEEDBACK
+        await updateAIFeedbackFast(this.currentInteractionId, 5);
         console.log('✅ Positive feedback sent to AI');
       } else {
         recordFoodDecision(
@@ -606,10 +1315,27 @@ class VFIEDOneButtonApp {
       // Show success animation
       this.showSuccessAnimation();
       
+      // 🧠 RESET MOOD STATE
+      const moodContext = document.getElementById('mood-context');
+      if (moodContext) {
+        moodContext.classList.add('hidden');
+      }
+      
+      const moodInput = document.getElementById('mood-input');
+      if (moodInput) {
+        moodInput.value = '';
+        moodInput.style.background = '';
+        moodInput.style.borderColor = '';
+      }
+      
+      // Clear current mood
+      currentMood = null;
+      resetButtonText();
+      
       // Reset after delay
       setTimeout(() => {
         this.resetToDecisionMode();
-      }, 3000);
+      }, 2500); // Slightly faster
       
     } catch (error) {
       console.error('Error recording acceptance:', error);
@@ -617,7 +1343,7 @@ class VFIEDOneButtonApp {
       this.showSuccessAnimation();
       setTimeout(() => {
         this.resetToDecisionMode();
-      }, 3000);
+      }, 2500);
     }
   }
 
@@ -627,11 +1353,18 @@ class VFIEDOneButtonApp {
     // Record negative feedback for AI learning
     if (this.useAI && this.currentInteractionId) {
       try {
-        await updateAIFeedback(this.currentInteractionId, 2);
+        // 🚀 USE FAST FEEDBACK
+        await updateAIFeedbackFast(this.currentInteractionId, 2);
         console.log('📉 Negative feedback sent for AI learning');
       } catch (error) {
         console.error('Error sending negative feedback:', error);
       }
+    }
+    
+    // Hide mood context but keep mood for retry
+    const moodContext = document.getElementById('mood-context');
+    if (moodContext) {
+      moodContext.classList.add('hidden');
     }
     
     // Try again immediately
@@ -700,7 +1433,7 @@ class VFIEDOneButtonApp {
     try {
       if (this.useAI) {
         const status = getAIServiceStatus();
-        let message = '🤖 AI ready';
+        let message = '🚀 Fast AI ready';
         
         if (status.hasCulture) {
           message += ' with cultural intelligence';
@@ -713,6 +1446,16 @@ class VFIEDOneButtonApp {
         // Add dietary awareness if user has restrictions
         if (this.userPreferences.dietary && this.userPreferences.dietary.length > 0) {
           message += ` + dietary intelligence`;
+        }
+        
+        // Add mood awareness
+        if (currentMood) {
+          message += ` + mood detection`;
+        }
+        
+        // Add performance info
+        if (this.performanceMetrics.avgResponseTime > 0) {
+          message += ` (${Math.round(this.performanceMetrics.avgResponseTime)}ms avg)`;
         }
         
         aiStatus.textContent = message;
@@ -741,12 +1484,16 @@ class VFIEDOneButtonApp {
         setTimeout(() => {
           mainApp.style.opacity = '1';
         }, 50);
-      }, 500);
+      }, 300); // Faster transition
     }
   }
 
   async refreshContext() {
     this.loadUserPreferences(); // Reload preferences
+    
+    // 🚀 CLEAR CACHE ON CONTEXT REFRESH
+    mcpClient.clearCache();
+    
     this.updateContextWithAI();
     this.updateStats();
     this.updateAIStatus();
@@ -774,6 +1521,18 @@ class VFIEDOneButtonApp {
     }, 3000);
   }
 
+  debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
+  }
+
   // Debug functions
   getStatus() {
     return {
@@ -781,7 +1540,11 @@ class VFIEDOneButtonApp {
       hasCurrentSuggestion: !!this.currentSuggestion,
       isThinking: this.isThinking,
       stats: this.stats,
-      userPreferences: this.userPreferences
+      userPreferences: this.userPreferences,
+      performance: this.performanceMetrics,
+      cacheSize: mcpClient.cache.size,
+      currentMood: currentMood,
+      moodHistory: moodHistory
     };
   }
 }
@@ -797,7 +1560,7 @@ function forceButtonClickability() {
 
 // Initialize the one-button app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('🚀 DOM loaded, initializing VFIED...');
+  console.log('🚀 DOM loaded, initializing FAST VFIED with Mood Detection...');
   
   // Force button to be clickable immediately
   setTimeout(() => {
@@ -807,21 +1570,40 @@ document.addEventListener('DOMContentLoaded', () => {
       button.style.cursor = 'pointer';
       console.log('🔧 Forced button clickability');
     }
-  }, 100);
+  }, 50); // Even faster
   
   window.vfiedApp = new VFIEDOneButtonApp();
   
   // Make app globally available for settings integration
   window.vfiedAppInstance = window.vfiedApp;
   
-  // Emergency fix: Force button clickability every 3 seconds
-  setInterval(forceButtonClickability, 3000);
+  // 🧠 EXPOSE MOOD FUNCTIONS GLOBALLY
+  window.quickMood = quickMood;
+  window.detectMoodFromText = detectMoodFromText;
+  window.useMoodForDecision = useMoodForDecision;
+  window.currentMood = () => currentMood;
+  window.moodHistory = () => moodHistory;
   
-  // Debug helper
+  // Emergency fix: Force button clickability every 2 seconds (faster check)
+  setInterval(forceButtonClickability, 2000);
+  
+  // Debug helper with performance info
   window.vfiedDebug = {
     getStatus: () => window.vfiedApp?.getStatus() || 'Not initialized',
     testDecision: () => window.vfiedApp?.handleDecideClick() || console.log('App not ready'),
     getPreferences: () => window.vfiedApp?.userPreferences || {},
+    clearCache: () => mcpClient.clearCache(),
+    getCache: () => mcpClient.cache,
+    testMCP: async () => {
+      try {
+        const result = await mcpClient.call('/health', {});
+        console.log('MCP Health:', result);
+        return result;
+      } catch (error) {
+        console.error('MCP Test Failed:', error);
+        return { error: error.message };
+      }
+    },
     testButton: () => {
       const btn = document.getElementById('decide-button');
       console.log('Button found:', !!btn);
@@ -831,8 +1613,18 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.style.pointerEvents = 'auto';
         btn.click();
       }
-    }
+    },
+    // 🧠 MOOD DEBUG FUNCTIONS
+    testMood: (text) => detectMoodFromText(text || 'tired and stressed'),
+    getCurrentMood: () => currentMood,
+    getMoodHistory: () => moodHistory,
+    clearMood: () => { currentMood = null; moodHistory = []; },
+    useMood: () => useMoodForDecision()
   };
+  
+  console.log('✅ REAL AI VFIED system with Mood Detection ready!');
+  console.log('🧠 Mood functions available: quickMood(), detectMoodFromText(), useMoodForDecision()');
+  console.log('🧠 Debug: window.vfiedDebug.testMood("tired and celebrating")');
 });
 
 export default VFIEDOneButtonApp;
