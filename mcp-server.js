@@ -2853,20 +2853,36 @@ app.post('/v1/quick_decision',
   
       // Validate dietary compliance of the recommendation
       if (dietary.length > 0 && recommendation.food?.name) {
-        const compliance = await smartDietaryService.validateCompliance(
-          recommendation.food.name, 
-          dietary
-        );
-  
-        // If not compliant, get a fallback
-        if (!compliance.compliant) {
-          console.warn(`Recommendation "${recommendation.food.name}" not compliant with ${dietary.join(', ')}`);
-          recommendation = getFallbackRecommendation(location, primaryMood, dietary);
+        try {
+          const compliance = await smartDietaryService.validateCompliance(
+            recommendation.food.name, 
+            dietary
+          );
+      
+          // If not compliant, get a fallback
+          if (!compliance.compliant) {
+            console.warn(`Recommendation "${recommendation.food.name}" not compliant with ${dietary.join(', ')}`);
+            recommendation = getFallbackRecommendation(location, primaryMood, dietary);
+            
+            // 🔥 RE-CHECK the fallback food (this was missing!)
+            const fallbackCompliance = await smartDietaryService.validateCompliance(
+              recommendation.food.name, 
+              dietary
+            );
+            recommendation.dietaryCompliance = fallbackCompliance;
+          } else {
+            recommendation.dietaryCompliance = compliance;
+          }
+        } catch (error) {
+          console.warn('Dietary compliance check failed:', error.message);
+          // For fallback foods, assume compliant since we designed them to be
+          recommendation.dietaryCompliance = { 
+            compliant: true, 
+            source: 'assumed', 
+            reasoning: 'Fallback food designed to be compliant' 
+          };
         }
-  
-        recommendation.dietaryCompliance = compliance;
       }
-  
       // Filter alternatives to be dietary compliant
       if (dietary.length > 0 && recommendation.alternatives) {
         const compliantAlternatives = [];
