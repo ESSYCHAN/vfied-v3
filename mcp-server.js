@@ -1152,84 +1152,533 @@ function normalizeMoods(moodText, moodIds) {
 }
 
 async function getPersonalizedMenuRecommendation(vendorId, context) {
-  const vendorMenu = vendorMenus.get(vendorId);
+    const vendorMenu = vendorMenus.get(vendorId);
+    
+    if (!vendorMenu || vendorMenu.items.length === 0) {
+      return {
+        error: 'No menu uploaded',
+        message: 'Upload your menu first to get personalized recommendations'
+      };
+    }
   
-  if (!vendorMenu || vendorMenu.items.length === 0) {
+    // Enhanced filtering with better logic
+    let availableItems = vendorMenu.items.filter(item => 
+      !item.availability || item.availability === 'in_stock'
+    );
+  
+    // Smart dietary filtering with better accuracy
+    availableItems = applySmartDietaryFilters(availableItems, context.dietary);
+  
+    if (availableItems.length === 0) {
+      return {
+        error: 'No suitable items',
+        message: `No menu items available that match your ${context.dietary.join(', ')} dietary requirements.`,
+        suggestion: 'Consider expanding your dietary preferences or contact the restaurant for custom options.'
+      };
+    }
+  
+    // Use AI to score and recommend items
+    const aiRecommendation = await getAIMenuRecommendation(availableItems, context);
+    
+    if (aiRecommendation) {
+      return aiRecommendation;
+    }
+  
+    // Fallback to enhanced rule-based scoring
+    return getEnhancedRuleBasedRecommendation(availableItems, context);
+  }
+  
+  // AI-Powered Menu Recommendation
+  async function getAIMenuRecommendation(availableItems, context) {
+    if (!aiFoodService.openaiApiKey) {
+      return null; // Fall back to rule-based
+    }
+  
+    try {
+      const menuPrompt = buildMenuRecommendationPrompt(availableItems, context);
+      const aiResponse = await aiFoodService.callOpenAI(menuPrompt, { 
+        responseFormat: 'json',
+        maxTokens: 800 
+      });
+  
+      const recommendation = JSON.parse(aiResponse);
+      return formatAIMenuRecommendation(recommendation, availableItems, context);
+  
+    } catch (error) {
+      console.error('AI menu recommendation failed:', error);
+      return null; // Fall back to rule-based
+    }
+  }
+  
+  // Build sophisticated AI prompt for menu recommendations
+  function buildMenuRecommendationPrompt(availableItems, context) {
+    const menuItemsText = availableItems.map(item => `
+  - ${item.name} (${item.emoji || '🍽️'}) - ${item.category || 'main'}
+    Tags: ${item.tags?.join(', ') || 'none'}
+    Price: ${item.price || 'N/A'}
+    Description: ${item.description || 'No description'}
+    Macros: ${item.macros ? `${item.macros.kcal}kcal, ${item.macros.protein_g}g protein` : 'N/A'}
+    Country: ${item.country || 'Local'}
+    Dietary: ${formatDietaryInfo(item)}
+  `).join('\n');
+  
+    const contextInfo = buildContextDescription(context);
+  
+    return `
+  You are a sophisticated restaurant menu AI that helps customers choose the perfect dish based on their current situation and preferences.
+  
+  CUSTOMER CONTEXT:
+  ${contextInfo}
+  
+  AVAILABLE MENU ITEMS:
+  ${menuItemsText}
+  
+  TASK: Analyze the customer's situation and recommend the BEST menu item from the available options.
+  
+  Consider these factors in order of importance:
+  1. Dietary restrictions (MUST be compatible)
+  2. Current mood and situation
+  3. Time of day and weather
+  4. Nutritional needs based on context
+  5. Price vs value for their situation
+  6. Cultural preferences and authenticity
+  
+  SCORING CRITERIA:
+  - Perfect dietary match: +40 points
+  - Mood alignment: +30 points
+  - Situational appropriateness: +20 points
+  - Nutritional fitness: +15 points
+  - Value proposition: +10 points
+  - Cultural authenticity: +10 points
+  
+  Respond with this exact JSON structure:
+  {
+    "recommended_item": "exact menu item name",
+    "confidence": 95,
+    "reasoning": "detailed explanation of why this is perfect for them",
+    "mood_match": "how this fits their current mood/situation",
+    "dietary_compliance": "confirmation this meets all dietary needs",
+    "cultural_note": "cultural context or authenticity note",
+    "nutritional_benefit": "why this is nutritionally appropriate",
+    "alternatives": [
+      {"name": "backup option 1", "reason": "why this works too"},
+      {"name": "backup option 2", "reason": "another good choice"}
+    ],
+    "personalized_message": "friendly, encouraging message as their food friend"
+  }
+  
+  Be specific, personal, and consider the customer's complete situation. Make them excited about your recommendation!
+  `;
+  }
+  
+  // Build rich context description
+  function buildContextDescription(context) {
+    const parts = [];
+    
+    // Location context
+    if (context.location) {
+      parts.push(`Location: ${context.location.city}, ${context.location.country}`);
+    }
+    
+    // Mood and emotional state
+    if (context.mood_text) {
+      parts.push(`Mood: ${context.mood_text}`);
+    }
+    if (context.mood_ids?.length) {
+      parts.push(`Emotional state: ${context.mood_ids.join(', ')}`);
+    }
+    
+    // Dietary requirements
+    if (context.dietary?.length) {
+      parts.push(`Dietary requirements: ${context.dietary.join(', ')} (STRICT - must comply)`);
+    }
+    
+    // Social context
+    if (context.social) {
+      parts.push(`Dining situation: ${context.social}`);
+    }
+    
+    // Budget considerations
+    if (context.budget) {
+      parts.push(`Budget preference: ${context.budget}`);
+    }
+    
+    // Time context
+    const hour = new Date().getHours();
+    const timeOfDay = hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening';
+    parts.push(`Time: ${timeOfDay}`);
+    
+    // Weather context (if available)
+    if (context.weather) {
+      parts.push(`Weather: ${context.weather.description}, ${context.weather.temperature}°C`);
+    }
+  
+    return parts.join('\n');
+  }
+  
+  // Format dietary information for display
+  function formatDietaryInfo(item) {
+    const dietary = [];
+    if (item.suitability?.vegetarian) dietary.push('vegetarian');
+    if (item.suitability?.vegan) dietary.push('vegan');
+    if (item.suitability?.gluten_free) dietary.push('gluten-free');
+    if (item.suitability?.halal_friendly) dietary.push('halal');
+    if (item.suitability?.kosher_friendly) dietary.push('kosher');
+    return dietary.length ? dietary.join(', ') : 'no special dietary info';
+  }
+  
+  // Smart dietary filtering with comprehensive logic
+  function applySmartDietaryFilters(items, dietaryRestrictions) {
+    if (!dietaryRestrictions?.length) return items;
+  
+    return items.filter(item => {
+      for (const restriction of dietaryRestrictions) {
+        if (!isDietaryCompliant(item, restriction)) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+  
+  // Check if item complies with specific dietary restriction
+  function isDietaryCompliant(item, restriction) {
+    const lower = restriction.toLowerCase();
+    
+    switch (lower) {
+      case 'vegetarian':
+        return item.suitability?.vegetarian || 
+               item.tags?.includes('vegetarian') ||
+               !hasMeatTags(item);
+      
+      case 'vegan':
+        return item.suitability?.vegan || 
+               item.tags?.includes('vegan');
+      
+      case 'gluten-free':
+        return item.suitability?.gluten_free || 
+               item.tags?.includes('gluten-free');
+      
+      case 'dairy-free':
+        return item.suitability?.dairy_free || 
+               item.tags?.includes('dairy-free') ||
+               !hasDairyTags(item);
+      
+      case 'halal':
+        return item.suitability?.halal_friendly || 
+               item.tags?.includes('halal');
+      
+      case 'kosher':
+        return item.suitability?.kosher_friendly || 
+               item.tags?.includes('kosher');
+      
+      case 'keto':
+        return item.tags?.includes('keto') || 
+               item.tags?.includes('low-carb');
+      
+      default:
+        return true;
+    }
+  }
+  
+  // Check for meat-related tags
+  function hasMeatTags(item) {
+    const meatTags = ['meat', 'chicken', 'beef', 'pork', 'lamb', 'fish', 'seafood', 'bacon', 'sausage'];
+    return item.tags?.some(tag => meatTags.includes(tag.toLowerCase()));
+  }
+  
+  // Check for dairy-related tags
+  function hasDairyTags(item) {
+    const dairyTags = ['cheese', 'milk', 'cream', 'butter', 'yogurt'];
+    return item.tags?.some(tag => dairyTags.includes(tag.toLowerCase()));
+  }
+  
+  // Format AI recommendation response
+  function formatAIMenuRecommendation(aiResponse, availableItems, context) {
+    const selectedItem = availableItems.find(item => 
+      item.name === aiResponse.recommended_item
+    );
+  
+    if (!selectedItem) {
+      return null; // Fall back to rule-based if AI picked invalid item
+    }
+  
+    const alternatives = aiResponse.alternatives
+      ?.map(alt => {
+        const altItem = availableItems.find(item => item.name === alt.name);
+        return altItem ? {
+          name: altItem.name,
+          emoji: altItem.emoji || '🍽️',
+          reason: alt.reason,
+          price: altItem.price
+        } : null;
+      })
+      .filter(Boolean)
+      .slice(0, 2) || [];
+  
     return {
-      error: 'No menu uploaded',
-      message: 'Upload your menu first to get personalized recommendations'
+      food: {
+        name: selectedItem.name,
+        emoji: selectedItem.emoji || '🍽️',
+        country: selectedItem.country || 'Local',
+        country_code: selectedItem.country_code,
+        category: selectedItem.category || 'comfort',
+        menu_item_id: selectedItem.menu_item_id,
+        price: selectedItem.price,
+        menu_link: selectedItem.menu_link,
+        description: selectedItem.description
+      },
+      friend_message: aiResponse.personalized_message || `${selectedItem.name} is perfect for you right now!`,
+      reasoning: aiResponse.reasoning,
+      mood_match: aiResponse.mood_match,
+      cultural_note: aiResponse.cultural_note,
+      nutritional_benefit: aiResponse.nutritional_benefit,
+      dietary_compliance: aiResponse.dietary_compliance,
+      availability_note: `Available now from your menu`,
+      alternatives,
+      confidence: aiResponse.confidence || 90,
+      source: 'ai-menu',
+      timestamp: new Date().toISOString(),
+      context_used: {
+        mood: context.mood_text,
+        dietary: context.dietary,
+        location: context.location?.city
+      }
     };
   }
   
-  // Filter available items
-  let availableItems = vendorMenu.items.filter(item => 
-    !item.availability || item.availability === 'in_stock'
-  );
+  // Enhanced rule-based fallback with better scoring
+  function getEnhancedRuleBasedRecommendation(availableItems, context) {
+    const scoredItems = availableItems.map(item => {
+      let score = 60; // Higher base score
+      
+      // Enhanced mood scoring
+      if (context.mood_text) {
+        score += getMoodScore(item, context.mood_text);
+      }
+      
+      // Time-of-day scoring
+      score += getTimeScore(item);
+      
+      // Price-value scoring
+      score += getPriceScore(item, context.budget);
+      
+      // Popularity/rating scoring
+      score += getPopularityScore(item);
+      
+      // Cultural authenticity bonus
+      if (item.country && context.location?.country) {
+        if (item.country.toLowerCase() === context.location.country.toLowerCase()) {
+          score += 15; // Local cuisine bonus
+        }
+      }
+      
+      // Add controlled randomness for variety
+      score += Math.random() * 10;
+      
+      return { ...item, score };
+    });
   
-  // Apply dietary filters
-  if (context.dietary.includes('vegetarian')) {
-    availableItems = availableItems.filter(item => 
-      item.tags?.includes('vegetarian') || 
-      !item.tags?.some(tag => ['meat', 'chicken', 'beef', 'pork'].includes(tag))
-    );
-  }
+    scoredItems.sort((a, b) => b.score - a.score);
+    const selectedItem = scoredItems[0];
   
-  if (context.dietary.includes('vegan')) {
-    availableItems = availableItems.filter(item => 
-      item.tags?.includes('vegan') ||
-      item.suitability?.vegan
-    );
-  }
-  
-  // Simple mood-based scoring
-  const scoredItems = availableItems.map(item => {
-    let score = 50; // Base score
-    
-    // Mood scoring
-    if (context.mood_text?.includes('tired') && item.tags?.includes('comfort')) score += 30;
-    if (context.mood_text?.includes('celebrating') && item.tags?.includes('special')) score += 25;
-    if (context.mood_text?.includes('workout') && item.tags?.includes('protein')) score += 35;
-    
-    // Random factor for variety
-    score += Math.random() * 20;
-    
-    return { ...item, score };
-  });
-  
-  // Sort by score and pick the best
-  scoredItems.sort((a, b) => b.score - a.score);
-  const selectedItem = scoredItems[0];
-  
-  if (!selectedItem) {
     return {
-      error: 'No suitable items',
-      message: 'No menu items match your preferences. Try adjusting your dietary restrictions.'
+      food: {
+        name: selectedItem.name,
+        emoji: selectedItem.emoji || '🍽️',
+        country: selectedItem.country || 'Local',
+        country_code: selectedItem.country_code,
+        category: selectedItem.category || 'comfort',
+        menu_item_id: selectedItem.menu_item_id,
+        price: selectedItem.price,
+        menu_link: selectedItem.menu_link
+      },
+      friend_message: generateSmartMessage(selectedItem, context),
+      reasoning: generateSmartReasoning(selectedItem, context),
+      cultural_note: generateCulturalNote(selectedItem, context),
+      availability_note: `Available now from your menu`,
+      alternatives: scoredItems.slice(1, 3).map(item => ({
+        name: item.name,
+        emoji: item.emoji || '🍽️',
+        reason: generateAlternativeReason(item, context),
+        price: item.price
+      })),
+      confidence: Math.min(95, selectedItem.score),
+      source: 'enhanced-rules',
+      timestamp: new Date().toISOString()
     };
   }
   
-  return {
-    food: {
-      name: selectedItem.name,
-      emoji: selectedItem.emoji || '🍽️',
-      country: selectedItem.country || 'Local',
-      country_code: selectedItem.country_code,
-      category: selectedItem.category || 'comfort',
-      menu_item_id: selectedItem.menu_item_id,
-      price: selectedItem.price,
-      menu_link: selectedItem.menu_link
-    },
-    friend_message: `Perfect choice from your menu! ${selectedItem.name} is exactly what you need right now.`,
-    reasoning: `Selected from your uploaded menu based on your ${context.mood_text} mood and dietary preferences.`,
-    cultural_note: `This ${selectedItem.country || 'local'} dish fits perfectly with your current situation.`,
-    availability_note: `Available now from your menu`,
-    alternatives: scoredItems.slice(1, 3).map(item => ({
-      name: item.name,
-      emoji: item.emoji || '🍽️',
-      reason: 'Another great option from your menu'
-    })),
-    confidence: Math.min(95, 70 + (selectedItem.score - 50))
-  };
-}
+  // Enhanced mood scoring
+  function getMoodScore(item, moodText) {
+    const mood = moodText.toLowerCase();
+    let score = 0;
+    
+    if (mood.includes('tired') || mood.includes('exhausted')) {
+      if (item.tags?.includes('comfort')) score += 25;
+      if (item.tags?.includes('protein')) score += 15;
+      if (item.tags?.includes('energizing')) score += 20;
+    }
+    
+    if (mood.includes('celebrating') || mood.includes('happy')) {
+      if (item.tags?.includes('special')) score += 30;
+      if (item.tags?.includes('premium')) score += 20;
+      if (item.category === 'dessert') score += 15;
+    }
+    
+    if (mood.includes('workout') || mood.includes('exercise')) {
+      if (item.tags?.includes('protein')) score += 35;
+      if (item.tags?.includes('healthy')) score += 25;
+      if (item.macros?.protein_g > 20) score += 20;
+    }
+    
+    if (mood.includes('stressed') || mood.includes('anxious')) {
+      if (item.tags?.includes('comfort')) score += 30;
+      if (item.tags?.includes('warm')) score += 15;
+    }
+    
+    if (mood.includes('sick') || mood.includes('unwell')) {
+      if (item.tags?.includes('light')) score += 25;
+      if (item.tags?.includes('soup')) score += 30;
+      if (item.tags?.includes('healthy')) score += 20;
+    }
+    
+    return score;
+  }
+  
+  // Time-based scoring
+  function getTimeScore(item) {
+    const hour = new Date().getHours();
+    
+    if (hour >= 6 && hour < 11) { // Morning
+      if (item.category === 'breakfast') return 20;
+      if (item.tags?.includes('coffee')) return 15;
+    } else if (hour >= 11 && hour < 15) { // Lunch
+      if (item.category === 'lunch') return 20;
+      if (item.tags?.includes('light')) return 10;
+    } else if (hour >= 17 && hour < 22) { // Dinner
+      if (item.category === 'dinner') return 20;
+      if (item.tags?.includes('hearty')) return 15;
+    } else { // Late night
+      if (item.tags?.includes('comfort')) return 15;
+      if (item.tags?.includes('light')) return 10;
+    }
+    
+    return 0;
+  }
+  
+  // Price-value scoring
+  function getPriceScore(item, budget) {
+    if (!item.price || !budget) return 5;
+    
+    const price = parseFloat(item.price);
+    
+    switch (budget) {
+      case 'low':
+        return price < 10 ? 15 : price < 15 ? 5 : -5;
+      case 'medium':
+        return price < 20 ? 10 : price < 30 ? 5 : 0;
+      case 'high':
+        return price > 25 ? 10 : 5;
+      default:
+        return 5;
+    }
+  }
+  
+  // Popularity scoring (based on tags and category)
+  function getPopularityScore(item) {
+    let score = 0;
+    
+    if (item.tags?.includes('popular')) score += 10;
+    if (item.tags?.includes('chef-special')) score += 15;
+    if (item.tags?.includes('signature')) score += 12;
+    if (item.category === 'signature') score += 10;
+    
+    return score;
+  }
+  
+  // Generate smart contextual messages
+  function generateSmartMessage(item, context) {
+    const mood = context.mood_text?.toLowerCase() || '';
+    const time = new Date().getHours();
+    
+    const messages = [
+      `Perfect choice! ${item.name} is exactly what you need right now.`,
+      `${item.name} hits the spot for your current mood.`,
+      `You'll love ${item.name} - it's made for moments like this.`,
+      `${item.name} is calling your name! Great pick for today.`
+    ];
+    
+    if (mood.includes('tired')) {
+      return `${item.name} will give you the comfort and energy boost you need right now.`;
+    } else if (mood.includes('celebrating')) {
+      return `${item.name} is perfect for celebrating! You deserve this treat.`;
+    } else if (time < 12) {
+      return `Start your day right with ${item.name} - perfect morning choice!`;
+    }
+    
+    return messages[Math.floor(Math.random() * messages.length)];
+  }
+  
+  // Generate smart reasoning
+  function generateSmartReasoning(item, context) {
+    const reasons = [];
+    
+    if (context.dietary?.length) {
+      reasons.push(`matches your ${context.dietary.join(' and ')} dietary needs`);
+    }
+    
+    if (context.mood_text) {
+      reasons.push(`perfect for your ${context.mood_text} mood`);
+    }
+    
+    if (item.tags?.includes('comfort')) {
+      reasons.push('provides the comfort you\'re looking for');
+    }
+    
+    if (item.country && context.location) {
+      reasons.push(`authentic ${item.country} cuisine`);
+    }
+    
+    if (reasons.length === 0) {
+      return `${item.name} is a great choice from your menu that fits your current situation.`;
+    }
+    
+    return `Selected because it ${reasons.join(', ')}.`;
+  }
+  
+  // Generate cultural notes
+  function generateCulturalNote(item, context) {
+    if (item.country) {
+      return `This ${item.country} dish represents authentic flavors and traditional preparation methods.`;
+    }
+    
+    if (item.category) {
+      return `A ${item.category} favorite that's beloved for its satisfying qualities.`;
+    }
+    
+    return 'A carefully crafted dish that reflects culinary excellence.';
+  }
+  
+  // Generate alternative reasons
+  function generateAlternativeReason(item, context) {
+    const reasons = [
+      'Another excellent choice from your menu',
+      'Great alternative with similar appeal',
+      'Popular option that hits different notes',
+      'Solid backup that many customers love'
+    ];
+    
+    if (item.tags?.includes('popular')) {
+      return 'Customer favorite with great reviews';
+    }
+    
+    if (item.price && context.budget === 'low') {
+      return 'Budget-friendly option without compromising taste';
+    }
+    
+    return reasons[Math.floor(Math.random() * reasons.length)];
+  }
 
 // Create demo API keys (run this once to set up test accounts)
 function createDemoApiKeys() {
@@ -1900,7 +2349,12 @@ app.post('/mcp/get_quick_food_decision', async (req, res) => {
     const { location, dietary = [], context = {} } = req.body;
 
     if (location) {
-      aiFoodService.setLocationFromRequest(location);
+      aiFoodService.setLocationFromRequest({
+        city: location?.city || 'London',
+        country: location?.country || 'UK', 
+        countryCode: location?.country_code || 'GB'
+      });
+      
     }
 
     const hour = new Date().getHours();
