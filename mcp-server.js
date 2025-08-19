@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import crypto from 'crypto';
 import 'dotenv/config';
+import { z } from 'zod';
+
 // Add these routes to your mcp-server.js BEFORE your existing endpoints
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -42,22 +44,42 @@ app.use((req, res, next) => {
 
 // Serve static HTML pages - ADD THESE ROUTES RIGHT HERE
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'index.html'), (err) => {
+      if (err) {
+        console.error('Error serving index.html:', err);
+        res.status(404).send('Page not found');
+      }
+    });
   });
   
   app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dashboard.html'));
+    res.sendFile(path.join(__dirname, 'dashboard.html'), (err) => {
+      if (err) {
+        console.error('Error serving dashboard.html:', err);
+        res.status(404).send('Dashboard not found');
+      }
+    });
   });
   
   app.get('/docs', (req, res) => {
-    res.sendFile(path.join(__dirname, 'docs.html'));
+    res.sendFile(path.join(__dirname, 'docs.html'), (err) => {
+      if (err) {
+        console.error('Error serving docs.html:', err);
+        res.status(404).send('Documentation not found');
+      }
+    });
   });
   
   app.get('/demo', (req, res) => {
-    res.sendFile(path.join(__dirname, 'demo.html'));
+    res.sendFile(path.join(__dirname, 'demo.html'), (err) => {
+      if (err) {
+        console.error('Error serving demo.html:', err);
+        res.status(404).send('Demo not found');
+      }
+    });
   });
   
-  // Serve static assets (if you add any CSS/JS files later)
+  // Your assets route is perfect as-is
   app.use('/assets', express.static(path.join(__dirname, 'assets')));
 
 // ==================== MENU UPLOAD SYSTEM ====================
@@ -2552,73 +2574,75 @@ const quickDecisionSchema = Joi.object({
   ).optional()
 });
 
-const recommendSchema = Joi.object({
-  location: Joi.object({
-    city: Joi.string().optional(),
-    country: Joi.string().required(),
-    country_code: Joi.string().length(2).uppercase().required()
-  }).optional(),
-  mood_text: Joi.string().optional(),
-  mood_ids: Joi.array().items(
-    Joi.string().valid('TIRED', 'STRESSED', 'CELEBRATING', 'HUNGRY', 'POST_WORKOUT', 'SICK', 'FOCUSED', 'RELAX', 'ADVENTUROUS')
-  ).min(1).required(),
-  dietary: Joi.array().items(
-    Joi.string().valid('vegetarian', 'vegan', 'gluten-free', 'dairy-free', 'keto', 'halal', 'kosher')
-  ).optional(),
-  budget: Joi.string().valid('low', 'medium', 'high').optional(),
-  social: Joi.string().valid('solo', 'date', 'family', 'friends', 'work').optional()
-});
+export const recommendSchema = z.object({
+    location: z.object({
+      city: z.string().optional(),
+      country: z.string().optional(),
+      country_code: z.string().length(2).optional(),
+      latitude: z.number().optional(),
+      longitude: z.number().optional()
+    }).optional(),
+  
+    // either mood_text or mood_ids (or both)
+    mood_text: z.string().max(200).optional(),
+    mood_ids: z.array(z.enum([
+      'TIRED','STRESSED','CELEBRATING','HEALTHY','HUNGRY','LAZY','ENERGETIC','POST_WORKOUT','SICK','HUNGOVER'
+    ])).optional(),
+  
+    dietary: z.array(z.enum([
+      'vegetarian','vegan','gluten-free','dairy-free','keto','halal','kosher','nut-free','paleo','pescatarian'
+    ])).default([]),
+  
+    budget: z.enum(['low','medium','high']).optional(),
+    social: z.enum(['solo','couple','group','family']).optional(),
+    menu_source: z.enum(['global_database','my_uploaded_menu']).default('global_database')
+  }).refine(data => !!data.mood_text || (data.mood_ids && data.mood_ids.length > 0), {
+    message: 'Provide mood_text or mood_ids',
+    path: ['mood_text']
+  });
 
 
 // Validation middleware
-function validateRequest(schema) {
-  return (req, res, next) => {
-    const { error, value } = schema.validate(req.body, { stripUnknown: true });
-    if (error) {
+export const validateRequest = (schema) => (req, res, next) => {
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) {
       return res.status(400).json({
-        error: 'Validation Error',
-        details: error.details.map(d => ({ field: d.path.join('.'), message: d.message }))
+        success: false,
+        error: 'Validation failed',
+        details: parsed.error.issues.map(i => ({ path: i.path, message: i.message }))
       });
     }
-    req.body = value;
+    // write parsed data back (normalized defaults)
+    req.body = parsed.data;
     next();
   };
-}
 
 // Helper functions
-function textToMoodIds(text) {
-  if (!text) return [];
-  
-  const moodMap = {
-    'tired': 'TIRED', 'exhausted': 'TIRED', 'sleepy': 'TIRED',
-    'stressed': 'STRESSED', 'anxious': 'ANXIOUS', 'worried': 'ANXIOUS',
-    'celebrating': 'CELEBRATING', 'happy': 'HAPPY', 'excited': 'CELEBRATING',
-    'hungry': 'HUNGRY', 'starving': 'HUNGRY', 'craving': 'CRAVING',
-    'sick': 'SICK', 'unwell': 'SICK', 'hungover': 'HUNGOVER',
-    'workout': 'POST_WORKOUT', 'gym': 'POST_WORKOUT', 'exercise': 'POST_WORKOUT',
-    'focused': 'FOCUSED', 'work': 'FOCUSED', 'relax': 'RELAX', 'chill': 'RELAX'
-  };
-  
-  const textLower = text.toLowerCase();
-  const detectedMoods = [];
-  
-  for (const [keyword, moodId] of Object.entries(moodMap)) {
-    if (textLower.includes(keyword)) {
-      detectedMoods.push(moodId);
-    }
+function textToMoodIds(text = '') {
+    const t = text.toLowerCase();
+    const map = [
+      [/post[-\s]?workout|gym|workout/, 'POST_WORKOUT'],
+      [/tired|exhausted|fatigued/, 'TIRED'],
+      [/stress|anxious|overwhelmed/, 'STRESSED'],
+      [/celebrat|party|birthday|win/, 'CELEBRATING'],
+      [/healthy|clean|light/, 'HEALTHY'],
+      [/hungry|starving|ravenous/, 'HUNGRY'],
+      [/lazy|couch|chill/, 'LAZY'],
+      [/energetic|pumped|hype/, 'ENERGETIC'],
+      [/sick|flu|cold/, 'SICK'],
+      [/hangover|hungover/, 'HUNGOVER']
+    ];
+    const out = new Set();
+    for (const [re, id] of map) if (re.test(t)) out.add(id);
+    return [...out];
   }
-  
-  return [...new Set(detectedMoods)];
-}
 
-function calculateConfidence(food, moodIds, context) {
-    let confidence = 75;
-    if (moodIds.length === 1) confidence += 10;
-    if (moodIds.length > 1) confidence += 5; // Multi-mood bonus
-    if (context.dietary && context.dietary.length > 0) confidence -= 5;
-    if (food.country && food.country !== 'Local') confidence += 5;
-    if (food.category === 'comfort') confidence += 5;
-    return Math.min(confidence, 95);
+  function calculateConfidence(food, moods = [], opts = {}) {
+    let c = 80;
+    if (moods.includes('POST_WORKOUT') && (food?.suitability?.protein || food?.tags?.includes?.('protein'))) c += 5;
+    if (opts.dietary?.length) c += 3;
+    if (food?.country_code) c += 2;
+    return Math.max(60, Math.min(95, c));
   }
 
 // NEW ENDPOINTS
@@ -2761,51 +2785,185 @@ app.post('/v1/quick_decision',
     }
   );
 
-// POST /v1/recommend - Full recommendation (requires auth)
-app.post('/v1/recommend',
-//     authenticateApiKey,           // ❌ REMOVE THIS LINE
-//   countUsage,                   // ❌ REMOVE THIS LINE  
-    validateRequest(recommendSchema),  // ✅ Keep validation
+  app.post('/v1/recommend',
+    validateRequest(recommendSchema),
     async (req, res) => {
       const startTime = Date.now();
       
       try {
-        const { location, mood_text, mood_ids, dietary = [], budget, social } = req.body;
-        
-        // Merge mood_text into mood_ids
-        let resolvedMoods = [...mood_ids];
+        const { 
+          location, 
+          mood_text, 
+          mood_ids, 
+          dietary = [], 
+          budget, 
+          social,
+          menu_source = 'global_database' 
+        } = req.body;
+  
+        // Set location for AI service (preserving lat/lon)
+        if (location) {
+          aiFoodService.setLocationFromRequest({
+            city: location.city,
+            country: location.country,
+            countryCode: location.country_code,
+            latitude: location.latitude,
+            longitude: location.longitude
+          });
+        }
+  
+        // 🔥 Resolve moods using the improved helper
+        let resolvedMoods = [...(mood_ids || [])];
         if (mood_text) {
           const textMoods = textToMoodIds(mood_text);
           resolvedMoods = [...new Set([...resolvedMoods, ...textMoods])];
         }
-        
-        // Use your existing AI service
-        const primaryMood = resolvedMoods[0] || 'HUNGRY';
-        const suggestion = await getAIFoodSuggestion(primaryMood, { 
+        const primaryMood = resolvedMoods.length ? resolvedMoods.join(' and ') : 'hungry';
+  
+        const enhancedContext = {
           location, 
           dietary, 
           budget, 
-          social 
-        });
+          social,
+          quick: false, 
+          includeRestaurants: true, 
+          culturalPriority: true
+        };
+  
+        // 🔥 KEY FIX: Respect menu_source and avoid unnecessary AI calls
+        let recommendation;
+        let usedMenuPath = false;
         
-        // Enhance the response to match vision schema
+        try {
+          if (menu_source === 'my_uploaded_menu' && req.apiKey?.vendorId) {
+            try {
+              // Try menu path first with timeout
+              recommendation = await Promise.race([
+                getPersonalizedMenuRecommendation(req.apiKey.vendorId, {
+                  location, 
+                  mood_text: primaryMood, 
+                  mood_ids: resolvedMoods, 
+                  dietary, 
+                  budget, 
+                  social
+                }),
+                new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('Menu recommendation timeout')), 3000)
+                )
+              ]);
+              
+              if (recommendation && !recommendation.error) {
+                usedMenuPath = true;
+                console.log('✅ Used vendor menu path - no AI calls needed!');
+              } else {
+                throw new Error('Menu recommendation failed or empty');
+              }
+            } catch (menuError) {
+              console.warn('Menu path failed, falling back to AI:', menuError.message);
+              recommendation = await Promise.race([
+                getWeatherAndDietaryAwareSuggestion(location, primaryMood, enhancedContext),
+                new Promise((_, reject) => 
+                  setTimeout(() => reject(new Error('AI recommendation timeout')), 5000)
+                )
+              ]);
+            }
+          } else {
+            // Global database path with timeout
+            recommendation = await Promise.race([
+              getWeatherAndDietaryAwareSuggestion(location, primaryMood, enhancedContext),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('AI recommendation timeout')), 5000)
+              )
+            ]);
+          }
+        } catch (error) {
+          console.warn('All recommendation methods failed, using fallback:', error.message);
+          recommendation = getFallbackRecommendation(location, primaryMood, dietary);
+        }
+  
+        // Validate primary recommendation dietary compliance
+        if (dietary.length > 0 && recommendation.food?.name) {
+          try {
+            const complianceCheck = await Promise.race([
+              smartDietaryService.validateCompliance(recommendation.food.name, dietary),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Compliance check timeout')), 2000)
+              )
+            ]);
+            
+            recommendation.dietaryCompliance = complianceCheck;
+            
+            if (!complianceCheck.compliant) {
+              console.warn(`Primary recommendation "${recommendation.food.name}" not compliant with ${dietary.join(', ')}`);
+              recommendation = getFallbackRecommendation(location, primaryMood, dietary);
+            }
+          } catch (error) {
+            console.warn('Dietary compliance check failed:', error.message);
+            recommendation.dietaryCompliance = { compliant: true, source: 'skipped' };
+          }
+        }
+  
+        // 🔥 OPTIMIZED: Validate max 3 alternatives in parallel with timeout
+        const toCheck = (recommendation.alternatives || []).slice(0, 3);
+        const withTimeout = (promise, ms = 1500) => Promise.race([
+          promise, 
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('timeout')), ms)
+          )
+        ]);
+  
+        if (dietary.length > 0 && toCheck.length > 0) {
+          try {
+            const results = await Promise.allSettled(
+              toCheck.map(alt => 
+                withTimeout(smartDietaryService.validateCompliance(alt.name, dietary))
+              )
+            );
+            
+            recommendation.alternatives = toCheck.filter((_, index) =>
+              results[index].status === 'fulfilled' && 
+              results[index].value?.compliant
+            );
+            
+            console.log(`✅ Validated ${toCheck.length} alternatives in parallel, ${recommendation.alternatives.length} compliant`);
+          } catch (error) {
+            console.warn('Alternative validation failed:', error.message);
+            recommendation.alternatives = [];
+          }
+        }
+  
+        // Build enhanced food object
         const enhancedFood = {
-          dish_id: suggestion.food?.id || `dish_${Date.now()}`,
-          name: suggestion.food?.name || 'Great Choice',
-          emoji: suggestion.food?.emoji || '🍽️',
-          country: location?.country || 'Local',
-          country_code: location?.country_code || 'US',
-          category: suggestion.food?.category || 'comfort',
-          tags: suggestion.food?.tags || [],
+          dish_id: recommendation.food?.menu_item_id || 
+                   recommendation.food?.id || 
+                   `dish_${Date.now()}`,
+          name: recommendation.food?.name || 'Great Choice',
+          emoji: recommendation.food?.emoji || '🍽️',
+          country: location?.country || recommendation.food?.country || 'Local',
+          country_code: location?.country_code || 
+                        recommendation.food?.country_code || 
+                        getCountryCode(location?.country) || 'GB',
+          category: recommendation.food?.category || 'comfort',
+          type: recommendation.food?.type || getLocalCuisineType(location),
+          tags: recommendation.food?.tags || [],
           suitability: {
-            vegetarian: !suggestion.food?.name?.toLowerCase().includes('meat'),
-            vegan: false,
-            gluten_free: false,
-            halal_friendly: true,
-            kosher_friendly: true
+            // Prefer menu data over heuristics
+            ...(recommendation.food?.suitability || {}),
+            ...buildSuitability(recommendation.food?.name, dietary)
           }
         };
-        
+  
+        // Generate reason codes for client badges
+        const reasonCodes = [];
+        if (resolvedMoods.includes('TIRED')) reasonCodes.push('mood.tired');
+        if (resolvedMoods.includes('CELEBRATING')) reasonCodes.push('mood.celebrating');
+        if (resolvedMoods.includes('POST_WORKOUT')) reasonCodes.push('mood.workout');
+        if (dietary.includes('vegetarian')) reasonCodes.push('diet.vegetarian');
+        if (dietary.includes('vegan')) reasonCodes.push('diet.vegan');
+        if (budget) reasonCodes.push(`budget.${budget}`);
+        if (social) reasonCodes.push(`social.${social}`);
+  
+        // Build response
         res.json({
           success: true,
           request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -2813,16 +2971,37 @@ app.post('/v1/recommend',
             resolved_moods: resolvedMoods,
             location: location,
             dietary: dietary,
-            source: 'public_access'
+            source: usedMenuPath ? 'uploaded_menu' : 'global_database',
+            menu_version: usedMenuPath && req.apiKey?.vendorId ? 
+                         vendorMenus.get(req.apiKey.vendorId)?.version : undefined
           },
           food: enhancedFood,
-          friendMessage: suggestion.friendResponse || suggestion.description,
-          reasoning: suggestion.reason || 'Perfect choice for your current situation',
-          culturalNote: suggestion.culturalNote || 'Fits your cultural preferences',
-          availabilityNote: suggestion.availabilityNote || 'Available in your area',
-          alternatives: suggestion.alternatives || [],
-          confidence: calculateConfidence(enhancedFood, resolvedMoods, { dietary }),
-          processingTimeMs: Date.now() - startTime
+          friendMessage: recommendation.friendResponse || recommendation.description,
+          reasoning: recommendation.reason || 
+                     recommendation.reasoning || 
+                     buildReasoning(enhancedFood, resolvedMoods, dietary, location),
+          culturalNote: recommendation.culturalNote || buildCulturalNote(enhancedFood, location),
+          personalNote: recommendation.personalNote,
+          weatherNote: recommendation.weatherReasoning,
+          availabilityNote: recommendation.availabilityNote || buildAvailabilityNote(enhancedFood, location),
+          alternatives: recommendation.alternatives || [],
+          confidence: recommendation.confidence || 
+                      calculateConfidence(enhancedFood, resolvedMoods, { dietary }),
+          dietaryCompliance: recommendation.dietaryCompliance,
+          dietaryNote: buildDietaryNote(dietary, recommendation.dietaryCompliance),
+          weather: recommendation.weather,
+          interactionId: recommendation.interactionId,
+          processingTimeMs: Date.now() - startTime,
+          meta: {
+            primaryMood,
+            reasonCodes,
+            hasWeather: !!recommendation.weather,
+            hasDietary: dietary.length > 0,
+            dietaryRestrictions: dietary,
+            usedMenuPath,
+            alternativesChecked: toCheck.length,
+            timestamp: new Date().toISOString()
+          }
         });
         
       } catch (error) {
@@ -2830,11 +3009,23 @@ app.post('/v1/recommend',
         res.status(500).json({
           success: false,
           error: 'Internal server error',
-          request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          details: process.env.NODE_ENV === 'development' ? error.message : undefined
         });
       }
     }
   );
+  
+  // Helper function to get country code
+  function getCountryCode(country) {
+    const countryMap = {
+      'Kenya': 'KE', 'United Kingdom': 'GB', 'UK': 'GB',
+      'United States': 'US', 'USA': 'US', 'Japan': 'JP',
+      'France': 'FR', 'Germany': 'DE', 'Nigeria': 'NG',
+      'India': 'IN', 'Australia': 'AU'
+    };
+    return countryMap[country] || 'US';
+  }
   
 
 // Enhanced health check
