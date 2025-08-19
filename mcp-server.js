@@ -2254,7 +2254,49 @@ app.post('/v1/quick_decision',
     }
   }
 );
-
+// Add this debug endpoint temporarily
+app.get('/debug/test-ai', async (req, res) => {
+    try {
+      console.log('Testing OpenAI key...');
+      console.log('Key exists:', !!process.env.OPENAI_API_KEY);
+      console.log('Key length:', process.env.OPENAI_API_KEY?.length);
+      
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [{ role: 'user', content: 'Say "API key works"' }],
+          max_tokens: 10
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        res.json({ 
+          success: true, 
+          message: 'OpenAI key is valid!',
+          response: data.choices[0].message.content
+        });
+      } else {
+        res.json({ 
+          success: false, 
+          error: data.error?.message || 'Unknown error',
+          status: response.status
+        });
+      }
+      
+    } catch (error) {
+      res.json({ 
+        success: false, 
+        error: error.message 
+      });
+    }
+  });
 // POST /v1/recommend - Full recommendation (requires auth)
 app.post('/v1/recommend',
   authenticateApiKey,
