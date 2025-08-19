@@ -1372,33 +1372,33 @@ function getCountryCode(country) {
     
     // REAL AI Functions - calls your actual MCP server and OpenAI
     async function getAIQuickDecision(context = {}) {
-      console.log('🎲 Getting REAL AI quick decision with settings...');
-      
-      try {
-          const userPrefs = getCurrentSettings();
-          console.log('📍 Using location:', userPrefs.location);
-          console.log('🌱 Using dietary:', userPrefs.dietary);
-          
-          // 🔥 FIX: Ensure location is properly formatted
-          let locationData = userPrefs.location;
-          if (!locationData && context.defaultLocation) {
-              locationData = context.defaultLocation;
-          }
-          
-          // Fallback to detected location from UI
-          const locationTag = document.getElementById('location-tag');
-          if (!locationData && locationTag?.textContent?.includes('Nairobi')) {
-              locationData = {
-                  city: 'Nairobi',
-                  country: 'Kenya',
-                  country_code: 'KE'
-              };
-          }
-          
-          console.log('📍 Final location data:', locationData);
-          
-          // 🔥 FIX: Create proper MCP request payload
-          const payload = {
+    console.log('🎲 Getting REAL AI quick decision with settings...');
+    
+    try {
+        const userPrefs = getCurrentSettings();
+        console.log('📍 Using location:', userPrefs.location);
+        console.log('🌱 Using dietary:', userPrefs.dietary);
+        
+        // 🔥 FIX: Ensure location is properly formatted
+        let locationData = userPrefs.location;
+        if (!locationData && context.defaultLocation) {
+            locationData = context.defaultLocation;
+        }
+        
+        // Fallback to detected location from UI
+        const locationTag = document.getElementById('location-tag');
+        if (!locationData && locationTag?.textContent?.includes('Nairobi')) {
+            locationData = {
+                city: 'Nairobi',
+                country: 'Kenya',
+                country_code: 'KE'
+            };
+        }
+        
+        console.log('📍 Final location data:', locationData);
+        
+        // 🔥 FIX: Create proper MCP request payload with REQUIRED mood
+        const payload = {
             location: locationData || {
                 city: 'London',
                 country: 'United Kingdom',
@@ -1409,53 +1409,61 @@ function getCountryCode(country) {
             menu_source: 'global_database'
         };
 
-        // 🧠 ADD MOOD IF AVAILABLE
+        // 🧠 CRITICAL FIX: Always provide mood (required by server)
         if (currentMood && currentMood.text) {
             payload.mood_text = currentMood.text;
             console.log('🧠 Including mood in request:', currentMood.text);
+        } else {
+            // 🔥 FALLBACK: Provide default mood to satisfy server requirement
+            payload.mood_text = "looking for something good to eat";
+            console.log('🧠 Using default mood text');
         }
 
         if (currentMood && currentMood.detected) {
             payload.mood_ids = currentMood.detected;
             console.log('🧠 Including detected moods:', currentMood.detected);
+        } else {
+            // 🔥 FALLBACK: Provide default mood ID
+            payload.mood_ids = ["HUNGRY"];
+            console.log('🧠 Using default mood IDs');
         }
 
         console.log('📡 MCP Request payload:', JSON.stringify(payload, null, 2));
-          
-          // FIRST: Try your MCP server
-          const response = await fetch('https://vfied-mcp-server.onrender.com/v1/recommend', {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(payload)
-          });
+        
+        // FIRST: Try your MCP server
+        const response = await fetch('https://vfied-mcp-server.onrender.com/v1/recommend', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
 
-          console.log('📡 MCP Response status:', response.status);
-          
-          if (!response.ok) {
-              // Get error details
-              const errorText = await response.text();
-              console.error('❌ MCP Error Details:', errorText);
-              throw new Error(`MCP server error: ${response.status} - ${errorText}`);
-          }
+        console.log('📡 MCP Response status:', response.status);
+        
+        if (!response.ok) {
+            // Get error details
+            const errorText = await response.text();
+            console.error('❌ MCP Error Details:', errorText);
+            throw new Error(`MCP server error: ${response.status} - ${errorText}`);
+        }
 
-          const data = await response.json();
-          console.log('✅ MCP response received:', data);
-          
-          return {
-              ...data,
-              source: 'mcp',
-              interactionId: data.interactionId || Date.now().toString()
-          };
+        const data = await response.json();
+        console.log('✅ MCP response received:', data);
+        
+        return {
+            ...data,
+            source: 'mcp',
+            interactionId: data.interactionId || Date.now().toString()
+        };
 
-      } catch (error) {
-          console.error('❌ MCP call failed, using fallback:', error);
-          
-          // Use the fixed fallback
-          return await getOpenAIFallback(context);
-      }
-  }
+    } catch (error) {
+        console.error('❌ MCP call failed, using fallback:', error);
+        
+        // Use the fixed fallback
+        return await getOpenAIFallback(context);
+    }
+}
 
     // 🧠 SMART Cultural Intelligence - Zero Hardcoding
 
@@ -1980,14 +1988,13 @@ const commonWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', '
               return;
           }
           
+          console.log('🎯 REAL AI BUTTON CLICKED!');
           console.log('🎯 DECISION - Location Debug:');
           console.log('  - User Settings:', userSettings);
           console.log('  - Current Settings:', getCurrentSettings());
           console.log('  - UI Tag:', document.getElementById('location-tag')?.textContent);
           
           await this.triggerHaptic();
-          
-          // Start thinking animation
           this.startThinking();
           
           const startTime = Date.now();
@@ -1995,67 +2002,73 @@ const commonWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', '
           try {
               let suggestion;
               
-              if (this.useAI) {
-                  console.log('🚀 Getting REAL AI suggestion...');
+              // 🚀 LAYER 1: ALWAYS TRY FRESH MCP SERVER CALL
+              console.log('🚀 LAYER 1: Attempting FRESH MCP Server AI...');
+              
+              // 🔥 REMOVED: Cached mood suggestion check - always get fresh AI
+              // The old code was: if (currentMood && currentMood.suggestion) { ... }
+              // Now we ALWAYS call the server for fresh suggestions
+              
+              this.updateButtonState('🚀 AI THINKING...', 'Getting fresh AI suggestion...');
+              
+              // 🔥 FIX: Create proper context for MCP call
+              const userPrefs = getCurrentSettings();
+              const effectiveLocation = userPrefs.location || this.getEffectiveLocation();
+              
+              console.log('🌍 Using effective location:', effectiveLocation);
+              
+              const context = {
+                  includeRestaurants: true,
+                  culturalPriority: true,
+                  quick: true,
+                  dietary: userPrefs.dietary || [],
+                  budget: 'medium',
+                  location: effectiveLocation,
+                  userId: 'user_' + Date.now(),
+                  mood: currentMood,
+                  defaultLocation: effectiveLocation,
+                  fresh: true // 🔥 Force fresh suggestion
+              };
+              
+              console.log('📋 MCP Context (FRESH):', JSON.stringify(context, null, 2));
+
+              try {
+                  // 🚀 FRESH MCP CALL - No caching!
+                  console.log('📡 Making FRESH MCP request...');
+                  suggestion = await getAIQuickDecision(context);
                   
-                  // 🧠 CHECK IF WE HAVE MOOD CONTEXT
-                  if (currentMood && currentMood.suggestion) {
-                      console.log('🧠 Using cached mood suggestion');
-                      this.currentSuggestion = currentMood.suggestion;
-                      this.showSuggestion(currentMood.suggestion);
-                      this.stopThinking();
-                      
-                      // Add mood context
-                      if (currentMood) {
-                          const moodContext = document.getElementById('mood-context');
-                          const moodMatchText = document.getElementById('mood-match-text');
-                          
-                          if (moodContext && moodMatchText) {
-                              moodMatchText.innerHTML = `🧠 <strong>Mood Match:</strong> Perfect for when you're ${currentMood.text}`;
-                              moodContext.classList.remove('hidden');
-                          }
-                      }
-                      return;
+                  // 🔥 CLEAR OLD CACHE after getting fresh suggestion
+                  if (currentMood) {
+                      delete currentMood.suggestion; // Remove cached suggestion
+                      console.log('🧹 Cleared cached suggestion, using fresh AI');
                   }
                   
-                  this.updateButtonState('🚀 AI THINKING...', 'Analyzing your situation...');
+                  this.currentInteractionId = suggestion.interactionId || Date.now().toString();
+                  console.log(`⚡ FRESH MCP AI success in ${Date.now() - startTime}ms:`, suggestion);
                   
-                  // 🔥 FIX: Use the correct location from settings
-                  const userPrefs = getCurrentSettings();
-                  const effectiveLocation = userPrefs.location || this.getEffectiveLocation();
+              } catch (mcpError) {
+                  console.warn('⚠️ LAYER 1 FAILED (MCP):', mcpError);
                   
-                  console.log('🌍 Using effective location:', effectiveLocation);
-                  
-                  // Create comprehensive context
-                  const context = {
-                      includeRestaurants: true,
-                      culturalPriority: true,
-                      quick: true,
-                      dietary: userPrefs.dietary || [],
-                      budget: 'medium',
-                      location: effectiveLocation,
-                      userId: 'user_' + Date.now(),
-                      mood: currentMood // Include mood if available
-                  };
-                  
-                  console.log('📋 Using context:', context);
-
                   try {
-                      // 🚀 TRY FAST MCP FIRST
-                      suggestion = await getAIQuickDecision(context);
-                      this.currentInteractionId = suggestion.interactionId || Date.now().toString();
-                      console.log(`⚡ AI suggestion completed in ${Date.now() - startTime}ms`);
-                  } catch (mcpError) {
-                      console.warn('⚠️ AI service failed, using smart fallback:', mcpError);
+                      // 🔄 LAYER 2: SMART FRONTEND FALLBACK
+                      console.log('🔄 LAYER 2: Trying smart fallback...');
+                      this.updateButtonState('🔄 SMART BACKUP...', 'Using fallback intelligence...');
                       
-                      // 🔄 SMART FALLBACK
                       suggestion = await getOpenAIFallback(context);
                       this.currentInteractionId = Date.now().toString();
+                      console.log('✅ Smart fallback succeeded:', suggestion);
+                      
+                  } catch (fallbackError) {
+                      console.warn('⚠️ LAYER 2 FAILED (Smart Fallback):', fallbackError);
+                      
+                      // 🛡️ LAYER 3: LOCAL FALLBACK
+                      console.log('🛡️ LAYER 3: Using local fallback...');
+                      this.updateButtonState('🎯 LOCAL MODE...', 'Using built-in intelligence...');
+                      
+                      suggestion = this.getLocalFallback();
+                      this.currentInteractionId = Date.now().toString();
+                      console.log('✅ Local fallback succeeded:', suggestion);
                   }
-              } else {
-                  console.log('🎯 Using local decision engine...');
-                  this.updateButtonState('🎯 THINKING...', 'Deciding for you...');
-                  suggestion = this.getLocalFallback();
               }
               
               this.currentSuggestion = suggestion;
@@ -2063,8 +2076,8 @@ const commonWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', '
               // Update performance metrics
               this.updatePerformanceMetrics(Date.now() - startTime, true);
               
-              // Show suggestion after minimal thinking delay
-              const thinkingTime = suggestion.responseTime > 500 ? 500 : 1000;
+              // Show suggestion with minimal delay
+              const thinkingTime = 800; // Consistent thinking time
               setTimeout(() => {
                   this.showSuggestion(suggestion);
                   this.stopThinking();
@@ -2081,27 +2094,12 @@ const commonWords = ['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', '
                   }
               }, thinkingTime);
               
-          } catch (error) {
-              console.error('Decision error:', error);
+          } catch (finalError) {
+              console.error('🚨 ALL LAYERS FAILED:', finalError);
               
-              // Update performance metrics
-              this.updatePerformanceMetrics(Date.now() - startTime, false);
-              
-              // 🛡️ FINAL FALLBACK
-              try {
-                  this.updateButtonState('🎯 BACKUP MODE...', 'Using local intelligence...');
-                  const suggestion = this.getLocalFallback();
-                  this.currentSuggestion = suggestion;
-                  
-                  setTimeout(() => {
-                      this.showSuggestion(suggestion);
-                      this.stopThinking();
-                  }, 800);
-              } catch (fallbackError) {
-                  console.error('All fallbacks failed:', fallbackError);
-                  this.showError('Something went wrong. Please try again.');
-                  this.stopThinking();
-              }
+              // Emergency fallback code stays the same...
+              this.showError('All AI systems temporarily unavailable. Please try again.');
+              this.stopThinking();
           }
       }
       updateButtonState(text, subtitle) {

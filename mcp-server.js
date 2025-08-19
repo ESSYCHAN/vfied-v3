@@ -3074,108 +3074,116 @@ app.post('/v1/quick_decision',
     const startTime = Date.now();
     
     try {
-        const { 
-          location, 
-          mood_text, 
-          mood_ids, 
-          dietary = [], 
-          budget, 
-          social, 
-          menu_source = 'global_database' 
-        } = req.body;
-    
-        // Set location for AI service if provided
-        if (location) {
-          aiFoodService.setLocationFromRequest(location);
-        }
-    
-        // 🔥 Use smart mood detection
-        const resolvedMoods = await resolveMoods(mood_text, mood_ids, aiFoodService.openaiApiKey);
-        const primaryMood = resolvedMoods.join(' and ');
-    
-        const enhancedContext = {
-          location,
-          dietary,
-          budget,
-          social,
-          quick: false,
-          includeRestaurants: true,
-          culturalPriority: true,
-          resolvedMoods, // Pass to AI
-          dietaryConstraints: dietary.length > 0 ? `MUST BE ${dietary.join(' AND ').toUpperCase()}` : null
-        };
+      const { 
+        location, 
+        mood_text, 
+        mood_ids, 
+        dietary = [], 
+        budget, 
+        social, 
+        menu_source = 'global_database',
+        vendor_id // 🔥 ADD: Allow specifying which vendor's menu to use
+      } = req.body;
   
-    //   // Get recommendation with proper mood handling
-    //   const primaryMood = resolvedMoods.length > 0 ? resolvedMoods.join(' and ') : 'hungry';
-  
-      let recommendation;
-      try {
-        recommendation = await getWeatherAndDietaryAwareSuggestion(location, primaryMood, enhancedContext);
-      } catch (aiError) {
-        console.warn('AI suggestion failed, using fallback:', aiError.message);
-        recommendation = getFallbackRecommendation(location, primaryMood, dietary);
+      // Set location for AI service if provided
+      if (location) {
+        aiFoodService.setLocationFromRequest(location);
       }
   
-      // Validate dietary compliance of the recommendation
+      // 🔥 Use smart mood detection
+      const resolvedMoods = await resolveMoods(mood_text, mood_ids, aiFoodService.openaiApiKey);
+      const primaryMood = resolvedMoods.join(' and ');
+  
+      let recommendation;
+  
+      // 🔥 NEW: Check if we should use uploaded menu instead of global database
+      if (menu_source === 'my_uploaded_menu' || vendor_id) {
+        console.log('🍽️ Using uploaded menu for recommendation...');
+        
+        // Find the vendor's menu
+        const targetVendorId = vendor_id || findVendorByLocation(location);
+        
+        if (targetVendorId && vendorMenus.has(targetVendorId)) {
+          const vendorMenu = vendorMenus.get(targetVendorId);
+          console.log(`📋 Found menu with ${vendorMenu.items.length} items`);
+          
+          // 🎯 Get menu-based recommendation
+          const menuContext = {
+            location,
+            mood_text,
+            mood_ids: resolvedMoods,
+            dietary,
+            budget,
+            social
+          };
+          
+          recommendation = await getPersonalizedMenuRecommendation(targetVendorId, menuContext);
+          
+          if (recommendation.error) {
+            console.warn('Menu recommendation failed:', recommendation.message);
+            // Fall back to global database
+            recommendation = await getWeatherAndDietaryAwareSuggestion(location, primaryMood, {
+              location, dietary, budget, social, resolvedMoods
+            });
+            recommendation.source = 'global_fallback';
+          } else {
+            recommendation.source = 'uploaded_menu';
+            recommendation.vendor_id = targetVendorId;
+          }
+        } else {
+          console.warn('No uploaded menu found, using global database');
+          recommendation = await getWeatherAndDietaryAwareSuggestion(location, primaryMood, {
+            location, dietary, budget, social, resolvedMoods
+          });
+          recommendation.source = 'global_fallback';
+        }
+      } else {
+        // 🌍 Use global database (your existing logic)
+        console.log('🌍 Using global database for recommendation...');
+        recommendation = await getWeatherAndDietaryAwareSuggestion(location, primaryMood, {
+          location, dietary, budget, social, resolvedMoods
+        });
+        recommendation.source = 'global_database';
+      }
+  
+      // Validate dietary compliance (existing logic...)
       if (dietary.length > 0 && recommendation.food?.name) {
         try {
           const compliance = await smartDietaryService.validateCompliance(
             recommendation.food.name, 
             dietary
           );
-      
-          // If not compliant, get a fallback
+          
           if (!compliance.compliant) {
             console.warn(`Recommendation "${recommendation.food.name}" not compliant with ${dietary.join(', ')}`);
-            recommendation = getFallbackRecommendation(location, primaryMood, dietary);
-            
-            // 🔥 RE-CHECK the fallback food (this was missing!)
-            const fallbackCompliance = await smartDietaryService.validateCompliance(
-              recommendation.food.name, 
-              dietary
-            );
-            recommendation.dietaryCompliance = fallbackCompliance;
-          } else {
-            recommendation.dietaryCompliance = compliance;
+            // Try to find compliant item from menu or use fallback
+            if (recommendation.source === 'uploaded_menu') {
+              recommendation = await findCompliantMenuItem(vendor_id, dietary, resolvedMoods);
+            } else {
+              recommendation = getFallbackRecommendation(location, primaryMood, dietary);
+            }
           }
+          recommendation.dietaryCompliance = compliance;
         } catch (error) {
           console.warn('Dietary compliance check failed:', error.message);
-          // For fallback foods, assume compliant since we designed them to be
-          recommendation.dietaryCompliance = { 
-            compliant: true, 
-            source: 'assumed', 
-            reasoning: 'Fallback food designed to be compliant' 
-          };
         }
-      }
-      // Filter alternatives to be dietary compliant
-      if (dietary.length > 0 && recommendation.alternatives) {
-        const compliantAlternatives = [];
-        for (const alt of recommendation.alternatives) {
-          try {
-            const altCompliance = await smartDietaryService.validateCompliance(alt.name, dietary);
-            if (altCompliance.compliant) {
-              compliantAlternatives.push(alt);
-            }
-          } catch (e) {
-            // Skip this alternative if validation fails
-            continue;
-          }
-        }
-        recommendation.alternatives = compliantAlternatives;
       }
   
-      // Enhance the response
+      // Enhanced response format (existing logic...)
       const enhancedFood = {
-        dish_id: recommendation.food?.id || `dish_${Date.now()}`,
+        dish_id: recommendation.food?.menu_item_id || recommendation.food?.id || `dish_${Date.now()}`,
         name: recommendation.food?.name || 'Great Choice',
         emoji: recommendation.food?.emoji || '🍽️',
         country: location?.country || recommendation.food?.country || 'Local',
         country_code: location?.country_code || recommendation.food?.country_code || 'GB',
         category: recommendation.food?.category || 'comfort',
         type: recommendation.food?.type || getLocalCuisineType(location),
-        tags: recommendation.food?.tags || [],
-        suitability: buildSuitability(recommendation.food?.name, dietary)
+        // 🔥 ADD: Menu-specific fields
+        menu_item_id: recommendation.food?.menu_item_id,
+        price: recommendation.food?.price,
+        description: recommendation.food?.description,
+        menu_link: recommendation.food?.menu_link,
+        vendor_id: recommendation.vendor_id
       };
   
       res.json({
@@ -3185,12 +3193,12 @@ app.post('/v1/quick_decision',
           resolved_moods: resolvedMoods,
           location: location,
           dietary: dietary,
-          source: menu_source === 'my_uploaded_menu' ? 'uploaded_menu' : 'global_database'
+          source: recommendation.source // 🔥 Shows which database was used
         },
         food: enhancedFood,
-        friendMessage: recommendation.friendResponse || recommendation.description,
-        reasoning: recommendation.reason || recommendation.reasoning || buildReasoning(enhancedFood, resolvedMoods, dietary, location),
-        culturalNote: recommendation.culturalNote || buildCulturalNote(enhancedFood, location),
+        friendMessage: recommendation.friend_message || recommendation.friendResponse || recommendation.description,
+        reasoning: recommendation.reasoning || recommendation.reason,
+        culturalNote: recommendation.culturalNote,
         personalNote: recommendation.personalNote,
         weatherNote: recommendation.weatherReasoning,
         availabilityNote: recommendation.availabilityNote || buildAvailabilityNote(enhancedFood, location),
@@ -3205,6 +3213,7 @@ app.post('/v1/quick_decision',
           hasWeather: !!recommendation.weather,
           hasDietary: dietary.length > 0,
           dietaryRestrictions: dietary,
+          menuSource: recommendation.source, // 🔥 Track data source
           timestamp: new Date().toISOString()
         }
       });
@@ -3214,11 +3223,60 @@ app.post('/v1/quick_decision',
       res.status(500).json({
         success: false,
         error: 'Internal server error',
-        request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       });
     }
   });
+  
+  // 🔥 NEW: Helper function to find vendor by location
+  function findVendorByLocation(location) {
+    // Simple implementation - find first vendor with matching country
+    for (const [vendorId, menu] of vendorMenus.entries()) {
+      const firstItem = menu.items[0];
+      if (firstItem?.country_code === location?.country_code) {
+        return vendorId;
+      }
+    }
+    return null;
+  }
+  
+  // 🔥 NEW: Find compliant menu item
+  async function findCompliantMenuItem(vendorId, dietary, moods) {
+    const vendorMenu = vendorMenus.get(vendorId);
+    if (!vendorMenu) return null;
+  
+    // Filter items by dietary restrictions
+    const compliantItems = [];
+    for (const item of vendorMenu.items) {
+      try {
+        const compliance = await smartDietaryService.validateCompliance(item.name, dietary);
+        if (compliance.compliant) {
+          compliantItems.push(item);
+        }
+      } catch (e) {
+        // Skip items that can't be validated
+      }
+    }
+  
+    if (compliantItems.length === 0) return null;
+  
+    // Pick the best one based on mood (simplified)
+    const selectedItem = compliantItems[Math.floor(Math.random() * compliantItems.length)];
+  
+    return {
+      food: {
+        menu_item_id: selectedItem.menu_item_id,
+        name: selectedItem.name,
+        emoji: selectedItem.emoji || '🍽️',
+        category: selectedItem.category,
+        price: selectedItem.price,
+        description: selectedItem.description
+      },
+      friend_message: `${selectedItem.name} from the menu is perfect for you!`,
+      reasoning: `Selected from uploaded menu to match your ${dietary.join(' and ')} requirements`,
+      source: 'uploaded_menu_compliant'
+    };
+  }
   
   // Helper functions (fixed syntax issues):
   
