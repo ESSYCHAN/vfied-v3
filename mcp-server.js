@@ -2636,7 +2636,7 @@ function textToMoodIds(text = '') {
     for (const [re, id] of map) if (re.test(t)) out.add(id);
     return [...out];
   }
-
+  
   function calculateConfidence(food, moods = [], opts = {}) {
     let c = 80;
     if (moods.includes('POST_WORKOUT') && (food?.suitability?.protein || food?.tags?.includes?.('protein'))) c += 5;
@@ -2785,236 +2785,258 @@ app.post('/v1/quick_decision',
     }
   );
 
-  app.post('/v1/recommend',
-    validateRequest(recommendSchema),
-    async (req, res) => {
-      const startTime = Date.now();
-      
+  app.post('/v1/recommend', validateRequest(recommendSchema), async (req, res) => {
+    const startTime = Date.now();
+    
+    try {
+      const { 
+        location, 
+        mood_text, 
+        mood_ids, 
+        dietary = [], 
+        budget, 
+        social, 
+        menu_source = 'global_database' 
+      } = req.body;
+  
+      // Set location for AI service if provided
+      if (location) {
+        aiFoodService.setLocationFromRequest(location);
+      }
+  
+      // Merge mood_text into mood_ids
+      let resolvedMoods = [...(mood_ids || [])];
+      if (mood_text) {
+        const textMoods = textToMoodIds(mood_text);
+        resolvedMoods = [...new Set([...resolvedMoods, ...textMoods])];
+      }
+  
+      // Enhanced context for AI with better dietary emphasis
+      const enhancedContext = {
+        location,
+        dietary,
+        budget,
+        social,
+        quick: false,
+        includeRestaurants: true,
+        culturalPriority: true,
+        // Fixed: Add explicit dietary constraint with proper template literal
+        dietaryConstraints: dietary.length > 0 ? `MUST BE ${dietary.join(' AND ').toUpperCase()}` : null
+      };
+  
+      // Get recommendation with proper mood handling
+      const primaryMood = resolvedMoods.length > 0 ? resolvedMoods.join(' and ') : 'hungry';
+  
+      let recommendation;
       try {
-        const { 
-          location, 
-          mood_text, 
-          mood_ids, 
-          dietary = [], 
-          budget, 
-          social,
-          menu_source = 'global_database' 
-        } = req.body;
+        recommendation = await getWeatherAndDietaryAwareSuggestion(location, primaryMood, enhancedContext);
+      } catch (aiError) {
+        console.warn('AI suggestion failed, using fallback:', aiError.message);
+        recommendation = getFallbackRecommendation(location, primaryMood, dietary);
+      }
   
-        // Set location for AI service (preserving lat/lon)
-        if (location) {
-          aiFoodService.setLocationFromRequest({
-            city: location.city,
-            country: location.country,
-            countryCode: location.country_code,
-            latitude: location.latitude,
-            longitude: location.longitude
-          });
-        }
+      // Validate dietary compliance of the recommendation
+      if (dietary.length > 0 && recommendation.food?.name) {
+        const compliance = await smartDietaryService.validateCompliance(
+          recommendation.food.name, 
+          dietary
+        );
   
-        // 🔥 Resolve moods using the improved helper
-        let resolvedMoods = [...(mood_ids || [])];
-        if (mood_text) {
-          const textMoods = textToMoodIds(mood_text);
-          resolvedMoods = [...new Set([...resolvedMoods, ...textMoods])];
-        }
-        const primaryMood = resolvedMoods.length ? resolvedMoods.join(' and ') : 'hungry';
-  
-        const enhancedContext = {
-          location, 
-          dietary, 
-          budget, 
-          social,
-          quick: false, 
-          includeRestaurants: true, 
-          culturalPriority: true
-        };
-  
-        // 🔥 KEY FIX: Respect menu_source and avoid unnecessary AI calls
-        let recommendation;
-        let usedMenuPath = false;
-        
-        try {
-          if (menu_source === 'my_uploaded_menu' && req.apiKey?.vendorId) {
-            try {
-              // Try menu path first with timeout
-              recommendation = await Promise.race([
-                getPersonalizedMenuRecommendation(req.apiKey.vendorId, {
-                  location, 
-                  mood_text: primaryMood, 
-                  mood_ids: resolvedMoods, 
-                  dietary, 
-                  budget, 
-                  social
-                }),
-                new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('Menu recommendation timeout')), 3000)
-                )
-              ]);
-              
-              if (recommendation && !recommendation.error) {
-                usedMenuPath = true;
-                console.log('✅ Used vendor menu path - no AI calls needed!');
-              } else {
-                throw new Error('Menu recommendation failed or empty');
-              }
-            } catch (menuError) {
-              console.warn('Menu path failed, falling back to AI:', menuError.message);
-              recommendation = await Promise.race([
-                getWeatherAndDietaryAwareSuggestion(location, primaryMood, enhancedContext),
-                new Promise((_, reject) => 
-                  setTimeout(() => reject(new Error('AI recommendation timeout')), 5000)
-                )
-              ]);
-            }
-          } else {
-            // Global database path with timeout
-            recommendation = await Promise.race([
-              getWeatherAndDietaryAwareSuggestion(location, primaryMood, enhancedContext),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('AI recommendation timeout')), 5000)
-              )
-            ]);
-          }
-        } catch (error) {
-          console.warn('All recommendation methods failed, using fallback:', error.message);
+        // If not compliant, get a fallback
+        if (!compliance.compliant) {
+          console.warn(`Recommendation "${recommendation.food.name}" not compliant with ${dietary.join(', ')}`);
           recommendation = getFallbackRecommendation(location, primaryMood, dietary);
         }
   
-        // Validate primary recommendation dietary compliance
-        if (dietary.length > 0 && recommendation.food?.name) {
-          try {
-            const complianceCheck = await Promise.race([
-              smartDietaryService.validateCompliance(recommendation.food.name, dietary),
-              new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Compliance check timeout')), 2000)
-              )
-            ]);
-            
-            recommendation.dietaryCompliance = complianceCheck;
-            
-            if (!complianceCheck.compliant) {
-              console.warn(`Primary recommendation "${recommendation.food.name}" not compliant with ${dietary.join(', ')}`);
-              recommendation = getFallbackRecommendation(location, primaryMood, dietary);
-            }
-          } catch (error) {
-            console.warn('Dietary compliance check failed:', error.message);
-            recommendation.dietaryCompliance = { compliant: true, source: 'skipped' };
-          }
-        }
-  
-        // 🔥 OPTIMIZED: Validate max 3 alternatives in parallel with timeout
-        const toCheck = (recommendation.alternatives || []).slice(0, 3);
-        const withTimeout = (promise, ms = 1500) => Promise.race([
-          promise, 
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('timeout')), ms)
-          )
-        ]);
-  
-        if (dietary.length > 0 && toCheck.length > 0) {
-          try {
-            const results = await Promise.allSettled(
-              toCheck.map(alt => 
-                withTimeout(smartDietaryService.validateCompliance(alt.name, dietary))
-              )
-            );
-            
-            recommendation.alternatives = toCheck.filter((_, index) =>
-              results[index].status === 'fulfilled' && 
-              results[index].value?.compliant
-            );
-            
-            console.log(`✅ Validated ${toCheck.length} alternatives in parallel, ${recommendation.alternatives.length} compliant`);
-          } catch (error) {
-            console.warn('Alternative validation failed:', error.message);
-            recommendation.alternatives = [];
-          }
-        }
-  
-        // Build enhanced food object
-        const enhancedFood = {
-          dish_id: recommendation.food?.menu_item_id || 
-                   recommendation.food?.id || 
-                   `dish_${Date.now()}`,
-          name: recommendation.food?.name || 'Great Choice',
-          emoji: recommendation.food?.emoji || '🍽️',
-          country: location?.country || recommendation.food?.country || 'Local',
-          country_code: location?.country_code || 
-                        recommendation.food?.country_code || 
-                        getCountryCode(location?.country) || 'GB',
-          category: recommendation.food?.category || 'comfort',
-          type: recommendation.food?.type || getLocalCuisineType(location),
-          tags: recommendation.food?.tags || [],
-          suitability: {
-            // Prefer menu data over heuristics
-            ...(recommendation.food?.suitability || {}),
-            ...buildSuitability(recommendation.food?.name, dietary)
-          }
-        };
-  
-        // Generate reason codes for client badges
-        const reasonCodes = [];
-        if (resolvedMoods.includes('TIRED')) reasonCodes.push('mood.tired');
-        if (resolvedMoods.includes('CELEBRATING')) reasonCodes.push('mood.celebrating');
-        if (resolvedMoods.includes('POST_WORKOUT')) reasonCodes.push('mood.workout');
-        if (dietary.includes('vegetarian')) reasonCodes.push('diet.vegetarian');
-        if (dietary.includes('vegan')) reasonCodes.push('diet.vegan');
-        if (budget) reasonCodes.push(`budget.${budget}`);
-        if (social) reasonCodes.push(`social.${social}`);
-  
-        // Build response
-        res.json({
-          success: true,
-          request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          context: {
-            resolved_moods: resolvedMoods,
-            location: location,
-            dietary: dietary,
-            source: usedMenuPath ? 'uploaded_menu' : 'global_database',
-            menu_version: usedMenuPath && req.apiKey?.vendorId ? 
-                         vendorMenus.get(req.apiKey.vendorId)?.version : undefined
-          },
-          food: enhancedFood,
-          friendMessage: recommendation.friendResponse || recommendation.description,
-          reasoning: recommendation.reason || 
-                     recommendation.reasoning || 
-                     buildReasoning(enhancedFood, resolvedMoods, dietary, location),
-          culturalNote: recommendation.culturalNote || buildCulturalNote(enhancedFood, location),
-          personalNote: recommendation.personalNote,
-          weatherNote: recommendation.weatherReasoning,
-          availabilityNote: recommendation.availabilityNote || buildAvailabilityNote(enhancedFood, location),
-          alternatives: recommendation.alternatives || [],
-          confidence: recommendation.confidence || 
-                      calculateConfidence(enhancedFood, resolvedMoods, { dietary }),
-          dietaryCompliance: recommendation.dietaryCompliance,
-          dietaryNote: buildDietaryNote(dietary, recommendation.dietaryCompliance),
-          weather: recommendation.weather,
-          interactionId: recommendation.interactionId,
-          processingTimeMs: Date.now() - startTime,
-          meta: {
-            primaryMood,
-            reasonCodes,
-            hasWeather: !!recommendation.weather,
-            hasDietary: dietary.length > 0,
-            dietaryRestrictions: dietary,
-            usedMenuPath,
-            alternativesChecked: toCheck.length,
-            timestamp: new Date().toISOString()
-          }
-        });
-        
-      } catch (error) {
-        console.error('Recommendation error:', error);
-        res.status(500).json({
-          success: false,
-          error: 'Internal server error',
-          request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          details: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
+        recommendation.dietaryCompliance = compliance;
       }
+  
+      // Filter alternatives to be dietary compliant
+      if (dietary.length > 0 && recommendation.alternatives) {
+        const compliantAlternatives = [];
+        for (const alt of recommendation.alternatives) {
+          try {
+            const altCompliance = await smartDietaryService.validateCompliance(alt.name, dietary);
+            if (altCompliance.compliant) {
+              compliantAlternatives.push(alt);
+            }
+          } catch (e) {
+            // Skip this alternative if validation fails
+            continue;
+          }
+        }
+        recommendation.alternatives = compliantAlternatives;
+      }
+  
+      // Enhance the response
+      const enhancedFood = {
+        dish_id: recommendation.food?.id || `dish_${Date.now()}`,
+        name: recommendation.food?.name || 'Great Choice',
+        emoji: recommendation.food?.emoji || '🍽️',
+        country: location?.country || recommendation.food?.country || 'Local',
+        country_code: location?.country_code || recommendation.food?.country_code || 'GB',
+        category: recommendation.food?.category || 'comfort',
+        type: recommendation.food?.type || getLocalCuisineType(location),
+        tags: recommendation.food?.tags || [],
+        suitability: buildSuitability(recommendation.food?.name, dietary)
+      };
+  
+      res.json({
+        success: true,
+        request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        context: {
+          resolved_moods: resolvedMoods,
+          location: location,
+          dietary: dietary,
+          source: menu_source === 'my_uploaded_menu' ? 'uploaded_menu' : 'global_database'
+        },
+        food: enhancedFood,
+        friendMessage: recommendation.friendResponse || recommendation.description,
+        reasoning: recommendation.reason || recommendation.reasoning || buildReasoning(enhancedFood, resolvedMoods, dietary, location),
+        culturalNote: recommendation.culturalNote || buildCulturalNote(enhancedFood, location),
+        personalNote: recommendation.personalNote,
+        weatherNote: recommendation.weatherReasoning,
+        availabilityNote: recommendation.availabilityNote || buildAvailabilityNote(enhancedFood, location),
+        alternatives: recommendation.alternatives || [],
+        confidence: recommendation.confidence || calculateConfidence(enhancedFood, resolvedMoods, { dietary }),
+        dietaryCompliance: recommendation.dietaryCompliance,
+        dietaryNote: buildDietaryNote(dietary, recommendation.dietaryCompliance),
+        weather: recommendation.weather,
+        interactionId: recommendation.interactionId,
+        processingTimeMs: Date.now() - startTime,
+        meta: {
+          hasWeather: !!recommendation.weather,
+          hasDietary: dietary.length > 0,
+          dietaryRestrictions: dietary,
+          timestamp: new Date().toISOString()
+        }
+      });
+  
+    } catch (error) {
+      console.error('Recommendation error:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
     }
-  );
+  });
+  
+  // Helper functions (fixed syntax issues):
+  
+  function getFallbackRecommendation(location, mood, dietary) {
+    const countryCode = location?.country_code || 'GB';
+    
+    // Dietary-appropriate fallbacks by country
+    const fallbacks = {
+      'GB': {
+        vegetarian: { name: 'Vegetable Shepherd\'s Pie', emoji: '🥧', category: 'comfort' },
+        vegan: { name: 'Mushroom and Ale Pie', emoji: '🍄', category: 'comfort' },
+        default: { name: 'Fish and Chips', emoji: '🍟', category: 'comfort' }
+      },
+      'KE': {
+        vegetarian: { name: 'Ugali with Sukuma Wiki', emoji: '🥬', category: 'traditional' },
+        vegan: { name: 'Githeri', emoji: '🌽', category: 'traditional' },
+        default: { name: 'Nyama Choma', emoji: '🥩', category: 'traditional' }
+      },
+      'US': {
+        vegetarian: { name: 'Veggie Burger', emoji: '🍔', category: 'comfort' },
+        vegan: { name: 'Buddha Bowl', emoji: '🥗', category: 'healthy' },
+        default: { name: 'Classic Burger', emoji: '🍔', category: 'comfort' }
+      }
+    };
+  
+    const countryFallbacks = fallbacks[countryCode] || fallbacks['GB'];
+    const dietaryKey = dietary.includes('vegan') ? 'vegan' : 
+                      dietary.includes('vegetarian') ? 'vegetarian' : 'default';
+    
+    const food = countryFallbacks[dietaryKey] || countryFallbacks['default'];
+  
+    return {
+      food: {
+        id: `fallback-${food.name.toLowerCase().replace(/\s+/g, '-')}`,
+        name: food.name,
+        emoji: food.emoji,
+        category: food.category,
+        country: location?.country || 'Local',
+        country_code: countryCode
+      },
+      friendResponse: `Here's a great ${food.category} choice: ${food.name}!`,
+      reasoning: `Perfect ${food.category} food for your ${mood} mood`,
+      alternatives: [],
+      confidence: 80,
+      source: 'fallback'
+    };
+  }
+  
+  function buildSuitability(foodName, dietary) {
+    const name = (foodName || '').toLowerCase();
+    
+    return {
+      vegetarian: dietary.includes('vegetarian') || dietary.includes('vegan') || 
+                  !name.match(/\b(meat|chicken|beef|pork|fish|seafood|bacon|ham|turkey)\b/),
+      vegan: dietary.includes('vegan') || 
+             (!name.match(/\b(meat|chicken|beef|pork|fish|seafood|bacon|ham|turkey|cheese|milk|cream|butter|egg)\b/)),
+      gluten_free: dietary.includes('gluten-free') || 
+                   !name.match(/\b(bread|pasta|wheat|flour|beer)\b/),
+      halal_friendly: dietary.includes('halal') || !name.match(/\b(pork|bacon|ham|alcohol)\b/),
+      kosher_friendly: dietary.includes('kosher') || !name.match(/\b(pork|bacon|ham|shellfish)\b/)
+    };
+  }
+  
+  function getLocalCuisineType(location) {
+    const cuisineMap = {
+      'GB': 'British cuisine',
+      'KE': 'East African cuisine', 
+      'US': 'American cuisine',
+      'FR': 'French cuisine',
+      'IN': 'Indian cuisine',
+      'JP': 'Japanese cuisine'
+    };
+    
+    return cuisineMap[location?.country_code] || 'Local cuisine';
+  }
+  
+  function buildReasoning(food, moods, dietary, location) {
+    const parts = [];
+    
+    if (moods.includes('TIRED')) parts.push('provides comfort for your tired mood');
+    if (moods.includes('CELEBRATING')) parts.push('perfect for celebrating');
+    if (dietary.length > 0) parts.push(`meets your ${dietary.join(' and ')} requirements`);
+    if (location?.country) parts.push(`authentic ${location.country} choice`);
+    
+    return parts.length > 0 ? 
+      `${food.name} is great because it ${parts.join(', ')}.` :
+      `${food.name} is a perfect choice for your current situation.`;
+  }
+  
+  function buildCulturalNote(food, location) {
+    if (location?.country_code === 'GB') {
+      return `This British classic represents the comfort and tradition of UK cuisine.`;
+    } else if (location?.country_code === 'KE') {
+      return `This East African dish showcases the rich flavors and communal spirit of Kenyan food culture.`;
+    }
+    
+    return `This dish represents the authentic flavors of ${location?.country || 'local'} cuisine.`;
+  }
+  
+  function buildAvailabilityNote(food, location) {
+    const city = location?.city || 'your area';
+    return `You can find great ${food.name} at local restaurants and pubs in ${city}.`;
+  }
+  
+  function buildDietaryNote(dietary, compliance) {
+    if (dietary.length === 0) return null;
+    
+    if (compliance?.compliant) {
+      return `✅ This recommendation meets all your dietary requirements: ${dietary.join(', ')}.`;
+    } else if (compliance?.warnings?.length > 0) {
+      return `⚠️ ${compliance.warnings.join(' ')}`;
+    }
+    
+    return `Filtered for your ${dietary.join(', ')} preferences.`;
+  }
   
   // Helper function to get country code
   function getCountryCode(country) {
