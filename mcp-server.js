@@ -83,9 +83,8 @@ function authenticateApiKey(req, res, next) {
     next();
   }
   
-  // Apply usage counting only to expensive calls:
-  app.post('/v1/recommend', authenticateApiKey, countUsage, async (req,res)=>{ /* unchanged body */ });
 
+  
 // ==================== AI FOOD SERVICE ====================
 
 // Sophisticated AI Food Service (with OpenAI + Weather + Cultural Intelligence)
@@ -1927,58 +1926,6 @@ app.patch('/v1/menus/availability', authenticateApiKey, async (req, res) => {
       res.status(500).json({ error: 'Availability update failed', details: error.message });
     }
   });
-
-// Enhanced recommendation with menu support
-app.post('/v1/recommend', authenticateApiKey, async (req, res) => {
-  try {
-    const {
-      location,
-      mood_text,
-      mood_ids = [],
-      dietary = [],
-      menu_source = 'global_database',
-      budget = 'medium'
-    } = req.body;
-    
-    const vendorId = req.apiKey.vendorId;
-    let recommendation;
-    
-    if (menu_source === 'my_uploaded_menu') {
-      // Use vendor's uploaded menu
-      recommendation = await getPersonalizedMenuRecommendation(vendorId, {
-        location,
-        mood_text,
-        mood_ids,
-        dietary,
-        budget
-      });
-    } else {
-      // Use your existing AI service
-      recommendation = await getAIFoodSuggestion(mood_text || 'hungry', {
-        location,
-        dietary,
-        budget
-      });
-    }
-    
-    res.json({
-      success: true,
-      request_id: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      ...recommendation,
-      context: {
-        resolved_moods: normalizeMoods(mood_text, mood_ids),
-        dietary,
-        location,
-        source: menu_source === 'my_uploaded_menu' ? 'uploaded_menu' : 'global_database'
-      },
-      processing_time_ms: Date.now() - req.startTime
-    });
-    
-  } catch (error) {
-    console.error('Recommendation error:', error);
-    res.status(500).json({ error: 'Recommendation failed', details: error.message });
-  }
-});
 
 // Get vendor's menu (for dashboard)
 app.get('/v1/menus', authenticateApiKey, (req, res) => {
