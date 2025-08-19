@@ -1014,15 +1014,31 @@ class WeatherService {
     if (!this.openWeatherKey) {
       return this.getSimulatedWeather(location);
     }
-
+  
     try {
+      // 🔥 FIX: Check for coordinates properly
+      const lat = location?.latitude;
+      const lon = location?.longitude;
+      
+      if (typeof lat !== 'number' || typeof lon !== 'number') {
+        console.log(`🌍 No valid coordinates for weather (lat: ${lat}, lon: ${lon}), using simulation`);
+        return this.getSimulatedWeather(location);
+      }
+  
+      console.log(`🌤️ Fetching real weather for coordinates: ${lat}, ${lon}`);
+      
       const response = await fetch(
-        `${this.baseUrl}/weather?lat=${location.latitude}&lon=${location.longitude}&appid=${this.openWeatherKey}&units=metric`
+        `${this.baseUrl}/weather?lat=${lat}&lon=${lon}&appid=${this.openWeatherKey}&units=metric`,
+        { timeout: 8000 } // Add timeout
       );
       
-      if (!response.ok) throw new Error('Weather API failed');
+      if (!response.ok) {
+        console.error(`Weather API Error: ${response.status} ${response.statusText}`);
+        throw new Error(`Weather API failed: ${response.status}`);
+      }
       
       const data = await response.json();
+      console.log('✅ Real weather data retrieved successfully');
       
       return {
         temperature: Math.round(data.main.temp),
@@ -1038,7 +1054,8 @@ class WeatherService {
         isCold: data.main.temp < 15,
         isHot: data.main.temp > 30,
         isComfortable: data.main.temp >= 18 && data.main.temp <= 26,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        source: 'openweather'
       };
     } catch (error) {
       console.error('Weather fetch error:', error);
