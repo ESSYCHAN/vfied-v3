@@ -2667,8 +2667,10 @@ function textToMoodIds(text) {
 function calculateConfidence(food, moodIds, context) {
     let confidence = 75;
     if (moodIds.length === 1) confidence += 10;
+    if (moodIds.length > 1) confidence += 5; // Multi-mood bonus
     if (context.dietary && context.dietary.length > 0) confidence -= 5;
     if (food.country && food.country !== 'Local') confidence += 5;
+    if (food.category === 'comfort') confidence += 5;
     return Math.min(confidence, 95);
   }
 
