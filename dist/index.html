@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VFIED API - Culturally-Aware Food Intelligence</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .hero {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+        }
+        .hero-content {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .hero h1 {
+            font-size: 3.5rem;
+            margin-bottom: 1rem;
+            font-weight: 800;
+        }
+        .hero p {
+            font-size: 1.4rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 3rem;
+        }
+        .btn {
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: #fff;
+            color: #667eea;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.2);
+        }
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid white;
+        }
+        .btn-secondary:hover {
+            background: white;
+            color: #667eea;
+        }
+        .demo-preview {
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .section {
+            padding: 5rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        .feature {
+            text-align: center;
+            padding: 2rem;
+            border-radius: 12px;
+            background: #f8f9fa;
+        }
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .code-block {
+            background: #2d3748;
+            color: white;
+            padding: 2rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 2rem 0;
+        }
+        .pricing {
+            background: #f8f9fa;
+            padding: 5rem 2rem;
+        }
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        .pricing-card {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: relative;
+        }
+        .pricing-card.featured {
+            border: 3px solid #667eea;
+            transform: scale(1.05);
+        }
+        .pricing-card h3 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .price {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 1rem;
+        }
+        .use-cases {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+        }
+        .use-case {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-left: 4px solid #667eea;
+        }
+        h2 {
+            font-size: 2.5rem;
+            text-align: center;
+            margin-bottom: 3rem;
+            color: #2d3748;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin: 3rem 0;
+            text-align: center;
+        }
+        .stat {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .stat-number {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+        }
+        .cta-section {
+            background: #2d3748;
+            color: white;
+            text-align: center;
+            padding: 5rem 2rem;
+        }
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.5rem; }
+            .hero p { font-size: 1.2rem; }
+            .cta-buttons { flex-direction: column; align-items: center; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <h1>🍽️ VFIED API</h1>
+            <p>The world's first culturally-aware food intelligence API</p>
+            <p>Get personalized food recommendations based on location, mood, and culture</p>
+            
+            <div class="cta-buttons">
+                <a href="#demo" class="btn btn-primary">Try Live Demo</a>
+                <a href="/docs" class="btn btn-secondary">View Documentation</a>
+            </div>
+            
+            <div class="demo-preview">
+                <h3>See it in action:</h3>
+                <div class="code-block">
+                    <code>
+// London user, vegetarian, tired → "Vegetable Curry"<br>
+// Tokyo user, post-workout → "Chicken Katsu with rice"<br>
+// Nairobi user, celebrating → "Nyama Choma with ugali"
+                    </code>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="section">
+        <div class="stats">
+            <div class="stat">
+                <span class="stat-number">34%</span>
+                <p>Higher order completion rate</p>
+            </div>
+            <div class="stat">
+                <span class="stat-number">73%</span>
+                <p>Faster food decisions</p>
+            </div>
+            <div class="stat">
+                <span class="stat-number">20+</span>
+                <p>Countries supported</p>
+            </div>
+            <div class="stat">
+                <span class="stat-number">&lt;50ms</span>
+                <p>Average response time</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="section">
+        <h2>Why Choose VFIED?</h2>
+        <div class="features">
+            <div class="feature">
+                <div class="feature-icon">🌍</div>
+                <h3>Cultural Intelligence</h3>
+                <p>Recommendations that understand local food culture, not just generic options</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🧠</div>
+                <h3>Mood-Aware</h3>
+                <p>Suggests food based on emotional state, time of day, and personal context</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🥗</div>
+                <h3>Dietary Compliant</h3>
+                <p>Automatic filtering for vegetarian, vegan, halal, kosher, and other dietary needs</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">📋</div>
+                <h3>Menu Personalization</h3>
+                <p>Upload your restaurant menu and get AI-powered recommendations for your customers</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">⚡</div>
+                <h3>Enterprise Ready</h3>
+                <p>99.9% uptime, comprehensive analytics, and white-label options</p>
+            </div>
+            <div class="feature">
+                <div class="feature-icon">🔧</div>
+                <h3>Easy Integration</h3>
+                <p>RESTful API with SDKs and comprehensive documentation</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Use Cases Section -->
+    <section class="section" style="background: #f8f9fa;">
+        <h2>Perfect For</h2>
+        <div class="use-cases">
+            <div class="use-case">
+                <h3>🛵 Food Delivery Apps</h3>
+                <p>Eliminate decision paralysis with smart recommendations. Increase order completion by 34%.</p>
+                <p><strong>Example:</strong> "User in London, tired after work" → Comfort food suggestions</p>
+            </div>
+            <div class="use-case">
+                <h3>✈️ Travel Apps</h3>
+                <p>Help tourists discover authentic local cuisine based on their preferences.</p>
+                <p><strong>Example:</strong> "Tourist in Tokyo" → Authentic Japanese recommendations</p>
+            </div>
+            <div class="use-case">
+                <h3>🧘 Wellness Apps</h3>
+                <p>Connect fitness goals with food choices for better health outcomes.</p>
+                <p><strong>Example:</strong> "Post-workout, vegetarian" → Protein-rich recovery foods</p>
+            </div>
+            <div class="use-case">
+                <h3>🍴 Restaurant Apps</h3>
+                <p>Personalize menu recommendations to increase order values and satisfaction.</p>
+                <p><strong>Example:</strong> Upload menu → AI suggests best dishes for each customer</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Live Demo Section -->
+    <section class="section" id="demo">
+        <h2>Try It Live</h2>
+        <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+            <iframe src="/demo" width="100%" height="600" style="border: none; border-radius: 8px;"></iframe>
+        </div>
+    </section>
+
+    <!-- Code Examples Section -->
+    <section class="section">
+        <h2>Quick Integration</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem;">
+            <div>
+                <h3>1. Get Recommendations</h3>
+                <div class="code-block">
+                    <code>
+curl -X POST https://api.vfied.com/v1/recommend \<br>
+  -H "Authorization: Bearer YOUR_API_KEY" \<br>
+  -H "Content-Type: application/json" \<br>
+  -d '{<br>
+    "location": {<br>
+      "city": "London",<br>
+      "country": "UK",<br>
+      "country_code": "GB"<br>
+    },<br>
+    "mood_text": "tired but celebrating",<br>
+    "dietary": ["vegetarian"]<br>
+  }'
+                    </code>
+                </div>
+            </div>
+            <div>
+                <h3>2. Upload Your Menu</h3>
+                <div class="code-block">
+                    <code>
+curl -X POST https://api.vfied.com/v1/menus \<br>
+  -H "Authorization: Bearer YOUR_API_KEY" \<br>
+  -H "Content-Type: application/json" \<br>
+  -d '{<br>
+    "menu": [{<br>
+      "name": "Ugali Mayai",<br>
+      "country_code": "KE",<br>
+      "tags": ["vegetarian", "protein-rich"],<br>
+      "price": "8.99"<br>
+    }]<br>
+  }'
+                    </code>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section class="pricing">
+        <div class="section">
+            <h2>Simple, Transparent Pricing</h2>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h3>Free</h3>
+                    <div class="price">$0<span style="font-size: 1rem;">/month</span></div>
+                    <ul style="text-align: left; list-style: none; padding: 0;">
+                        <li>✅ 1,000 API calls/month</li>
+                        <li>✅ Global food database</li>
+                        <li>✅ Basic recommendations</li>
+                        <li>✅ Email support</li>
+                        <li>❌ Menu upload</li>
+                    </ul>
+                    <a href="/signup?plan=free" class="btn btn-secondary" style="margin-top: 2rem;">Start Free</a>
+                </div>
+                
+                <div class="pricing-card featured">
+                    <div style="position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: #667eea; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-size: 0.8rem;">Most Popular</div>
+                    <h3>Growth</h3>
+                    <div class="price">$49<span style="font-size: 1rem;">/month</span></div>
+                    <ul style="text-align: left; list-style: none; padding: 0;">
+                        <li>✅ 50,000 API calls/month</li>
+                        <li>✅ Menu upload (500 items)</li>
+                        <li>✅ Advanced recommendations</li>
+                        <li>✅ Analytics dashboard</li>
+                        <li>✅ Priority support</li>
+                    </ul>
+                    <a href="/signup?plan=growth" class="btn btn-primary" style="margin-top: 2rem;">Start Trial</a>
+                </div>
+                
+                <div class="pricing-card">
+                    <h3>Scale</h3>
+                    <div class="price">$299<span style="font-size: 1rem;">/month</span></div>
+                    <ul style="text-align: left; list-style: none; padding: 0;">
+                        <li>✅ 500,000 API calls/month</li>
+                        <li>✅ Unlimited menu items</li>
+                        <li>✅ Webhooks</li>
+                        <li>✅ Custom analytics</li>
+                        <li>✅ Dedicated support</li>
+                    </ul>
+                    <a href="/signup?plan=scale" class="btn btn-secondary" style="margin-top: 2rem;">Start Trial</a>
+                </div>
+            </div>
+            <p style="text-align: center; margin-top: 2rem; color: #6c757d;">
+                <strong>Enterprise:</strong> Custom pricing for 1M+ calls/month. <a href="mailto:sales@vfied.com">Contact sales</a>
+            </p>
+        </div>
+    </section>
+
+    <!-- Social Proof Section -->
+    <section class="section">
+        <h2>Trusted by Food Tech Leaders</h2>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 2rem; margin: 3rem 0;">
+            <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <p style="font-style: italic; margin-bottom: 1rem;">"VFIED's cultural intelligence helped us increase order completion by 34%. Our international users finally get relevant food suggestions."</p>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 50px; height: 50px; background: #667eea; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">JD</div>
+                    <div>
+                        <strong>Jane Doe</strong><br>
+                        <span style="color: #6c757d;">CTO, FoodieGo</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <p style="font-style: italic; margin-bottom: 1rem;">"The menu personalization feature is game-changing. Our customers get perfect recommendations from our own dishes."</p>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 50px; height: 50px; background: #28a745; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">AS</div>
+                    <div>
+                        <strong>Ahmed Smith</strong><br>
+                        <span style="color: #6c757d;">Founder, Nairobi Eats</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                <p style="font-style: italic; margin-bottom: 1rem;">"Integration took 4 hours. ROI was immediate. VFIED understands food culture better than any other API."</p>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <div style="width: 50px; height: 50px; background: #dc3545; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold;">MJ</div>
+                    <div>
+                        <strong>Maria Johnson</strong><br>
+                        <span style="color: #6c757d;">Product Manager, TravelEats</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ROI Calculator Section -->
+    <section class="section" style="background: #f8f9fa;">
+        <h2>Calculate Your ROI</h2>
+        <div style="background: white; padding: 3rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 600px; margin: 0 auto;">
+            <div style="margin-bottom: 2rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Monthly Active Users:</label>
+                <input type="number" id="users" value="100000" style="width: 100%; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem;">
+            </div>
+            
+            <div style="margin-bottom: 2rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Average Order Value:</label>
+                <input type="number" id="aov" value="25" style="width: 100%; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem;">
+            </div>
+            
+            <div style="margin-bottom: 2rem;">
+                <label style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Current Conversion Rate:</label>
+                <input type="number" id="conversion" value="33" style="width: 100%; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem;">
+                <small style="color: #6c757d;">% of users who complete food orders</small>
+            </div>
+            
+            <button onclick="calculateROI()" class="btn btn-primary" style="width: 100%; margin-bottom: 2rem;">Calculate ROI</button>
+            
+            <div id="roi-results" style="display: none; background: #e8f5e8; padding: 2rem; border-radius: 8px; border: 1px solid #c3e6c3;">
+                <h3 style="color: #155724; margin-bottom: 1rem;">With VFIED API:</h3>
+                <div id="roi-details"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="section">
+            <h2 style="color: white;">Ready to Transform Your Food App?</h2>
+            <p style="font-size: 1.2rem; margin-bottom: 2rem; opacity: 0.9;">
+                Join hundreds of developers using VFIED to create better food experiences
+            </p>
+            <div class="cta-buttons">
+                <a href="/signup" class="btn btn-primary">Start Free Trial</a>
+                <a href="/docs" class="btn btn-secondary">Read Documentation</a>
+                <a href="mailto:sales@vfied.com" class="btn btn-secondary">Contact Sales</a>
+            </div>
+            <p style="margin-top: 2rem; opacity: 0.7;">
+                No credit card required • 14-day free trial • Cancel anytime
+            </p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer style="background: #2d3748; color: white; padding: 3rem 2rem 2rem;">
+        <div style="max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem;">
+            <div>
+                <h3 style="margin-bottom: 1rem;">🍽️ VFIED</h3>
+                <p style="opacity: 0.8;">The world's first culturally-aware food intelligence API</p>
+            </div>
+            <div>
+                <h4 style="margin-bottom: 1rem;">Product</h4>
+                <ul style="list-style: none; opacity: 0.8;">
+                    <li><a href="/docs" style="color: inherit; text-decoration: none;">Documentation</a></li>
+                    <li><a href="/pricing" style="color: inherit; text-decoration: none;">Pricing</a></li>
+                    <li><a href="/demo" style="color: inherit; text-decoration: none;">Live Demo</a></li>
+                    <li><a href="/status" style="color: inherit; text-decoration: none;">API Status</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="margin-bottom: 1rem;">Company</h4>
+                <ul style="list-style: none; opacity: 0.8;">
+                    <li><a href="/about" style="color: inherit; text-decoration: none;">About</a></li>
+                    <li><a href="/blog" style="color: inherit; text-decoration: none;">Blog</a></li>
+                    <li><a href="/careers" style="color: inherit; text-decoration: none;">Careers</a></li>
+                    <li><a href="/contact" style="color: inherit; text-decoration: none;">Contact</a></li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="margin-bottom: 1rem;">Support</h4>
+                <ul style="list-style: none; opacity: 0.8;">
+                    <li><a href="/help" style="color: inherit; text-decoration: none;">Help Center</a></li>
+                    <li><a href="mailto:support@vfied.com" style="color: inherit; text-decoration: none;">Email Support</a></li>
+                    <li><a href="/community" style="color: inherit; text-decoration: none;">Community</a></li>
+                </ul>
+            </div>
+        </div>
+        <div style="text-align: center; margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #4a5568; opacity: 0.6;">
+            <p>&copy; 2025 VFIED. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        function calculateROI() {
+            const users = parseInt(document.getElementById('users').value);
+            const aov = parseFloat(document.getElementById('aov').value);
+            const currentConversion = parseFloat(document.getElementById('conversion').value);
+            
+            // Current revenue
+            const currentOrders = users * (currentConversion / 100);
+            const currentRevenue = currentOrders * aov;
+            
+            // With VFIED (34% improvement)
+            const newConversion = currentConversion * 1.34;
+            const newOrders = users * (newConversion / 100);
+            const newRevenue = newOrders * aov;
+            
+            // Additional revenue
+            const additionalRevenue = newRevenue - currentRevenue;
+            const apiCost = users > 500000 ? 299 : users > 50000 ? 49 : 0;
+            const netGain = additionalRevenue - apiCost;
+            const roi = ((netGain / apiCost) * 100).toFixed(0);
+            
+            document.getElementById('roi-results').style.display = 'block';
+            document.getElementById('roi-details').innerHTML = `
+                <p><strong>Current monthly revenue:</strong> ${currentRevenue.toLocaleString()}</p>
+                <p><strong>With VFIED (+34% conversions):</strong> ${newRevenue.toLocaleString()}</p>
+                <p><strong>Additional revenue:</strong> ${additionalRevenue.toLocaleString()}</p>
+                <p><strong>VFIED API cost:</strong> ${apiCost}</p>
+                <p><strong>Net monthly gain:</strong> ${netGain.toLocaleString()}</p>
+                <p><strong>ROI:</strong> ${roi}% monthly return</p>
+                <p style="margin-top: 1rem; font-weight: bold; color: #155724;">
+                    Payback period: ${apiCost > 0 ? Math.ceil(apiCost / (additionalRevenue / 30)) : 0} days
+                </p>
+            `;
+        }
+    </script>
+</body>
+</html>

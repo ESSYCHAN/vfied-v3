@@ -4,6 +4,7 @@ import cors from 'cors';
 import crypto from 'crypto';
 import 'dotenv/config';
 import { z } from 'zod';
+import countries from "./data/countries.js";
 
 // Add these routes to your mcp-server.js BEFORE your existing endpoints
 import path from 'path';
@@ -2938,9 +2939,21 @@ app.get('/v1/moods', (req, res) => {
 });
 
 // GET /v1/countries - Supported countries
-app.get('/v1/countries', (req, res) => {
-  res.json(SUPPORTED_COUNTRIES);
+app.get("/v1/countries", (_req, res) => {
+  try {
+    const list = (countries || []).map(c => ({
+      name: c.name || c.commonName || c.official || c.country || "",
+      code: (c.alpha2 || c.code || c.iso2 || "").toUpperCase()
+    }))
+    .filter(c => c.name && c.code.length === 2)
+    .sort((a,b) => a.name.localeCompare(b.name));
+    res.json({ countries: list });
+  } catch (e) {
+    res.status(500).json({ error: "Failed to load countries" });
+  }
 });
+
+app.listen(3001, () => console.log("MCP/VFIED server on :3001"));
 
 // POST /v1/quick_decision - Public quick decision
 app.post('/v1/quick_decision', 
