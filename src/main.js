@@ -1,3 +1,7 @@
+import { getCountries, getFoodSuggestion } from "./services/foodService.js";
+import { countryCodeToEmoji } from "./utils/helpers.js";
+
+
 // Basic front-end wiring to your Express server
 const SERVER = 'http://localhost:3001';
 const API_KEY = 'demo_growth_key_456'; // demo vendor key for upload endpoints
@@ -179,4 +183,101 @@ viewMenuBtn.addEventListener('click', async () => {
   } catch (e) {
     menuResponse.textContent = `Error: ${e.message}`;
   }
+  let countries = [];
+let selectedCountry = null;
+let city = "London";
+let mood = "";
+let dietary = []; // hook up your own chips if you have them
+let result = null;
+
+async function initCountries() {
+  try {
+    countries = await getCountries();
+    const sel = document.getElementById("countrySelect");
+    if (!sel) return;
+    sel.innerHTML = `<option value="" disabled selected>Select your country</option>` +
+      countries.map(c => `<option value="${c.code}">${c.name}</option>`).join("");
+  } catch (e) { console.error(e); }
+}
+
+function renderFlag() {
+  const el = document.getElementById("selectedFlag");
+  if (!el) return;
+  el.textContent = selectedCountry?.code ? countryCodeToEmoji(selectedCountry.code) : "";
+}
+
+function renderLoading(v) {
+  const el = document.getElementById("loading");
+  if (el) el.style.display = v ? "block" : "none";
+}
+
+function renderError(msg) {
+  const el = document.getElementById("error");
+  if (el) el.textContent = msg || "";
+}
+
+function renderResultBox() {
+  const box = document.getElementById("resultBox");
+  if (!box) return;
+  if (!result) { box.innerHTML = ""; return; }
+  const header = `${selectedCountry?.code ? countryCodeToEmoji(selectedCountry.code) + " " : ""}${city ? city + ", " : ""}${selectedCountry?.name || ""}`;
+
+  box.innerHTML = `
+    <div class="header">${header}</div>
+    ${result.friendMessage ? `<div class="friend">${result.friendMessage}</div>` : ""}
+    ${result.dietaryNote ? `<div class="note">${result.dietaryNote}</div>` : ""}
+    ${result.weatherNote ? `<div class="note">${result.weatherNote}</div>` : ""}
+    ${result.food ? `
+      <div class="food">
+        <div class="title">${result.food.emoji ? result.food.emoji + " " : ""}${result.food.name}</div>
+        ${result.culturalNote ? `<div class="note">${result.culturalNote}</div>` : ""}
+      </div>` : ""}
+    ${
+      Array.isArray(result.alternatives) && result.alternatives.length
+        ? `<div class="alts">
+            <div class="alt-title">Alternatives</div>
+            <ul>${result.alternatives.map(a => `<li>${a.emoji ? a.emoji + " " : ""}${a.name}</li>`).join("")}</ul>
+          </div>`
+        : ""
+    }
+  `;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initCountries();
+
+  document.getElementById("countrySelect")?.addEventListener("change", (e) => {
+    const code = e.target.value;
+    selectedCountry = countries.find(c => c.code === code) || null;
+    renderFlag();
+  });
+
+  document.getElementById("cityInput")?.addEventListener("input", (e) => { city = e.target.value; });
+  document.getElementById("moodInput")?.addEventListener("input", (e) => { mood = e.target.value; });
+
+  document.getElementById("decideBtn")?.addEventListener("click", async () => {
+    try {
+      renderError(""); renderLoading(true); result = null; renderResultBox();
+      if (!selectedCountry?.code) throw new Error("Please select a country.");
+
+      const payload = {
+        mood: mood || "surprise me with something balanced",
+        location: {
+          city: city || "",
+          country: selectedCountry.name,
+          country_code: selectedCountry.code
+        },
+        dietary
+      };
+
+      result = await getFoodSuggestion(payload);
+      renderResultBox();
+    } catch (e) {
+      renderError(e.message || "Something went wrong");
+    } finally {
+      renderLoading(false);
+    }
+  });
+});
+
 });
