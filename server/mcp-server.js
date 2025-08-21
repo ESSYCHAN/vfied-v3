@@ -355,6 +355,13 @@ app.get('/v1/menus', authenticateApiKey, (req, res) => {
     items: vm.items
   });
 });
+// View current vendor menu (requires API key)
+app.get('/v1/menus', authenticateApiKey, (req, res) => {
+  const vendorId = req.apiKey.vendorId;
+  const vm = vendorMenus.get(vendorId);
+  if (!vm) return res.json({ success: true, items: [], version: null, updatedAt: null });
+  res.json({ success: true, vendor_id: vendorId, version: vm.version, updatedAt: vm.updatedAt, items: vm.items });
+});
 
 app.get('/v1/analytics', authenticateApiKey, (req, res) => {
   const k = req.apiKey;
