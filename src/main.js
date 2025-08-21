@@ -3,8 +3,8 @@ import { countryCodeToEmoji } from "./utils/helpers.js";
 
 
 // Basic front-end wiring to your Express server
-const SERVER = 'http://localhost:3001';
-const API_KEY = 'https://vfied-v3.onrender.com'; // demo vendor key for upload endpoints
+const SERVER = import.meta.env.VITE_MCP_SERVER_URL || 'https://vfied-v3.onrender.com';
+const API_KEY = 'demo_growth_key_456'; // demo vendor key for upload endpoints
 
 // Elements
 const moodInput = document.getElementById('moodInput');
