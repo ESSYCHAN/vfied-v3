@@ -818,3 +818,50 @@ button {
   cursor: pointer !important;
 }
 
+/* --- Tabs --- */
+.tabs {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 16px;
+  border-bottom: 1px solid #1f2937;
+  padding-bottom: 6px;
+}
+.tab {
+  background: #0b1220;
+  border: 1px solid #263247;
+  color: #e2e8f0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tab.active {
+  background: #6d28d9;
+  border-color: #6d28d9;
+  color: #fff;
+}
+
+/* --- Panels --- */
+.tabpanel.hidden { display: none; }
+
+/* --- Events list --- */
+.event-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.event-list li {
+  background: #0b1220;
+  border: 1px solid #263247;
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+/* --- Mobile layout --- */
+@media (max-width: 640px) {
+  .container { padding: 0 12px; }
+  .grid-2 { grid-template-columns: 1fr !important; }
+  .row { flex-wrap: wrap; }
+  .card { padding: 14px; }
+  button { width: 100%; }
+  .tabs { overflow-x: auto; }
+}
+
+/* --- Better result card text wrapping on mobile --- */
+#resultCard .result { word-break: break-word; }

@@ -39,7 +39,22 @@ const DIETARY = [
   'vegetarian','vegan','gluten-free','dairy-free','keto','halal',
   'kosher','nut-free','paleo','pescatarian'
 ];
-
+function activateTab(name) {
+  document.querySelectorAll('.tab').forEach(btn => {
+    const isActive = btn.dataset.tab === name;
+    btn.classList.toggle('active', isActive);
+    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+  });
+  document.querySelectorAll('.tabpanel').forEach(panel => {
+    panel.classList.toggle('hidden', panel.id !== `tab-${name}`);
+  });
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.tab');
+  if (!btn) return;
+  activateTab(btn.dataset.tab);
+});
+document.addEventListener('DOMContentLoaded', () => activateTab('food'));
 // ------------------ RENDER ------------------
 function renderChips() {
   chipsWrap.innerHTML = '';
@@ -200,16 +215,19 @@ decideBtn?.addEventListener('click', async () => {
 document.getElementById('loadEventsBtn')?.addEventListener('click', async () => {
   const loc = getLocation();
   const url = `${SERVER}/v1/events?city=${encodeURIComponent(loc.city||'')}&country_code=${encodeURIComponent(loc.country_code||'')}`;
+  const list = document.getElementById('eventsList');
+  list.innerHTML = '<li>Loading…</li>';
   try {
     const r = await fetch(url);
     const data = await r.json();
-    const list = document.getElementById('eventsList');
-    list.innerHTML = (data.events || []).map(e => `<li>${e.title} — ${e.when}</li>`).join('') || '<li>No events found.</li>';
+    const events = data?.events || [];
+    list.innerHTML = events.length
+      ? events.map(e => `<li><strong>${e.title}</strong><br><span class="small muted">${e.when} — ${e.city} ${e.country_code}</span></li>`).join('')
+      : '<li>No events found.</li>';
   } catch (e) {
-    alert('Failed to load events');
+    list.innerHTML = '<li>Failed to load events.</li>';
   }
 });
-
 
 // ------------------ ACCEPT / RETRY ------------------
 document.getElementById('acceptBtn').addEventListener('click', () => {

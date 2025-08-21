@@ -33,6 +33,17 @@
     .rowsm{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px}
     .small{font-size:12px}
+    
+    /* Tab styles */
+    .tabs{display:flex; gap:0; margin:16px 0; border-bottom:1px solid #1f2937}
+    .tab{background:transparent; border:none; color:#94a3b8; padding:12px 24px; border-radius:0; font-weight:500; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.2s ease}
+    .tab:hover{color:#e2e8f0; background:#1e293b}
+    .tab.active{color:#e2e8f0; border-bottom-color:#6d28d9; background:#111827}
+    .tabpanel{display:block}
+    .tabpanel.hidden{display:none}
+    
+    /* Event list styles */
+    .event-list{list-style:none; margin:0; padding:0}
   </style>
 </head>
 <body>
@@ -40,107 +51,130 @@
     <h1>🍽️ VFIED — One-Tap Food Decision</h1>
     <div class="muted">Hooked to your local server at <code class="mono">http://localhost:3001</code></div>
 
-    <!-- Decision Card -->
-    <div class="card">
-      <div class="grid grid-2">
-        <div>
-          <label for="moodInput">How are you feeling?</label>
-          <input id="moodInput" placeholder="e.g. stressed but want something light" style="width:100%; margin-top:6px" />
-          <div class="rowsm" style="margin-top:8px">
-            <button class="secondary" data-quick="tired">😴 Tired</button>
-            <button class="secondary" data-quick="stressed">😰 Stressed</button>
-            <button class="secondary" data-quick="celebrating">🎉 Celebrating</button>
-            <button class="secondary" data-quick="hungry">🤤 Hungry</button>
-            <button class="secondary" id="detectMoodBtn">✨ Detect Mood (AI)</button>
-          </div>
-        </div>
+    <!-- TABS -->
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="food" role="tab" aria-selected="true">🍲 Food</button>
+      <button class="tab" data-tab="events" role="tab" aria-selected="false">🎶 Events</button>
+    </nav>
 
-        <div>
-          <label>Location</label>
-          <div class="row" style="margin-top:6px">
-            <select id="citySelect">
-              <option value='{"city":"London","country":"United Kingdom","country_code":"GB"}'>London, GB</option>
-              <option value='{"city":"Nairobi","country":"Kenya","country_code":"KE"}'>Nairobi, KE</option>
-              <option value='{"city":"New York","country":"United States","country_code":"US"}'>New York, US</option>
-              <option value='{"city":"Tokyo","country":"Japan","country_code":"JP"}'>Tokyo, JP</option>
-            </select>
-            <input id="latInput" placeholder="lat (optional)" style="width:130px" />
-            <input id="lngInput" placeholder="lng (optional)" style="width:130px" />
+    <section id="tab-food" class="tabpanel" role="tabpanel" aria-labelledby="tab-food-btn">
+      <!-- Decision Card -->
+      <div class="card">
+        <div class="grid grid-2">
+          <div>
+            <label for="moodInput">How are you feeling?</label>
+            <input id="moodInput" placeholder="e.g. stressed but want something light" style="width:100%; margin-top:6px" />
+            <div class="rowsm" style="margin-top:8px">
+              <button class="secondary" data-quick="tired">😴 Tired</button>
+              <button class="secondary" data-quick="stressed">😰 Stressed</button>
+              <button class="secondary" data-quick="celebrating">🎉 Celebrating</button>
+              <button class="secondary" data-quick="hungry">🤤 Hungry</button>
+              <button class="secondary" id="detectMoodBtn">✨ Detect Mood (AI)</button>
+            </div>
           </div>
 
-          <div style="margin-top:12px">
-            <label>Dietary</label>
-            <div class="chips" id="dietaryChips" style="margin-top:6px">
-              <!-- chips rendered by JS -->
+          <div>
+            <label>Location</label>
+            <div class="row" style="margin-top:6px">
+              <select id="citySelect">
+                <option value='{"city":"London","country":"United Kingdom","country_code":"GB"}'>London, GB</option>
+                <option value='{"city":"Nairobi","country":"Kenya","country_code":"KE"}'>Nairobi, KE</option>
+                <option value='{"city":"New York","country":"United States","country_code":"US"}'>New York, US</option>
+                <option value='{"city":"Tokyo","country":"Japan","country_code":"JP"}'>Tokyo, JP</option>
+              </select>
+              <input id="latInput" placeholder="lat (optional)" style="width:130px" />
+              <input id="lngInput" placeholder="lng (optional)" style="width:130px" />
+            </div>
+
+            <div style="margin-top:12px">
+              <label>Dietary</label>
+              <div class="chips" id="dietaryChips" style="margin-top:6px">
+                <!-- chips rendered by JS -->
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="row" style="margin-top:12px">
-        <select id="budgetSelect">
-          <option value="medium">Budget: Medium</option>
-          <option value="low">Budget: Low</option>
-          <option value="high">Budget: High</option>
-        </select>
-        <button id="decideBtn" class="big">🎯 Decide For Me</button>
-      </div>
-    </div>
-
-    <!-- Result Card -->
-    <div class="card" id="resultCard" style="display:none">
-      <div class="row" style="align-items:flex-start">
-        <div class="emoji" id="foodEmoji">🍽️</div>
-        <div class="result">
-          <div class="big" id="foodName">Your suggestion appears here</div>
-          <div class="muted" id="foodType"></div>
-          <div style="margin-top:8px" id="friendMessage"></div>
-          <div class="muted" style="margin-top:8px" id="reasoning"></div>
-          <div class="muted" style="margin-top:8px" id="culturalNote"></div>
-          <div class="muted" style="margin-top:8px" id="dietaryNote"></div>
-          <div class="muted" style="margin-top:8px" id="weatherNote"></div>
-
-          <div class="kpi" style="margin-top:10px">
-            <span id="countryCode">—</span>
-            <span id="confidence">—</span>
-            <span id="weatherBadge">—</span>
-          </div>
+        <div class="row" style="margin-top:12px">
+          <select id="budgetSelect">
+            <option value="medium">Budget: Medium</option>
+            <option value="low">Budget: Low</option>
+            <option value="high">Budget: High</option>
+          </select>
+          <button id="decideBtn" class="big">🎯 Decide For Me</button>
         </div>
       </div>
 
-      <div class="row" style="margin-top:12px">
-        <button id="acceptBtn">✅ Accept</button>
-        <button id="tryAgainBtn" class="secondary">🔄 Try Again</button>
-      </div>
-    </div>
+      <!-- Result Card -->
+      <div class="card" id="resultCard" style="display:none">
+        <div class="row" style="align-items:flex-start">
+          <div class="emoji" id="foodEmoji">🍽️</div>
+          <div class="result">
+            <div class="big" id="foodName">Your suggestion appears here</div>
+            <div class="muted" id="foodType"></div>
+            <div style="margin-top:8px" id="friendMessage"></div>
+            <div class="muted" style="margin-top:8px" id="reasoning"></div>
+            <div class="muted" style="margin-top:8px" id="culturalNote"></div>
+            <div class="muted" style="margin-top:8px" id="dietaryNote"></div>
+            <div class="muted" style="margin-top:8px" id="weatherNote"></div>
 
-    <!-- Vendor Upload (Demo) -->
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <h2 style="margin:0">📤 Vendor Menu Upload (demo)</h2>
-        <span class="small mono">Bearer demo_growth_key_456</span>
+            <div class="kpi" style="margin-top:10px">
+              <span id="countryCode">—</span>
+              <span id="confidence">—</span>
+              <span id="weatherBadge">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <button id="acceptBtn">✅ Accept</button>
+          <button id="tryAgainBtn" class="secondary">🔄 Try Again</button>
+        </div>
       </div>
-      <div class="grid grid-2" style="margin-top:8px">
-        <div>
-          <label>Menu JSON</label>
-          <textarea id="menuTextarea" rows="7" style="width:100%; margin-top:6px">[
+
+      <!-- Vendor Upload (Demo) -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">📤 Vendor Menu Upload (demo)</h2>
+          <span class="small mono">Bearer demo_growth_key_456</span>
+        </div>
+        <div class="grid grid-2" style="margin-top:8px">
+          <div>
+            <label>Menu JSON</label>
+            <textarea id="menuTextarea" rows="7" style="width:100%; margin-top:6px">[
   {"name":"Ugali Mayai","country_code":"KE","price":"8.99","tags":["vegetarian","comfort","protein"],"kcal":420,"protein_g":22,"carbs_g":60,"fat_g":10},
   {"name":"Fried Tilapia","country_code":"KE","price":"12.50","tags":["pescatarian","protein","healthy"],"kcal":500,"protein_g":40,"carbs_g":5,"fat_g":25}
 ]</textarea>
-          <div class="row" style="margin-top:8px">
-            <button id="uploadMenuBtn">Upload Menu</button>
-            <button id="viewMenuBtn" class="secondary">View My Menu</button>
+            <div class="row" style="margin-top:8px">
+              <button id="uploadMenuBtn">Upload Menu</button>
+              <button id="viewMenuBtn" class="secondary">View My Menu</button>
+            </div>
+          </div>
+          <div>
+            <label>Response</label>
+            <pre id="menuResponse" class="mono" style="margin-top:6px; white-space:pre-wrap; background:#0b1220; padding:10px; border-radius:10px; border:1px solid #263247; height:170px; overflow:auto">—</pre>
           </div>
         </div>
-        <div>
-          <label>Response</label>
-          <pre id="menuResponse" class="mono" style="margin-top:6px; white-space:pre-wrap; background:#0b1220; padding:10px; border-radius:10px; border:1px solid #263247; height:170px; overflow:auto">—</pre>
+      </div>
+    </section>
+
+    <section id="tab-events" class="tabpanel hidden" role="tabpanel" aria-labelledby="tab-events-btn">
+      <div class="card">
+        <h2 style="margin:0 0 8px;">🎶 What's happening near me?</h2>
+        <p class="muted small" style="margin:6px 0 12px;">
+          Uses your current city/country selection.
+        </p>
+        <div class="row" style="gap:8px;">
+          <button id="loadEventsBtn" class="secondary">Load events</button>
         </div>
       </div>
-    </div>
+
+      <div class="card">
+        <ul id="eventsList" class="event-list"></ul>
+      </div>
+    </section>
   </div>
-  <button id="loadEventsBtn" class="secondary">🎶 What’s happening near me?</button>
-  <ul id="eventsList" style="margin-top:8px;"></ul> 
+  
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
