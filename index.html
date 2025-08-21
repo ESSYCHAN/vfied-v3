@@ -72,7 +72,6 @@
               <button class="secondary mood-chip" data-quick="hungry">🤤 Hungry</button>
             </div>
           </div>
-
           <div>
             <label>Location</label>
             <div class="row" style="margin-top:6px">
@@ -82,6 +81,7 @@
                 <option value='{"city":"New York","country":"United States","country_code":"US"}'>New York, US</option>
                 <option value='{"city":"Tokyo","country":"Japan","country_code":"JP"}'>Tokyo, JP</option>
               </select>
+              <input id="cityInputFree" placeholder="Type your city (optional)" style="width:180px" />
               <input id="latInput" placeholder="lat (optional)" style="width:130px" />
               <input id="lngInput" placeholder="lng (optional)" style="width:130px" />
             </div>
@@ -104,7 +104,16 @@
           <button id="decideBtn" class="big">🎯 Decide For Me</button>
         </div>
       </div>
-
+      <!-- Add after the first decision card: -->
+      <div id="installBanner" class="card" style="display:none; margin-top:8px">
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <div>📲 Install VFIED for 1-tap access</div>
+          <div class="row">
+            <button id="installBtn" class="secondary">Install</button>
+            <button id="installClose" class="secondary">✕</button>
+          </div>
+        </div>
+      </div>
       <!-- Result Card -->
       <div class="card" id="resultCard" style="display:none">
         <div class="row" style="align-items:flex-start">
@@ -122,6 +131,7 @@
               <span id="countryCode">—</span>
               <span id="confidence">—</span>
               <span id="weatherBadge">—</span>
+              <span id="engineBadge">—</span>
             </div>
           </div>
         </div>
@@ -173,7 +183,7 @@
         <div id="eventsGrid" class="events-grid"></div>
       </div>
     </section>
-    
+
     <section id="tab-travel" class="tabpanel hidden" role="tabpanel" aria-labelledby="tab-travel-btn">
       <div class="card">
         <h2 style="margin:0 0 8px;">🧭 Travel: Must-try in your city</h2>

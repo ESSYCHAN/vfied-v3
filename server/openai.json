@@ -1,0 +1,695 @@
+{
+    "openapi": "3.1.0",
+    "info": {
+      "title": "VFIED Food Intelligence API",
+      "description": "AI-powered, culturally-aware food recommendations with smart mood detection, dietary compliance, weather awareness, and menu personalization. The AI can understand ANY mood description and intelligently map it to appropriate food recommendations.",
+      "version": "2.1.0"
+    },
+    "servers": [
+      {
+        "url": "https://vfied-v3.onrender.com",
+        "description": "Production server"
+      },
+      {
+        "url": "http://localhost:3048",
+        "description": "Development server"
+      }
+    ],
+    "paths": {
+      "/health": {
+        "get": {
+          "summary": "Health check endpoint",
+          "operationId": "healthCheck",
+          "responses": {
+            "200": {
+              "description": "Service health status",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "status": { "type": "string" },
+                      "service": { "type": "string" },
+                      "version": { "type": "string" },
+                      "features": { "type": "array", "items": { "type": "string" } },
+                      "services": { "type": "object" },
+                      "timestamp": { "type": "string" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/v1/quick_decision": {
+        "post": {
+          "summary": "Instant food decision (<1s). No AI reasoning, just a fast pick.",
+          "operationId": "quickDecision",
+          "requestBody": {
+            "required": false,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/QuickDecisionRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Quick decision result",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/QuickDecisionResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/v1/recommend": {
+        "post": {
+          "summary": "AI-powered personalized recommendation with smart mood detection, cultural awareness, weather analysis, and dietary compliance",
+          "operationId": "recommend",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RecommendRequest" },
+                "examples": {
+                  "flexible_mood_example": {
+                    "summary": "Flexible mood detection example",
+                    "value": {
+                      "location": { "city": "London", "country": "United Kingdom", "country_code": "GB" },
+                      "mood_text": "cozy but craving something adventurous",
+                      "dietary": ["vegetarian"]
+                    }
+                  },
+                  "complex_mood_example": {
+                    "summary": "Complex emotional state example",
+                    "value": {
+                      "location": { "city": "Tokyo", "country": "Japan", "country_code": "JP" },
+                      "mood_text": "stressed from work but want to celebrate finishing project",
+                      "dietary": ["vegan"],
+                      "budget": "medium",
+                      "social": "solo"
+                    }
+                  },
+                  "explicit_mood_ids": {
+                    "summary": "Using explicit mood IDs",
+                    "value": {
+                      "location": { "city": "Nairobi", "country": "Kenya", "country_code": "KE" },
+                      "mood_ids": ["POST_WORKOUT", "HUNGRY"],
+                      "dietary": ["halal"],
+                      "social": "solo",
+                      "budget": "medium"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "AI-powered recommendation with cultural context, weather analysis, and dietary compliance",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/RecommendResponse" }
+                }
+              }
+            },
+            "400": { "description": "Bad request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } },
+            "500": { "description": "Internal server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Error" } } } }
+          }
+        }
+      },
+      "/v1/moods": {
+        "get": {
+          "summary": "List canonical moods + synonyms (for client-side mapping)",
+          "operationId": "listMoods",
+          "responses": {
+            "200": {
+              "description": "Complete mood taxonomy with groups and synonyms",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/MoodTaxonomy" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/v1/countries": {
+        "get": {
+          "summary": "List supported countries with cultural cuisine info",
+          "operationId": "listCountries",
+          "responses": {
+            "200": {
+              "description": "Supported countries with cultural context",
+              "content": {
+                "application/json": { "schema": { "$ref": "#/components/schemas/CountryList" } }
+              }
+            }
+          }
+        }
+      },
+      "/mcp/validate_dietary_compliance": {
+        "post": {
+          "summary": "AI-powered dietary compliance validation for any food item",
+          "operationId": "validateDietaryCompliance",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/DietaryValidationRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Detailed dietary compliance analysis with AI reasoning",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/DietaryValidationResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/mcp/get_cultural_food_context": {
+        "post": {
+          "summary": "Get cultural food intelligence for any location",
+          "operationId": "getCulturalContext",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CulturalContextRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Rich cultural food context with local recommendations",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/CulturalContextResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/mcp/get_quick_food_decision": {
+        "post": {
+          "summary": "MCP-compatible quick decision with weather intelligence",
+          "operationId": "mcpQuickDecision",
+          "requestBody": {
+            "required": false,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MCPQuickRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Quick decision with weather and cultural context",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/MCPQuickResponse" }
+                }
+              }
+            }
+          }
+        }
+      },
+      "/mcp/get_food_suggestion": {
+        "post": {
+          "summary": "MCP-compatible detailed food suggestion with full AI analysis",
+          "operationId": "mcpFoodSuggestion",
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MCPSuggestionRequest" }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Comprehensive AI food suggestion with weather, cultural, and personal insights",
+              "content": {
+                "application/json": {
+                  "schema": { "$ref": "#/components/schemas/MCPSuggestionResponse" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "components": {
+      "schemas": {
+        "Location": {
+          "type": "object",
+          "properties": {
+            "city": { "type": "string", "description": "City or locality (optional but recommended for better cultural context)" },
+            "country": { "type": "string", "description": "Country name (e.g., 'Kenya', 'United Kingdom')" },
+            "country_code": { "type": "string", "minLength": 2, "maxLength": 2, "description": "ISO 3166-1 alpha-2 (e.g., 'KE', 'GB')" },
+            "latitude": { "type": "number", "description": "Latitude for weather data (optional)" },
+            "longitude": { "type": "number", "description": "Longitude for weather data (optional)" }
+          }
+        },
+        "QuickDecisionRequest": {
+          "type": "object",
+          "properties": {
+            "location": { "$ref": "#/components/schemas/Location" },
+            "dietary": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/DietaryTag" },
+              "description": "Dietary restrictions to filter by"
+            }
+          }
+        },
+        "QuickDecisionResponse": {
+          "type": "object",
+          "properties": {
+            "success": { "type": "boolean" },
+            "request_id": { "type": "string" },
+            "decision": { "type": "string", "description": "Recommended dish name" },
+            "country_code": { "type": "string", "description": "Origin country of recommended dish" },
+            "explanation": { "type": "string", "description": "Brief reasoning for the choice" },
+            "dietaryNote": { "type": "string", "description": "Dietary compliance note if applicable" },
+            "processingTimeMs": { "type": "integer", "description": "Response time in milliseconds" }
+          }
+        },
+        "RecommendRequest": {
+          "type": "object",
+          "properties": {
+            "location": { "$ref": "#/components/schemas/Location" },
+            "mood_text": { 
+              "type": "string", 
+              "description": "Free text description of current mood/state. AI will intelligently map ANY mood description to supported categories. Examples: 'cozy and tired', 'anxious about work', 'celebrating but exhausted', 'feeling adventurous', 'post-workout hunger', 'sick and need comfort food'",
+              "examples": [
+                "cozy and relaxed",
+                "anxious about work presentation", 
+                "tired but celebrating small win",
+                "post-workout and starving",
+                "feeling sick and need comfort",
+                "stressed but want something adventurous"
+              ]
+            },
+            "mood_ids": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/MoodId" },
+              "description": "Optional: Specific mood IDs if you want to bypass AI detection. If provided along with mood_text, both will be combined."
+            },
+            "dietary": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/DietaryTag" },
+              "description": "Dietary restrictions and preferences"
+            },
+            "social": { 
+              "type": "string", 
+              "enum": ["solo", "date", "family", "friends", "work"],
+              "description": "Social dining context"
+            },
+            "budget": { 
+              "type": "string", 
+              "enum": ["low", "medium", "high"],
+              "description": "Budget preference for recommendations"
+            },
+            "menu_source": {
+              "type": "string",
+              "enum": ["global_database", "my_uploaded_menu"],
+              "default": "global_database",
+              "description": "Use global food database or vendor's uploaded menu"
+            }
+          },
+          "anyOf": [
+            { "required": ["mood_text"] },
+            { "required": ["mood_ids"] }
+          ],
+          "description": "Either mood_text (AI will detect) or specific mood_ids must be provided. The AI can understand ANY mood description and map it intelligently to food recommendations."
+        },
+        "RecommendResponse": {
+          "type": "object",
+          "properties": {
+            "success": { "type": "boolean" },
+            "request_id": { "type": "string" },
+            "context": {
+              "type": "object",
+              "properties": {
+                "original_mood_text": { 
+                  "type": "string", 
+                  "description": "The original mood text provided by user" 
+                },
+                "resolved_moods": { 
+                  "type": "array", 
+                  "items": { "$ref": "#/components/schemas/MoodId" },
+                  "description": "Mood IDs that the AI detected/mapped from the mood text"
+                },
+                "mood_detection_method": {
+                  "type": "string",
+                  "enum": ["ai", "regex_fallback", "explicit"],
+                  "description": "How the moods were determined"
+                },
+                "location": { "$ref": "#/components/schemas/Location" },
+                "dietary": { "type": "array", "items": { "$ref": "#/components/schemas/DietaryTag" } },
+                "source": { "type": "string", "enum": ["global_database", "uploaded_menu"] }
+              }
+            },
+            "food": { "$ref": "#/components/schemas/Food" },
+            "friendMessage": { "type": "string", "description": "Personalized, encouraging message from your AI food friend" },
+            "reasoning": { "type": "string", "description": "Detailed explanation of why this food was chosen based on detected moods" },
+            "culturalNote": { "type": "string", "description": "Cultural context and authenticity information" },
+            "personalNote": { "type": "string", "description": "Personal pattern recognition insights" },
+            "weatherNote": { "type": "string", "description": "How weather influenced this recommendation" },
+            "availabilityNote": { "type": "string", "description": "Where to find this food locally" },
+            "alternatives": { 
+              "type": "array", 
+              "items": { "$ref": "#/components/schemas/FoodAlt" },
+              "description": "Alternative food suggestions"
+            },
+            "confidence": { "type": "integer", "minimum": 0, "maximum": 100, "description": "AI confidence score for this recommendation" },
+            "dietaryCompliance": { "$ref": "#/components/schemas/DietaryCompliance" },
+            "dietaryNote": { "type": "string", "description": "Dietary compliance summary" },
+            "weather": { "$ref": "#/components/schemas/WeatherContext" },
+            "interactionId": { "type": "string", "description": "Unique interaction ID for feedback tracking" },
+            "processingTimeMs": { "type": "integer" },
+            "meta": {
+              "type": "object",
+              "properties": {
+                "hasWeather": { "type": "boolean" },
+                "hasDietary": { "type": "boolean" },
+                "dietaryRestrictions": { "type": "array", "items": { "type": "string" } },
+                "timestamp": { "type": "string" }
+              }
+            }
+          }
+        },
+        "Food": {
+          "type": "object",
+          "required": ["name"],
+          "properties": {
+            "dish_id": { "type": "string", "description": "Unique dish identifier" },
+            "name": { "type": "string", "description": "Dish name" },
+            "emoji": { "type": "string", "description": "Representative emoji" },
+            "country": { "type": "string", "description": "Dish origin country name" },
+            "country_code": { "type": "string", "description": "Dish origin ISO 3166-1 alpha-2" },
+            "category": { 
+              "type": "string", 
+              "enum": ["comfort", "healthy", "celebration", "recovery", "local", "signature"],
+              "description": "Food category"
+            },
+            "type": { "type": "string", "description": "Cuisine type (e.g., 'Italian', 'East African')" },
+            "tags": { "type": "array", "items": { "type": "string" }, "description": "Descriptive tags" },
+            "description": { "type": "string", "description": "Dish description" },
+            "price": { "type": "string", "description": "Price if from uploaded menu" },
+            "menu_item_id": { "type": "string", "description": "Menu item ID if from uploaded menu" },
+            "menu_link": { "type": "string", "description": "Link to menu item" },
+            "macros": {
+              "type": "object",
+              "properties": {
+                "kcal": { "type": "integer", "description": "Calories" },
+                "protein_g": { "type": "number", "description": "Protein in grams" },
+                "carbs_g": { "type": "number", "description": "Carbohydrates in grams" },
+                "fat_g": { "type": "number", "description": "Fat in grams" }
+              }
+            },
+            "suitability": {
+              "type": "object",
+              "properties": {
+                "vegetarian": { "type": "boolean" },
+                "vegan": { "type": "boolean" },
+                "gluten_free": { "type": "boolean" },
+                "dairy_free": { "type": "boolean" },
+                "halal_friendly": { "type": "boolean" },
+                "kosher_friendly": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "FoodAlt": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "emoji": { "type": "string" },
+            "country_code": { "type": "string" },
+            "reason": { "type": "string", "description": "Why this is a good alternative" },
+            "price": { "type": "string", "description": "Price if available" }
+          }
+        },
+        "DietaryCompliance": {
+          "type": "object",
+          "properties": {
+            "compliant": { "type": "boolean", "description": "Whether food meets all dietary requirements" },
+            "compliance": { 
+              "type": "object", 
+              "description": "Per-restriction compliance status",
+              "additionalProperties": { "type": "string", "enum": ["compliant", "non-compliant", "unknown"] }
+            },
+            "warnings": { 
+              "type": "array", 
+              "items": { "type": "string" },
+              "description": "Specific dietary compliance warnings"
+            },
+            "alternatives": { 
+              "type": "array", 
+              "items": { "type": "string" },
+              "description": "Suggested compliant alternatives"
+            },
+            "reasoning": { "type": "string", "description": "AI analysis of dietary compliance" },
+            "confidence": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "source": { "type": "string", "enum": ["ai", "fallback"] }
+          }
+        },
+        "WeatherContext": {
+          "type": "object",
+          "properties": {
+            "temperature": { "type": "number", "description": "Temperature in Celsius" },
+            "feelsLike": { "type": "number", "description": "Feels-like temperature in Celsius" },
+            "humidity": { "type": "integer", "description": "Humidity percentage" },
+            "condition": { "type": "string", "description": "Weather condition" },
+            "description": { "type": "string", "description": "Weather description" },
+            "isRaining": { "type": "boolean" },
+            "isSnowing": { "type": "boolean" },
+            "isCold": { "type": "boolean", "description": "Temperature < 15°C" },
+            "isHot": { "type": "boolean", "description": "Temperature > 30°C" },
+            "isComfortable": { "type": "boolean", "description": "Temperature 18-26°C" },
+            "simulated": { "type": "boolean", "description": "Whether weather data is simulated" },
+            "cityName": { "type": "string" },
+            "country": { "type": "string" }
+          }
+        },
+        "DietaryTag": {
+          "type": "string",
+          "enum": ["vegetarian", "vegan", "gluten-free", "dairy-free", "keto", "halal", "kosher", "nut-free", "paleo", "pescatarian"]
+        },
+        "MoodId": {
+          "type": "string",
+          "enum": [
+            "TIRED", "STRESSED", "CELEBRATING", "HUNGRY", "POST_WORKOUT", 
+            "SICK", "FOCUSED", "RELAX", "ADVENTUROUS"
+          ],
+          "description": "Canonical mood IDs used internally by the AI system. Note: The API accepts ANY mood text via mood_text field and intelligently maps it to these categories."
+        },
+        "MoodTaxonomy": {
+          "type": "object",
+          "properties": {
+            "moods": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "$ref": "#/components/schemas/MoodId" },
+                  "group": { "type": "string", "enum": ["Energy", "Emotion", "Body", "Social", "Intent"] },
+                  "synonyms": { "type": "array", "items": { "type": "string" } }
+                }
+              }
+            }
+          }
+        },
+        "CountryList": {
+          "type": "object",
+          "properties": {
+            "countries": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "country_code": { "type": "string" },
+                  "region": { "type": "string", "description": "Geographic region" },
+                  "cuisine": { "type": "string", "description": "Primary cuisine type" }
+                }
+              }
+            }
+          }
+        },
+        "DietaryValidationRequest": {
+          "type": "object",
+          "required": ["foodName", "dietary"],
+          "properties": {
+            "foodName": { "type": "string", "description": "Name of food to validate" },
+            "dietary": { "type": "array", "items": { "$ref": "#/components/schemas/DietaryTag" } }
+          }
+        },
+        "DietaryValidationResponse": {
+          "type": "object",
+          "properties": {
+            "success": { "type": "boolean" },
+            "foodName": { "type": "string" },
+            "dietaryRestrictions": { "type": "array", "items": { "type": "string" } },
+            "compliant": { "type": "boolean" },
+            "compliance": { "type": "object" },
+            "warnings": { "type": "array", "items": { "type": "string" } },
+            "alternatives": { "type": "array", "items": { "type": "string" } },
+            "reasoning": { "type": "string" },
+            "confidence": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "source": { "type": "string" }
+          }
+        },
+        "CulturalContextRequest": {
+          "type": "object",
+          "required": ["location"],
+          "properties": {
+            "location": { "$ref": "#/components/schemas/Location" },
+            "dietary": { "type": "array", "items": { "$ref": "#/components/schemas/DietaryTag" } }
+          }
+        },
+        "CulturalContextResponse": {
+          "type": "object",
+          "properties": {
+            "success": { "type": "boolean" },
+            "mainCuisine": { "type": "string" },
+            "popularFoods": { "type": "array", "items": { "type": "string" } },
+            "comfortFoods": { "type": "array", "items": { "type": "string" } },
+            "streetFoods": { "type": "array", "items": { "type": "string" } },
+            "celebrationFoods": { "type": "array", "items": { "type": "string" } },
+            "culturalNotes": { "type": "string" },
+            "dietaryFriendlyOptions": { 
+              "type": "object",
+              "description": "Foods that match each dietary restriction",
+              "additionalProperties": { "type": "array", "items": { "type": "string" } }
+            },
+            "location": { "type": "string" }
+          }
+        },
+        "MCPQuickRequest": {
+          "type": "object",
+          "properties": {
+            "location": { "$ref": "#/components/schemas/Location" },
+            "dietary": { "type": "array", "items": { "$ref": "#/components/schemas/DietaryTag" } },
+            "context": {
+              "type": "object",
+              "properties": {
+                "includeRestaurants": { "type": "boolean" },
+                "budget": { "type": "string", "enum": ["low", "medium", "high"] }
+              }
+            }
+          }
+        },
+        "MCPQuickResponse": {
+          "type": "object",
+          "properties": {
+            "success": { "type": "boolean" },
+            "decision": { "type": "string" },
+            "explanation": { "type": "string" },
+            "weather": { "$ref": "#/components/schemas/WeatherContext" },
+            "weatherReasoning": { "type": "string" },
+            "dietaryNote": { "type": "string" },
+            "autoMood": { "type": "string" },
+            "hasWeather": { "type": "boolean" },
+            "hasDietary": { "type": "boolean" },
+            "dietaryRestrictions": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "MCPSuggestionRequest": {
+          "type": "object",
+          "required": ["mood"],
+          "properties": {
+            "mood": { 
+              "type": "string", 
+              "description": "ANY mood description - AI will intelligently detect and map to appropriate food recommendations. Examples: 'cozy vibes', 'stressed from work', 'post-workout hunger', 'feeling adventurous', 'tired but celebrating'",
+              "examples": [
+                "cozy vibes",
+                "stressed from deadlines", 
+                "celebrating promotion",
+                "post-workout exhaustion",
+                "adventurous foodie mood",
+                "sick and need comfort",
+                "relaxing weekend vibes"
+              ]
+            },
+            "location": { "$ref": "#/components/schemas/Location" },
+            "dietary": { "type": "array", "items": { "$ref": "#/components/schemas/DietaryTag" } },
+            "context": {
+              "type": "object",
+              "properties": {
+                "budget": { "type": "string", "enum": ["low", "medium", "high"] },
+                "social": { "type": "string", "enum": ["solo", "couple", "group", "family"] },
+                "includeRestaurants": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "MCPSuggestionResponse": {
+          "type": "object",
+          "properties": {
+            "success": { "type": "boolean" },
+            "food": { "$ref": "#/components/schemas/Food" },
+            "description": { "type": "string" },
+            "friendResponse": { "type": "string" },
+            "reason": { "type": "string" },
+            "culturalNote": { "type": "string" },
+            "personalNote": { "type": "string" },
+            "availabilityNote": { "type": "string" },
+            "alternatives": { "type": "array", "items": { "$ref": "#/components/schemas/FoodAlt" } },
+            "confidence": { "type": "integer", "minimum": 0, "maximum": 100 },
+            "source": { "type": "string" },
+            "mood": { "type": "string" },
+            "location": { "type": "string" },
+            "dietaryCompliance": { "$ref": "#/components/schemas/DietaryCompliance" },
+            "dietaryNote": { "type": "string" },
+            "weather": { "$ref": "#/components/schemas/WeatherContext" },
+            "weatherReasoning": { "type": "string" },
+            "interactionId": { "type": "string" },
+            "meta": {
+              "type": "object",
+              "properties": {
+                "tool": { "type": "string" },
+                "originalMood": { "type": "string", "description": "Original mood text provided" },
+                "resolvedMoods": { "type": "array", "items": { "$ref": "#/components/schemas/MoodId" }, "description": "AI-detected mood IDs" },
+                "hasWeather": { "type": "boolean" },
+                "hasDietary": { "type": "boolean" },
+                "dietaryRestrictions": { "type": "array", "items": { "type": "string" } },
+                "timestamp": { "type": "string" }
+              }
+            }
+          }
+        },
+        "Error": {
+          "type": "object",
+          "properties": {
+            "success": { "type": "boolean", "enum": [false] },
+            "error": { "type": "string" },
+            "details": { "type": "string" },
+            "request_id": { "type": "string" },
+            "validation_errors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "field": { "type": "string" },
+                  "message": { "type": "string" },
+                  "value": { "type": "string" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }

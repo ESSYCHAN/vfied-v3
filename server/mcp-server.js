@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
+import fs from 'fs';
 import Joi from 'joi';
 import * as moodsModule from './data/moods.js';
 const moods = moodsModule.default || moodsModule.moods || moodsModule;
@@ -16,6 +17,9 @@ import * as countriesModule from './data/countries.js';
 const USE_GPT = String(process.env.USE_GPT || '').toLowerCase() === 'true';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL   = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+// Add after the fs import:
+const logPath = path.resolve(__dirname, './telemetry.log');
+function logLine(obj){ fs.appendFile(logPath, JSON.stringify(obj)+'\n', ()=>{}); }
 
 function extractCountriesFromModule(mod) {
   const candidates = [];
@@ -119,6 +123,7 @@ app.use(cors({
     'https://vfied.vercel.app',
     'https://vfied-v3.vercel.app',
     'https://vfied-v3-frontend.onrender.com', // Replace with your actual frontend URL
+    // 'https://your-actual-frontend-domain.com', // Add your real domain
     /^https:\/\/.*\.vercel\.app$/,
     /^https:\/\/.*\.onrender\.com$/
   ],
@@ -139,6 +144,11 @@ app.get('/dashboard', (req, res) => res.sendFile(path.resolve(__dirname, '../app
 
 // (Optionally serve public assets if needed)
 app.use('/public', express.static(path.resolve(__dirname, '../public')));
+
+app.get('/openapi.json', (_req, res) => {
+  res.setHeader('Content-Type','application/json');
+  res.send(fs.readFileSync(path.resolve(__dirname, './openapi.json'), 'utf8'));
+});
 
 // --- In-memory vendor data ---
 const vendorMenus = new Map(); // vendorId -> { items: [], version, updatedAt }
@@ -702,7 +712,18 @@ app.post('/v1/recommend', async (req, res) => {
     }
   });
 });
-
+// Add before the error handler:
+app.get('/v1/admin/summary', authenticateApiKey, (_req, res) => {
+  const vendorId = _req.apiKey.vendorId;
+  const m = vendorMenus.get(vendorId);
+  res.json({
+    success: true,
+    vendor_id: vendorId,
+    menu_items: m ? m.items.length : 0,
+    menu_version: m?.version || null,
+    updatedAt: m?.updatedAt || null
+  });
+});
 
 app.get('/v1/events', (req, res) => {
   const city = (req.query.city || 'Nairobi').toString();
@@ -869,9 +890,26 @@ app.post('/mcp/get_cultural_food_context', (req, res) => {
 });
 app.post('/v1/telemetry', (req, res) => {
   const { event, payload } = req.body || {};
-  // In real life, write to a DB / log drain. For now, console is fine.
-  console.log('[telemetry]', event, { at: new Date().toISOString(), payload });
+  const line = { type:'telemetry', event, payload, at:new Date().toISOString() };
+  console.log('[telemetry]', line); 
+  logLine(line);
   res.json({ success: true });
+});
+// --- Feedback endpoint ---
+app.post('/v1/feedback', (req, res) => {
+  const { interactionId, vote, payload } = req.body || {};
+  const line = { type:'feedback', interactionId, vote, payload, at:new Date().toISOString() };
+  console.log('[feedback]', line); 
+  logLine(line);
+  res.json({ success: true });
+});
+// Linkout tracker
+app.get('/v1/linkout', (req, res) => {
+  const url = String(req.query.url || '');
+  const tag = String(req.query.tag || 'generic');
+  if (!/^https?:\/\//i.test(url)) return res.status(400).send('bad url');
+  console.log('[linkout]', { tag, url, at:new Date().toISOString() });
+  res.redirect(url);
 });
 // --- Error handler (last) ---
 app.use((err, _req, res, _next) => {

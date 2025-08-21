@@ -40,10 +40,10 @@ const DIETARY = [
   'kosher','nut-free','paleo','pescatarian'
 ];
 const LS = {
-  get(k, d=null){ try{return JSON.parse(localStorage.getItem(k)) ?? d;}catch{return d;} },
+  get(k, d=null){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
 };
-
+const cityInputFree = document.getElementById('cityInputFree');
 let lastPayload = null;
 
 function setThinking(on) {
@@ -76,6 +76,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const last = LS.get('vfied:lastPayload');
   const mood = LS.get('vfied:mood');
   const diet = LS.get('vfied:dietary', []);
+  const budg = LS.get('vfied:budget');
+  const savedCity = LS.get('vfied:city'); 
+  
+  if(savedCity && cityInputFree) cityInputFree.value = savedCity;
 
   if (mood) document.getElementById('moodInput').value = mood;
   if (diet?.length) {
@@ -84,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (el) el.checked = true;
     });
   }
+  if (budg) { budgetSelect.value = budg; }
 
   // If you're using #citySelect with JSON options, try to match country_code
   try {
@@ -110,18 +115,37 @@ function renderChips() {
 }
 renderChips();
 
+// Add after line 45 (after renderChips();):
+// Save on change
+moodInput?.addEventListener('input', e => LS.set('vfied:mood', e.target.value));
+budgetSelect?.addEventListener('change', e => LS.set('vfied:budget', e.target.value));
+
+// Save dietary on change
+chipsWrap?.addEventListener('change', () => {
+  const vals = Array.from(chipsWrap.querySelectorAll('input[type="checkbox"]:checked')).map(x => x.value);
+  LS.set('vfied:dietary', vals);
+});
+
+// Save location (citySelect holds JSON per option)
+citySelect?.addEventListener('change', e => {
+  try {
+    const val = JSON.parse(e.target.value);
+    LS.set('vfied:location', val);
+  } catch {}
+});
+// Add after existing save handlers:
+cityInputFree?.addEventListener('input', e => LS.set('vfied:city', e.target.value));
 function getSelectedDietary() {
   return Array.from(chipsWrap.querySelectorAll('input[type="checkbox"]:checked')).map(c => c.value);
 }
 
 function getLocation() {
-  const countrySel = document.getElementById('countrySelect'); // optional
-  const citySel = document.getElementById('citySelect');       // you have this
-  let base = { city: 'London', country: 'United Kingdom', country_code: 'GB' }; // safe default
+  const countrySel = document.getElementById('countrySelect');
+  const citySel = document.getElementById('citySelect');
+  let base = { city: 'London', country: 'United Kingdom', country_code: 'GB' };
 
   try {
     if (countrySel && countrySel.value) {
-      // expects {"name":"Kenya","code":"KE"} or similar
       const c = JSON.parse(countrySel.value);
       base = {
         city: '',
@@ -129,15 +153,18 @@ function getLocation() {
         country_code: c.code || c.country_code || ''
       };
     } else if (citySel && citySel.value) {
-      // your #citySelect options already contain full JSON
       base = JSON.parse(citySel.value);
     }
   } catch (e) {
     console.warn("getLocation() parse failed, using default:", e);
   }
 
-  const lat = parseFloat(document.getElementById('latInput')?.value ?? "");
-  const lng = parseFloat(document.getElementById('lngInput')?.value ?? "");
+  // City override from free input
+  const cityOverride = cityInputFree?.value?.trim();
+  if (cityOverride) base.city = cityOverride;
+
+  const lat = parseFloat(latInput?.value ?? "");
+  const lng = parseFloat(lngInput?.value ?? "");
   if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
     base.latitude = lat;
     base.longitude = lng;
@@ -203,12 +230,7 @@ if (detectMoodBtn) {
     setTimeout(() => (detectMoodBtn.textContent = '✨ Detect Mood (AI)'), 1200);
   });
 }
-// ------------------ AUTO-SAVE USER INPUT ------------------
-document.getElementById('moodInput')?.addEventListener('input', e => LS.set('vfied:mood', e.target.value));
-document.getElementById('dietaryChips')?.addEventListener('change', () => {
-  const vals = Array.from(document.querySelectorAll('#dietaryChips input:checked')).map(x=>x.value);
-  LS.set('vfied:dietary', vals);
-});
+
 
 // ------------------ MAIN RECOMMEND CALL ------------------
 decideBtn?.addEventListener('click', async () => {
@@ -233,7 +255,6 @@ decideBtn?.addEventListener('click', async () => {
     if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
 
     // show result
-    document.getElementById('resultCard').style.display = 'block';
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
     const food = data.food || {};
@@ -242,11 +263,26 @@ decideBtn?.addEventListener('click', async () => {
     set('friendMessage', data.friendMessage || data.description || '');
     set('reasoning',  data.reasoning || data.reason || '');
     set('culturalNote', data.culturalNote || '');
-    set('dietaryNote', data.dietaryNote || '');
-    set('weatherNote', data.weatherNote || data.weatherReasoning || '');
+    set('dietaryNote', data.dietaryNote || '—');
+    set('weatherNote', data.weatherNote || data.weatherReasoning || '—');
+
+    // flag + confidence + weather
     set('countryCode', food.country_code ? countryCodeToEmoji(food.country_code) : '—');
-    set('confidence', typeof data.confidence === 'number' ? `Confidence: ${data.confidence}%` : 'Confidence: —');
-    set('weatherBadge', data?.weather?.description ? `Weather: ${data.weather.temperature}°C • ${data.weather.description}` : 'Weather: —');
+    set('confidence', (typeof data.confidence === 'number') ? `Confidence: ${data.confidence}%` : 'Confidence: —');
+    set('weatherBadge',
+      (data?.weather?.description || (data?.weather && data.weather.temperature != null))
+        ? `Weather: ${data.weather.temperature ?? '—'}°C • ${data.weather.description ?? data.weather.condition ?? ''}`.trim()
+        : 'Weather: —'
+    );
+
+    // engine badge
+    const engineEl = document.getElementById('engineBadge');
+    if (engineEl) engineEl.textContent =
+      (data.source === 'gpt' || data.context?.mood_detection_method === 'ai') ? 'Engine: GPT' :
+      (data.source === 'uploaded_menu') ? 'Engine: Vendor Menu' : 'Engine: Fallback';
+
+    document.getElementById('resultCard').style.display = 'block';
+    
     fetch(`${SERVER}/v1/telemetry`, {
       method: 'POST', 
       headers: {'Content-Type':'application/json'},
@@ -289,7 +325,7 @@ document.getElementById('loadEventsBtn')?.addEventListener('click', async () => 
             <div class="event-meta">${e.when} — ${e.city} ${e.country_code}</div>
             <div class="event-meta">${pairing}</div>
             <div class="event-cta">
-              <button class="secondary small" disabled>Book (coming soon)</button>
+              <a class="small secondary" href="${SERVER}/v1/linkout?tag=event&url=${encodeURIComponent(`https://www.google.com/search?q=${encodeURIComponent(`${e.title} ${e.city}`)}`)}" target="_blank" rel="noopener">Book (demo)</a>
               <button class="small" onclick="document.getElementById('decideBtn').scrollIntoView({behavior:'smooth'});">Suggest food</button>
             </div>
           </div>
@@ -335,6 +371,7 @@ document.getElementById('loadTravelBtn')?.addEventListener('click', async () => 
           <div class="travel-note">${d.note || ''}</div>
           <div class="travel-cta">
             <button class="small" data-suggest='${encodeURIComponent(JSON.stringify(d))}'>Suggest this</button>
+            <button class="small" onclick="window.open('${SERVER}/v1/linkout?tag=maps&url=${encodeURIComponent(`https://www.google.com/maps/search/${encodeURIComponent(`${d.name} ${loc.city||''}`)}`)}}','_blank','noopener')">Open in Maps</button>
           </div>
         </div>
       </div>
@@ -385,13 +422,20 @@ document.getElementById('acceptBtn').addEventListener('click', () => {
   resultCard.style.display = 'none';
 });
 document.getElementById('tryAgainBtn')?.addEventListener('click', async () => {
-  if (!lastPayload) return document.getElementById('decideBtn')?.click();
+  const btn = document.getElementById('tryAgainBtn');
+  btn.disabled = true;
   setThinking(true);
   try {
+    const payload = lastPayload || {
+      location: getLocation(),
+      mood_text: (moodInput?.value || 'hungry'),
+      dietary: getSelectedDietary ? getSelectedDietary() : [],
+      budget: budgetSelect?.value || 'medium',
+      menu_source: 'global_database'
+    };
     const res  = await fetch(`${SERVER}/v1/recommend`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(lastPayload)
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
@@ -401,15 +445,11 @@ document.getElementById('tryAgainBtn')?.addEventListener('click', async () => {
     document.getElementById('foodEmoji').textContent = data.food?.emoji || '🍽️';
     document.getElementById('foodName').textContent  = data.food?.name  || 'Great Choice';
     document.getElementById('friendMessage').textContent = data.friendMessage || '';
-    fetch(`${SERVER}/v1/telemetry`, {
-      method: 'POST', 
-      headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ event: 'decide_retry', payload: lastPayload })
-    }).catch(()=>{});
   } catch (e) {
     alert(`Error: ${e.message}`);
   } finally {
     setThinking(false);
+    btn.disabled = false;
   }
 });
 
@@ -419,31 +459,33 @@ uploadMenuBtn.addEventListener('click', async () => {
     const menu = JSON.parse(menuTextarea.value);
     const res = await fetch(`${SERVER}/v1/menus`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${API_KEY}`
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${API_KEY}` },
       body: JSON.stringify({ mode: 'snapshot', menu })
     });
     const data = await res.json();
-    if (data.success) {
-      alert('✅ Menu uploaded!');
-      menuResponse.textContent = JSON.stringify(data, null, 2);
-      
-      // Auto-suggest from uploaded menu
-      const recRes = await fetch(`${SERVER}/v1/recommend`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${API_KEY}` },
-        body: JSON.stringify({ menu_source: "my_uploaded_menu" })
-      });
-      const recData = await recRes.json();
-      menuResponse.textContent += "\n\nSuggestion:\n" + JSON.stringify(recData, null, 2);
-    } else {
-      menuResponse.textContent = JSON.stringify(data, null, 2);
-    }
 
+    if (!res.ok) throw new Error(data.error || 'Upload failed');
+
+    const accepted = (data.summary?.accepted ?? 0);
+    const total    = (data.summary?.total ?? menu.length);
+    const names    = Array.isArray(menu) ? menu.map(m => m.name).filter(Boolean).join(', ') : '';
+
+    menuResponse.textContent =
+      `✅ Menu uploaded (accepted ${accepted}/${total})\n`+
+      `version: ${data.menu_version}\n`+
+      (names ? `items: ${names}\n` : '') +
+      (data.errors?.length ? `errors: ${JSON.stringify(data.errors, null, 2)}` : '');
+
+    // Optional: preview a suggestion from uploaded menu
+    const recRes = await fetch(`${SERVER}/v1/recommend`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${API_KEY}` },
+      body: JSON.stringify({ menu_source: "my_uploaded_menu" })
+    });
+    const recData = await recRes.json();
+    menuResponse.textContent += `\n\nSuggestion → ${recData?.food?.name || 'n/a'} ${recData?.food?.emoji || ''}`;
   } catch (e) {
-    menuResponse.textContent = `Error: ${e.message}`;
+    menuResponse.textContent = `❌ ${e.message}`;
   }
 });
 // ------------------ SERVICE WORKER ------------------
@@ -462,4 +504,22 @@ viewMenuBtn.addEventListener('click', async () => {
   } catch (e) {
     menuResponse.textContent = `Error: ${e.message}`;
   }
+});
+// Add at the very end of main.js:
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt', (e)=>{
+  e.preventDefault(); 
+  deferredPrompt=e;
+  const b=document.getElementById('installBanner'); 
+  if(b) b.style.display='block';
+});
+document.getElementById('installBtn')?.addEventListener('click', async ()=>{
+  if(!deferredPrompt) return;
+  deferredPrompt.prompt(); 
+  await deferredPrompt.userChoice; 
+  deferredPrompt=null;
+  document.getElementById('installBanner').style.display='none';
+});
+document.getElementById('installClose')?.addEventListener('click', ()=>{
+  document.getElementById('installBanner').style.display='none';
 });
