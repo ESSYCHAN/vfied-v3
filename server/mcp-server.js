@@ -592,7 +592,10 @@ app.post('/v1/recommend', async (req, res) => {
   const items = vendorMenus.get(resolvedVendorId).items.filter(i => i.availability !== 'archived');
   const food = items[Math.floor(Math.random() * items.length)];
   const weather = await getWeather(location).catch(() => null);
-  
+  if (gpt && gpt.success) {
+    console.log('[VFIED] recommend → using GPT', { city: location?.city, cc: location?.country_code, mood: mood_text });
+    return res.json(gpt);
+  } 
   return res.json({
     success: true,
     request_id,
