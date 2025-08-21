@@ -226,7 +226,64 @@ function fallbackSuggestion(location, dietary = []) {
   }
   return picks[Math.floor(Math.random() * picks.length)];
 }
+// --- Moods extractor + fallback ---
+function extractMoodsFromModule(mod) {
+  // Accept shapes: default[], {moods:[]}, plain[], or object map
+  const candidates = [];
+  const tryPush = (val) => {
+    if (!val) return;
+    if (Array.isArray(val)) candidates.push(val);
+    else if (typeof val === 'object') {
+      const vals = Object.values(val);
+      if (vals.length && typeof vals[0] === 'object') candidates.push(vals);
+    }
+  };
+  tryPush(mod?.default);
+  tryPush(mod?.moods);
+  tryPush(mod);
+  Object.values(mod || {}).forEach(tryPush);
+  const arr = candidates.sort((a,b)=>b.length-a.length)[0] || [];
+  return Array.isArray(arr) ? arr : [];
+}
 
+// Normalize one mood into { id, group, synonyms[] }
+function normalizeMood(m) {
+  const id = (m?.id || m?.ID || m?.name || '').toString().trim().toUpperCase();
+  const group = (m?.group || m?.category || 'Emotion').toString();
+  const synonyms = Array.isArray(m?.synonyms) ? m.synonyms : [];
+  return id ? { id, group, synonyms } : null;
+}
+
+// Fallback taxonomy (covers your OpenAPI enum)
+const MOODS_FALLBACK = [
+  { id: 'TIRED',        group: 'Energy',  synonyms: ['exhausted','sleepy','low energy','fatigued'] },
+  { id: 'STRESSED',     group: 'Emotion', synonyms: ['anxious','tense','overwhelmed','deadline'] },
+  { id: 'CELEBRATING',  group: 'Social',  synonyms: ['party','treat','reward','birthday','win'] },
+  { id: 'HUNGRY',       group: 'Body',    synonyms: ['starving','very hungry','need food fast'] },
+  { id: 'POST_WORKOUT', group: 'Body',    synonyms: ['gym','post workout','protein','recovery'] },
+  { id: 'SICK',         group: 'Body',    synonyms: ['flu','cold','under the weather','sore throat'] },
+  { id: 'FOCUSED',      group: 'Intent',  synonyms: ['work mode','deep work','productive'] },
+  { id: 'RELAX',        group: 'Emotion', synonyms: ['cozy','chill','comforting','calm'] },
+  { id: 'ADVENTUROUS',  group: 'Intent',  synonyms: ['spicy','new cuisine','explore','try something new'] },
+];
+function detectMoodIds(mood_text) {
+  if (!mood_text) return [];
+  const t = mood_text.toLowerCase();
+  const hits = [];
+  for (const m of MOODS_TAXONOMY) {
+    if (t.includes(m.id.toLowerCase())) { hits.push(m.id); continue; }
+    if (m.synonyms?.some(s => t.includes(s.toLowerCase()))) { hits.push(m.id); }
+  }
+  // de-dup + cap to 3
+  return [...new Set(hits)].slice(0,3);
+}
+// Build taxonomy once at boot
+const rawMoods = extractMoodsFromModule(moodsModule)
+  .map(normalizeMood)
+  .filter(Boolean);
+
+// Use file if non-empty, else fallback
+const MOODS_TAXONOMY = rawMoods.length ? rawMoods : MOODS_FALLBACK;
 // --- Validation schemas ---
 const quickDecisionSchema = Joi.object({
   location: Joi.object({
@@ -289,8 +346,8 @@ return res.json({
   request_id,
   context: {
     original_mood_text: mood_text || null,
-    resolved_moods: [],
-    mood_detection_method: (gpt ? 'ai' : (mood_text ? 'regex_fallback' : 'explicit')),
+    resolved_moods,
+    mood_detection_method,
     location,
     dietary,
     source: base.source === 'uploaded_menu' ? 'uploaded_menu' : 'global_database'
@@ -772,7 +829,7 @@ app.post('/v1/quick_decision', async (req, res) => {
 
 // Add GET /v1/moods
 app.get('/v1/moods', (_req, res) => {
-  res.json({ moods: Array.isArray(moods) ? moods : [] });
+  res.json({ moods: MOODS_TAXONOMY });
 });
 
 // Add POST /mcp/get_cultural_food_context
