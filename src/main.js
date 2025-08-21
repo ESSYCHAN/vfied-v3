@@ -256,6 +256,80 @@ document.getElementById('loadEventsBtn')?.addEventListener('click', async () => 
     grid.innerHTML = '<div class="muted">Failed to load events.</div>';
   }
 });
+//------------------- TRAVEL  ------------------
+document.getElementById('loadTravelBtn')?.addEventListener('click', async () => {
+  const grid  = document.getElementById('travelGrid');
+  const intro = document.getElementById('travelIntro');
+  if (!grid) return;
+
+  const loc = getLocation();
+  const url = `${SERVER}/v1/travel/highlights?city=${encodeURIComponent(loc.city||'')}&country_code=${encodeURIComponent(loc.country_code||'')}`;
+
+  grid.innerHTML = '<div class="muted">Loading must-try…</div>';
+  intro.textContent = '';
+
+  try {
+    const r = await fetch(url);
+    const data = await r.json();
+    intro.textContent = data?.intro || '';
+
+    const dishes = data?.dishes || [];
+    if (!dishes.length) {
+      grid.innerHTML = '<div class="muted">No highlights yet.</div>';
+      return;
+    }
+
+    grid.innerHTML = dishes.map(d => `
+      <div class="travel-card">
+        <div class="travel-emoji">${d.emoji || '🍽️'}</div>
+        <div class="travel-body">
+          <div class="travel-title">${d.name}</div>
+          <div class="travel-note">${d.note || ''}</div>
+          <div class="travel-cta">
+            <button class="small" data-suggest='${encodeURIComponent(JSON.stringify(d))}'>Suggest this</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+
+  } catch (e) {
+    grid.innerHTML = '<div class="muted">Failed to load highlights.</div>';
+  }
+});
+
+// Delegate clicks on "Suggest this" to trigger your existing Decide flow
+document.getElementById('tab-travel')?.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-suggest]');
+  if (!btn) return;
+  try {
+    const d = JSON.parse(decodeURIComponent(btn.dataset.suggest));
+    // Build a payload that biases the suggestion to this dish name
+    const loc = getLocation();
+    const mood_text = `I want to try ${d.name}`;
+    const payload = { location: loc, mood_text, dietary: [], budget: 'medium', menu_source: 'global_database' };
+
+    // Optional: smooth scroll to result
+    document.getElementById('decideBtn')?.scrollIntoView({ behavior:'smooth', block:'center' });
+
+    // Call your existing recommend endpoint
+    const res = await fetch(`${SERVER}/v1/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
+
+    // Render result card
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('foodEmoji').textContent = data.food?.emoji || (d.emoji || '🍽️');
+    document.getElementById('foodName').textContent  = data.food?.name  || d.name;
+    document.getElementById('friendMessage').textContent = data.friendMessage || `Great pick for ${loc.city || 'your trip'}!`;
+
+  } catch (err) {
+    alert('Could not suggest this item.');
+  }
+});
 
 // ------------------ ACCEPT / RETRY ------------------
 document.getElementById('acceptBtn').addEventListener('click', () => {

@@ -444,6 +444,59 @@ app.get('/health', (_req, res) => {
   });
 });
 
+// Phase-2: Travel highlights (mock data, region-aware)
+app.get('/v1/travel/highlights', (req, res) => {
+  const city = String(req.query.city || 'Nairobi');
+  const cc   = String(req.query.country_code || 'KE').toUpperCase();
+
+  const DB = {
+    KE: {
+      intro: `Essential Kenyan bites in ${city}`,
+      dishes: [
+        { name: 'Nyama Choma', emoji: '🍖', note: 'Grilled goat/beef, classic weekend vibe' },
+        { name: 'Ugali & Sukuma', emoji: '🥬', note: 'Cornmeal with greens — true staple' },
+        { name: 'Pilau', emoji: '🍚', note: 'Spiced rice with coastal aroma' },
+        { name: 'Mutura', emoji: '🌭', note: 'Street sausage, late-night legend' },
+        { name: 'Tilapia Fry', emoji: '🐟', note: 'Lakeside crispy fish' }
+      ]
+    },
+    GB: {
+      intro: `Must-try UK comfort in ${city}`,
+      dishes: [
+        { name: 'Fish and Chips', emoji: '🍟', note: 'Seaside classic, vinegar mandatory' },
+        { name: 'Full English', emoji: '🍳', note: 'Hearty breakfast plate' },
+        { name: 'Chicken Tikka Masala', emoji: '🍛', note: 'Brit-Indian icon' },
+        { name: 'Sunday Roast', emoji: '🥩', note: 'Yorkshire puds + gravy' },
+        { name: 'Sticky Toffee Pudding', emoji: '🍰', note: 'Dessert royalty' }
+      ]
+    },
+    JP: {
+      intro: `Essentials of Japan in ${city}`,
+      dishes: [
+        { name: 'Ramen', emoji: '🍜', note: 'Broth & noodles heaven' },
+        { name: 'Sushi', emoji: '🍣', note: 'Nigiri/rolls — go fresh' },
+        { name: 'Okonomiyaki', emoji: '🥞', note: 'Savory pancake' },
+        { name: 'Katsu Curry', emoji: '🍛', note: 'Crispy cutlet + curry' },
+        { name: 'Takoyaki', emoji: '🧆', note: 'Octopus balls street snack' }
+      ]
+    },
+    US: {
+      intro: `American hits in ${city}`,
+      dishes: [
+        { name: 'Burger', emoji: '🍔', note: 'Smash or stacked' },
+        { name: 'BBQ Brisket', emoji: '🥩', note: 'Low & slow' },
+        { name: 'New York Slice', emoji: '🍕', note: 'Fold and go' },
+        { name: 'Poke Bowl', emoji: '🥗', note: 'Hawaiian fresh' },
+        { name: 'Chicken & Waffles', emoji: '🧇', note: 'Sweet + savory brunch' }
+      ]
+    }
+  };
+
+  const pack = DB[cc] || { intro: `Local picks in ${city}`, dishes: [{ name:'Chef’s choice', emoji:'🍽️', note:'Explore nearby' }] };
+  res.json({ success: true, city, country_code: cc, intro: pack.intro, dishes: pack.dishes });
+});
+
+
 // --- Error handler (last) ---
 app.use((err, _req, res, _next) => {
   console.error('Server error:', err);
