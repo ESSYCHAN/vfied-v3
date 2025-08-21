@@ -39,6 +39,17 @@ const DIETARY = [
   'vegetarian','vegan','gluten-free','dairy-free','keto','halal',
   'kosher','nut-free','paleo','pescatarian'
 ];
+
+let lastPayload = null;
+
+function setThinking(on) {
+  const btn = document.getElementById('decideBtn');
+  if (!btn) return;
+  btn.disabled = !!on;
+  btn.textContent = on ? '🤖 Thinking...' : '🎯 Decide For Me';
+  btn.setAttribute('aria-busy', on ? 'true' : 'false');
+}
+
 function activateTab(name) {
   document.querySelectorAll('.tab').forEach(btn => {
     const isActive = btn.dataset.tab === name;
@@ -134,16 +145,21 @@ countrySelect?.addEventListener("change", () => {
 });
 
 // ------------------ QUICK MOODS ------------------
-document.querySelectorAll('[data-quick]').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const map = {
-      tired: 'tired and need something comforting',
-      stressed: 'stressed but want something light',
-      celebrating: 'celebrating a small win',
-      hungry: 'very hungry and need food fast'
-    };
-    moodInput.value = map[btn.dataset.quick] || btn.dataset.quick;
-  });
+document.getElementById('quickMoods')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mood-chip');
+  if (!btn) return;
+  // visual active
+  document.querySelectorAll('.mood-chip').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  const map = {
+    tired: 'tired and need something comforting',
+    stressed: 'stressed but want something light',
+    celebrating: 'celebrating a small win',
+    hungry: 'very hungry and need food fast'
+  };
+  const val = map[btn.dataset.quick] || btn.dataset.quick;
+  document.getElementById('moodInput').value = val;
 });
 
 // OPTIONAL demo mood detection
@@ -159,73 +175,85 @@ if (detectMoodBtn) {
 
 // ------------------ MAIN RECOMMEND CALL ------------------
 decideBtn?.addEventListener('click', async () => {
-  decideBtn.disabled = true;
-  decideBtn.textContent = '🤖 Thinking...';
-  
   const mood_text = (document.getElementById('moodInput')?.value || '').trim() || 'hungry';
   const location  = getLocation();
   const chipsWrap = document.getElementById('dietaryChips');
   const dietary   = chipsWrap ? Array.from(chipsWrap.querySelectorAll('input[type="checkbox"]:checked')).map(c => c.value) : [];
   const budget    = document.getElementById('budgetSelect')?.value || 'medium';
-  
+
+  lastPayload = { location, mood_text, dietary, budget, menu_source: 'global_database' };
+
+  setThinking(true);
   try {
-    console.log("[VFIED] sending", { url: `${SERVER}/v1/recommend`, mood_text, location, dietary, budget });
-  
     const res  = await fetch(`${SERVER}/v1/recommend`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, // public endpoint; no key needed
-      body: JSON.stringify({ location, mood_text, dietary, budget, menu_source: 'global_database' })
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lastPayload)
     });
-  
     const text = await res.text();
-    let data;
-    try { data = JSON.parse(text); } catch { throw new Error(`Bad JSON: ${text.slice(0,140)}…`); }
-  
-    console.log("[VFIED] response", res.status, data);
-  
+    const data = JSON.parse(text);
+
     if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
-  
-    // --- Resilient rendering (works even if some elements are missing) ---
-    const rc = document.getElementById('resultCard');
-    if (rc?.style) rc.style.display = 'block';
-  
+
+    // show result
+    document.getElementById('resultCard').style.display = 'block';
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
     const food = data.food || {};
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  
-    set('foodEmoji',     food.emoji || '🍽️');
-    set('foodName',      food.name  || 'Great Choice');
+    set('foodEmoji',  food.emoji || '🍽️');
+    set('foodName',   food.name  || 'Great Choice');
     set('friendMessage', data.friendMessage || data.description || '');
-    set('reasoning',     data.reasoning || data.reason || '');
-    set('culturalNote',  data.culturalNote || '');
-    set('dietaryNote',   data.dietaryNote || '');
-    set('weatherNote',   data.weatherNote || data.weatherReasoning || '');
-    set('countryCode',   food.country_code ? (typeof countryCodeToEmoji === 'function' ? countryCodeToEmoji(food.country_code) : food.country_code) : '—');
-    set('confidence',    typeof data.confidence === 'number' ? `Confidence: ${data.confidence}%` : 'Confidence: —');
-    set('weatherBadge',  data?.weather?.description ? `Weather: ${data.weather.temperature}°C • ${data.weather.description}` : 'Weather: —');
-  
+    set('reasoning',  data.reasoning || data.reason || '');
+    set('culturalNote', data.culturalNote || '');
+    set('dietaryNote', data.dietaryNote || '');
+    set('weatherNote', data.weatherNote || data.weatherReasoning || '');
+    set('countryCode', food.country_code ? countryCodeToEmoji(food.country_code) : '—');
+    set('confidence', typeof data.confidence === 'number' ? `Confidence: ${data.confidence}%` : 'Confidence: —');
+    set('weatherBadge', data?.weather?.description ? `Weather: ${data.weather.temperature}°C • ${data.weather.description}` : 'Weather: —');
+
   } catch (e) {
-    console.error("[VFIED] decide error", e);
+    console.error(e);
     alert(`Error: ${e.message}`);
   } finally {
-    decideBtn.disabled = false;
-    decideBtn.textContent = '🎯 Decide For Me';
+    setThinking(false);
   }
 });
 //------------------- EVENTS  ------------------
 document.getElementById('loadEventsBtn')?.addEventListener('click', async () => {
+  const grid = document.getElementById('eventsGrid');
+  if (!grid) return;
   const loc = getLocation();
   const url = `${SERVER}/v1/events?city=${encodeURIComponent(loc.city||'')}&country_code=${encodeURIComponent(loc.country_code||'')}`;
-  const list = document.getElementById('eventsList');
-  list.innerHTML = '<li>Loading…</li>';
+  grid.innerHTML = '<div class="muted">Loading events…</div>';
   try {
     const r = await fetch(url);
     const data = await r.json();
     const events = data?.events || [];
-    list.innerHTML = events.length
-      ? events.map(e => `<li><strong>${e.title}</strong><br><span class="small muted">${e.when} — ${e.city} ${e.country_code}</span></li>`).join('')
-      : '<li>No events found.</li>';
+    if (!events.length) {
+      grid.innerHTML = '<div class="muted">No events found.</div>';
+      return;
+    }
+    grid.innerHTML = events.map(e => {
+      const pairing = (loc.country_code === 'KE') ? 'Try Nyama Choma nearby.' :
+                      (loc.country_code === 'GB') ? 'Pair with fish & chips.' :
+                      (loc.country_code === 'JP') ? 'Grab ramen after.' : 'Find a local favorite.';
+      const emoji = e.tag === 'music' ? '🎶' : e.tag === 'food' ? '🍢' : '🎬';
+      return `
+        <div class="event-card">
+          <div class="event-badge">${emoji}</div>
+          <div class="event-body">
+            <div class="event-title">${e.title}</div>
+            <div class="event-meta">${e.when} — ${e.city} ${e.country_code}</div>
+            <div class="event-meta">${pairing}</div>
+            <div class="event-cta">
+              <button class="secondary small" disabled>Book (coming soon)</button>
+              <button class="small" onclick="document.getElementById('decideBtn').scrollIntoView({behavior:'smooth'});">Suggest food</button>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
   } catch (e) {
-    list.innerHTML = '<li>Failed to load events.</li>';
+    grid.innerHTML = '<div class="muted">Failed to load events.</div>';
   }
 });
 
@@ -234,8 +262,28 @@ document.getElementById('acceptBtn').addEventListener('click', () => {
   alert('✅ Saved! Enjoy your meal.');
   resultCard.style.display = 'none';
 });
-document.getElementById('tryAgainBtn').addEventListener('click', () => {
-  decideBtn.click();
+document.getElementById('tryAgainBtn')?.addEventListener('click', async () => {
+  if (!lastPayload) return document.getElementById('decideBtn')?.click();
+  setThinking(true);
+  try {
+    const res  = await fetch(`${SERVER}/v1/recommend`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(lastPayload)
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
+
+    // minimal re-render
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('foodEmoji').textContent = data.food?.emoji || '🍽️';
+    document.getElementById('foodName').textContent  = data.food?.name  || 'Great Choice';
+    document.getElementById('friendMessage').textContent = data.friendMessage || '';
+  } catch (e) {
+    alert(`Error: ${e.message}`);
+  } finally {
+    setThinking(false);
+  }
 });
 
 // ------------------ VENDOR UPLOAD ------------------

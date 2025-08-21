@@ -865,3 +865,27 @@ button {
 
 /* --- Better result card text wrapping on mobile --- */
 #resultCard .result { word-break: break-word; }
+/* Quick mood chips */
+.mood-chip { transition: transform .04s ease; }
+.mood-chip.active { outline: 2px solid #6d28d9; transform: translateY(-1px); }
+
+/* Better disabled button look */
+button[disabled] { opacity: .6; cursor: not-allowed; }
+
+/* Events grid/cards */
+.events-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 700px) { .events-grid { grid-template-columns: 1fr; } }
+
+.event-card {
+  background:#0b1220; border:1px solid #263247; border-radius:14px; padding:12px;
+  display:flex; gap:10px; align-items:flex-start;
+}
+.event-badge { font-size:22px; line-height:1; }
+.event-body { flex:1; }
+.event-title { font-weight:700; }
+.event-meta { font-size:12px; opacity:.8; margin-top:4px; }
+.event-cta { margin-top:8px; display:flex; gap:8px; }

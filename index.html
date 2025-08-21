@@ -64,12 +64,11 @@
           <div>
             <label for="moodInput">How are you feeling?</label>
             <input id="moodInput" placeholder="e.g. stressed but want something light" style="width:100%; margin-top:6px" />
-            <div class="rowsm" style="margin-top:8px">
-              <button class="secondary" data-quick="tired">😴 Tired</button>
-              <button class="secondary" data-quick="stressed">😰 Stressed</button>
-              <button class="secondary" data-quick="celebrating">🎉 Celebrating</button>
-              <button class="secondary" data-quick="hungry">🤤 Hungry</button>
-              <button class="secondary" id="detectMoodBtn">✨ Detect Mood (AI)</button>
+            <div class="rowsm" id="quickMoods" style="margin-top:8px">
+              <button class="secondary mood-chip" data-quick="tired">😴 Tired</button>
+              <button class="secondary mood-chip" data-quick="stressed">😰 Stressed</button>
+              <button class="secondary mood-chip" data-quick="celebrating">🎉 Celebrating</button>
+              <button class="secondary mood-chip" data-quick="hungry">🤤 Hungry</button>
             </div>
           </div>
 
@@ -170,7 +169,7 @@
       </div>
 
       <div class="card">
-        <ul id="eventsList" class="event-list"></ul>
+        <div id="eventsGrid" class="events-grid"></div>
       </div>
     </section>
   </div>
