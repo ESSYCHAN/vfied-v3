@@ -272,56 +272,59 @@ app.post('/mcp/get_food_suggestion', async (req, res) => {
   }
   // fallback (existing)
   const pick = fallbackSuggestion(location, dietary);
-  const base = gpt || {
-    success: true,
-    source: 'global_database',
-    food: { name: pick.name, emoji: pick.emoji, country: location.country, country_code: (location.country_code || 'GB').toUpperCase() },
-    friendMessage: mood_text ? `Because you feel "${mood_text}", I suggest ${pick.name}.` : `I suggest ${pick.name}.`,
-    confidence: Math.floor(70 + Math.random() * 25),
-    dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null,
-    weatherNote: weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null
-  };
-  return res.json({
-    success: true,
-    request_id,
-    context: {
-      original_mood_text: mood_text || null,
-      resolved_moods: [],
-      mood_detection_method: (gpt ? 'ai' : (mood_text ? 'regex_fallback' : 'explicit')),
-      location,
-      dietary,
-      source: base.source === 'uploaded_menu' ? 'uploaded_menu' : 'global_database'
-    },
-    food: base.food,
-    friendMessage: base.friendMessage || '',
-    reasoning: base.reasoning || '',
-    culturalNote: base.culturalNote || null,
-    personalNote: null,
-    weatherNote: base.weatherNote || null,
-    availabilityNote: base.source === 'uploaded_menu' ? 'From uploaded vendor menu' : 'Widely available',
-    alternatives: base.alternatives || [],
-    confidence: typeof base.confidence === 'number' ? base.confidence : 80,
-    dietaryCompliance: { compliant: true, source: gpt ? 'ai' : 'fallback' },
-    dietaryNote: base.dietaryNote || null,
-    weather: weather ? {
-      temperature: weather.temperature,
-      condition: weather.condition,
-      description: weather.condition,
-      isRaining: !!weather.isRaining,
-      isCold: !!weather.isCold,
-      isHot: !!weather.isHot,
-      isComfortable: !(weather.isCold || weather.isHot),
-      simulated: false
-    } : null,
-    interactionId: `ix_${Date.now().toString(36)}`,
-    processingTimeMs: Date.now() - t0,
-    meta: {
-      hasWeather: !!weather,
-      hasDietary: dietary.length > 0,
-      dietaryRestrictions: dietary,
-      timestamp: new Date().toISOString()
-    }
-  });
+
+// After you have gpt result or fallback pick
+const base = gpt || {
+  success: true,
+  source: 'global_database',
+  food: { name: pick.name, emoji: pick.emoji, country: location.country, country_code: (location.country_code || 'GB').toUpperCase() },
+  friendMessage: mood_text ? `Because you feel "${mood_text}", I suggest ${pick.name}.` : `I suggest ${pick.name}.`,
+  confidence: Math.floor(70 + Math.random() * 25),
+  dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null,
+  weatherNote: weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null
+};
+
+return res.json({
+  success: true,
+  request_id,
+  context: {
+    original_mood_text: mood_text || null,
+    resolved_moods: [],
+    mood_detection_method: (gpt ? 'ai' : (mood_text ? 'regex_fallback' : 'explicit')),
+    location,
+    dietary,
+    source: base.source === 'uploaded_menu' ? 'uploaded_menu' : 'global_database'
+  },
+  food: base.food,
+  friendMessage: base.friendMessage || '',
+  reasoning: base.reasoning || '',
+  culturalNote: base.culturalNote || null,
+  personalNote: null,
+  weatherNote: base.weatherNote || null,
+  availabilityNote: base.source === 'uploaded_menu' ? 'From uploaded vendor menu' : 'Widely available',
+  alternatives: base.alternatives || [],
+  confidence: typeof base.confidence === 'number' ? base.confidence : 80,
+  dietaryCompliance: { compliant: true, source: gpt ? 'ai' : 'fallback' },
+  dietaryNote: base.dietaryNote || null,
+  weather: weather ? {
+    temperature: weather.temperature,
+    condition: weather.condition,
+    description: weather.condition,
+    isRaining: !!weather.isRaining,
+    isCold: !!weather.isCold,
+    isHot: !!weather.isHot,
+    isComfortable: !(weather.isCold || weather.isHot),
+    simulated: false
+  } : null,
+  interactionId: `ix_${Date.now().toString(36)}`,
+  processingTimeMs: Date.now() - t0,
+  meta: {
+    hasWeather: !!weather,
+    hasDietary: dietary.length > 0,
+    dietaryRestrictions: dietary,
+    timestamp: new Date().toISOString()
+  }
+});
 });
 // --- GPT helpers (fetch-based, no SDK) ---
 async function gptChatJSON({ system, user, model = OPENAI_MODEL }) {
@@ -592,7 +595,47 @@ app.post('/v1/recommend', async (req, res) => {
   }
 
   if (gpt && gpt.success) {
-    return res.json(gpt);
+    return res.json({
+      success: true,
+      request_id,
+      context: {
+        original_mood_text: mood_text || null,
+        resolved_moods: [],
+        mood_detection_method: 'ai',
+        location,
+        dietary,
+        source: 'global_database'
+      },
+      food: gpt.food,
+      friendMessage: gpt.friendMessage || '',
+      reasoning: gpt.reasoning || '',
+      culturalNote: gpt.culturalNote || null,
+      personalNote: null,
+      weatherNote: gpt.weatherNote || null,
+      availabilityNote: 'Widely available',
+      alternatives: gpt.alternatives || [],
+      confidence: gpt.confidence || 80,
+      dietaryCompliance: { compliant: true, source: 'ai' },
+      dietaryNote: gpt.dietaryNote || null,
+      weather: weather ? {
+        temperature: weather.temperature,
+        condition: weather.condition,
+        description: weather.condition,
+        isRaining: !!weather.isRaining,
+        isCold: !!weather.isCold,
+        isHot: !!weather.isHot,
+        isComfortable: !(weather.isCold || weather.isHot),
+        simulated: false
+      } : null,
+      interactionId: `ix_${Date.now().toString(36)}`,
+      processingTimeMs: Date.now() - t0,
+      meta: {
+        hasWeather: !!weather,
+        hasDietary: dietary.length > 0,
+        dietaryRestrictions: dietary,
+        timestamp: new Date().toISOString()
+      }
+    });
   }
 
   // Fallback (no key or GPT failed)
