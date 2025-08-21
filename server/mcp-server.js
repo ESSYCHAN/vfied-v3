@@ -272,12 +272,55 @@ app.post('/mcp/get_food_suggestion', async (req, res) => {
   }
   // fallback (existing)
   const pick = fallbackSuggestion(location, dietary);
-  res.json({
+  const base = gpt || {
     success: true,
-    friendMessage: `Try ${pick.name} ${pick.emoji} — ${weather?.isCold ? 'it will warm you up' : 'it suits today'}.`,
-    food: { name: pick.name, emoji: pick.emoji, country: location.country, country_code: location.country_code },
-    weather,
-    dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null
+    source: 'global_database',
+    food: { name: pick.name, emoji: pick.emoji, country: location.country, country_code: (location.country_code || 'GB').toUpperCase() },
+    friendMessage: mood_text ? `Because you feel "${mood_text}", I suggest ${pick.name}.` : `I suggest ${pick.name}.`,
+    confidence: Math.floor(70 + Math.random() * 25),
+    dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null,
+    weatherNote: weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null
+  };
+  return res.json({
+    success: true,
+    request_id,
+    context: {
+      original_mood_text: mood_text || null,
+      resolved_moods: [],
+      mood_detection_method: (gpt ? 'ai' : (mood_text ? 'regex_fallback' : 'explicit')),
+      location,
+      dietary,
+      source: base.source === 'uploaded_menu' ? 'uploaded_menu' : 'global_database'
+    },
+    food: base.food,
+    friendMessage: base.friendMessage || '',
+    reasoning: base.reasoning || '',
+    culturalNote: base.culturalNote || null,
+    personalNote: null,
+    weatherNote: base.weatherNote || null,
+    availabilityNote: base.source === 'uploaded_menu' ? 'From uploaded vendor menu' : 'Widely available',
+    alternatives: base.alternatives || [],
+    confidence: typeof base.confidence === 'number' ? base.confidence : 80,
+    dietaryCompliance: { compliant: true, source: gpt ? 'ai' : 'fallback' },
+    dietaryNote: base.dietaryNote || null,
+    weather: weather ? {
+      temperature: weather.temperature,
+      condition: weather.condition,
+      description: weather.condition,
+      isRaining: !!weather.isRaining,
+      isCold: !!weather.isCold,
+      isHot: !!weather.isHot,
+      isComfortable: !(weather.isCold || weather.isHot),
+      simulated: false
+    } : null,
+    interactionId: `ix_${Date.now().toString(36)}`,
+    processingTimeMs: Date.now() - t0,
+    meta: {
+      hasWeather: !!weather,
+      hasDietary: dietary.length > 0,
+      dietaryRestrictions: dietary,
+      timestamp: new Date().toISOString()
+    }
   });
 });
 // --- GPT helpers (fetch-based, no SDK) ---
@@ -469,6 +512,9 @@ Return STRICT JSON (no prose) shaped exactly like:
 
 // Optional vendor recommend that prefers menu if present
 app.post('/v1/recommend', async (req, res) => {
+  const t0 = Date.now();
+  const request_id = `req_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+
   const { location = {}, dietary = [], menu_source = 'global_database', vendor_id, mood_text = "" } = req.body || {};
 
   // Prefer uploaded menu if requested and available
@@ -483,24 +529,59 @@ app.post('/v1/recommend', async (req, res) => {
   } catch {}
 
   if ((menu_source === 'my_uploaded_menu' || resolvedVendorId) && resolvedVendorId && vendorMenus.has(resolvedVendorId)) {
-    const items = vendorMenus.get(resolvedVendorId).items.filter(i => i.availability !== 'archived');
-    const food = items[Math.floor(Math.random() * items.length)];
-    return res.json({
-      success: true,
-      source: 'uploaded_menu',
-      food: {
-        menu_item_id: food.menu_item_id,
-        name: food.name,
-        emoji: food.emoji || '🍽️',
-        price: food.price,
-        description: food.description,
-        country_code: food.country_code
-      },
-      friendMessage: `From your menu, try ${food.name}.`,
-      confidence: 95,
-      dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null
-    });
-  }
+  const items = vendorMenus.get(resolvedVendorId).items.filter(i => i.availability !== 'archived');
+  const food = items[Math.floor(Math.random() * items.length)];
+  const weather = await getWeather(location).catch(() => null);
+  
+  return res.json({
+    success: true,
+    request_id,
+    context: {
+      original_mood_text: mood_text || null,
+      resolved_moods: [],
+      mood_detection_method: mood_text ? 'regex_fallback' : 'explicit',
+      location,
+      dietary,
+      source: 'uploaded_menu'
+    },
+    food: {
+      menu_item_id: food.menu_item_id,
+      name: food.name,
+      emoji: food.emoji || '🍽️',
+      price: food.price,
+      description: food.description,
+      country_code: food.country_code
+    },
+    friendMessage: `From your menu, try ${food.name}.`,
+    reasoning: '',
+    culturalNote: null,
+    personalNote: null,
+    weatherNote: weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null,
+    availabilityNote: 'From uploaded vendor menu',
+    alternatives: [],
+    confidence: 95,
+    dietaryCompliance: { compliant: true, source: 'fallback' },
+    dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null,
+    weather: weather ? {
+      temperature: weather.temperature,
+      condition: weather.condition,
+      description: weather.condition,
+      isRaining: !!weather.isRaining,
+      isCold: !!weather.isCold,
+      isHot: !!weather.isHot,
+      isComfortable: !(weather.isCold || weather.isHot),
+      simulated: false
+    } : null,
+    interactionId: `ix_${Date.now().toString(36)}`,
+    processingTimeMs: Date.now() - t0,
+    meta: {
+      hasWeather: !!weather,
+      hasDietary: dietary.length > 0,
+      dietaryRestrictions: dietary,
+      timestamp: new Date().toISOString()
+    }
+  });
+}
 
   // Global path → try GPT first (if key present), else fallback
   const weather = await getWeather(location).catch(() => null);
@@ -540,15 +621,37 @@ app.get('/v1/events', (req, res) => {
 });
 // --- Countries & health ---
 app.get('/v1/countries', (_req, res) => {
-  // Always returns something; sorted by name
-  const out = [...COUNTRIES_LIST].sort((a, b) => a.name.localeCompare(b.name));
+  const out = [...COUNTRIES_LIST]
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .map(c => ({
+      name: c.name,
+      country_code: c.code,
+      region: c.region || '—',
+      cuisine: c.cuisine || '—'
+    }));
   res.json({ countries: out });
 });
 
 app.get('/health', (_req, res) => {
   res.json({
     status: 'healthy',
-    service: 'VFIED MCP Server (clean)',
+    service: 'VFIED MCP Server',
+    version: '2.1.0',
+    features: [
+      'recommend/global',
+      'recommend/vendor',
+      'countries',
+      'moods',
+      'quick_decision',
+      'dietary_validation',
+      'cultural_context',
+      'events_mock',
+      'travel_highlights'
+    ],
+    services: {
+      weather: !!process.env.OPENWEATHER_API_KEY,
+      gpt: !!(process.env.USE_GPT && process.env.OPENAI_API_KEY)
+    },
     timestamp: new Date().toISOString()
   });
 });
@@ -604,7 +707,71 @@ app.get('/v1/travel/highlights', (req, res) => {
   const pack = DB[cc] || { intro: `Local picks in ${city}`, dishes: [{ name:'Chef’s choice', emoji:'🍽️', note:'Explore nearby' }] };
   res.json({ success: true, city, country_code: cc, intro: pack.intro, dishes: pack.dishes });
 });
+// Add POST /v1/quick_decision
+app.post('/v1/quick_decision', async (req, res) => {
+  const t0 = Date.now();
+  const request_id = `req_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+  const { location = {}, dietary = [] } = req.body || {};
 
+  const pick = fallbackSuggestion(location, dietary);
+  const explanation = `Quick pick based on your location${dietary.length ? ` and ${dietary.join(', ')}` : ''}.`;
+
+  res.json({
+    success: true,
+    request_id,
+    decision: pick.name,
+    country_code: (location.country_code || 'GB').toUpperCase(),
+    explanation,
+    dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : undefined,
+    processingTimeMs: Date.now() - t0
+  });
+});
+
+// Add GET /v1/moods
+app.get('/v1/moods', (_req, res) => {
+  res.json({ moods: Array.isArray(moods) ? moods : [] });
+});
+
+// Add POST /mcp/get_cultural_food_context
+app.post('/mcp/get_cultural_food_context', (req, res) => {
+  const { location = {}, dietary = [] } = req.body || {};
+  const city = location.city || 'your city';
+  const cc = (location.country_code || 'GB').toUpperCase();
+
+  const presets = {
+    KE: {
+      mainCuisine: 'East African',
+      popularFoods: ['Nyama Choma', 'Ugali & Sukuma', 'Pilau'],
+      comfortFoods: ['Githeri', 'Ndengu'],
+      streetFoods: ['Mutura', 'Smokie Pasua'],
+      celebrationFoods: ['Goat Feast', 'Biriyani (Coast)'],
+      culturalNotes: 'Weekend grilling culture; coastal spice influence.'
+    },
+    GB: {
+      mainCuisine: 'British & Global Fusion',
+      popularFoods: ['Fish & Chips', 'Sunday Roast', 'Chicken Tikka Masala'],
+      comfortFoods: ['Shepherds Pie', 'Full English'],
+      streetFoods: ['Kebab', 'Bao, Tacos (markets)'],
+      celebrationFoods: ['Roast Dinner', 'Pies'],
+      culturalNotes: 'Pub culture; strong South Asian influence.'
+    }
+  };
+  const pack = presets[cc] || {
+    mainCuisine: 'Local',
+    popularFoods: ['Chefs choice'],
+    comfortFoods: ['Local comfort meals'],
+    streetFoods: ['Local snacks'],
+    celebrationFoods: ['Local feasts'],
+    culturalNotes: 'Explore local markets and staples.'
+  };
+
+  res.json({
+    success: true,
+    ...pack,
+    dietaryFriendlyOptions: dietary.length ? Object.fromEntries(dietary.map(tag => [tag, []])) : {},
+    location: `${city} (${cc})`
+  });
+});
 app.post('/v1/telemetry', (req, res) => {
   const { event, payload } = req.body || {};
   // In real life, write to a DB / log drain. For now, console is fine.
