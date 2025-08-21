@@ -131,6 +131,13 @@ app.use(cors({
   ],
   credentials: true
 }));
+app.use('/src', express.static(path.resolve(__dirname, '../src')));
+app.use('/assets', express.static(path.resolve(__dirname, '../assets')));
+app.use('/public', express.static(path.resolve(__dirname, '../public')));
+
+// If you have a built version, also serve that:
+app.use(express.static(path.resolve(__dirname, '../dist')));
+
 app.use(helmet());
 app.use(rateLimit({ windowMs: 60_000, max: 300 }));
 app.use(express.json({ limit: '1mb' }));
