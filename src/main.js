@@ -144,31 +144,52 @@ if (detectMoodBtn) {
 
 // ------------------ MAIN RECOMMEND CALL ------------------
 decideBtn?.addEventListener('click', async () => {
-  console.log("[VFIED] Decide clicked");
-
+  decideBtn.disabled = true;
+  decideBtn.textContent = '🤖 Thinking...';
+  
   const mood_text = (document.getElementById('moodInput')?.value || '').trim() || 'hungry';
   const location  = getLocation();
   const chipsWrap = document.getElementById('dietaryChips');
-  const dietary   = chipsWrap
-    ? Array.from(chipsWrap.querySelectorAll('input[type="checkbox"]:checked')).map(c => c.value)
-    : [];
+  const dietary   = chipsWrap ? Array.from(chipsWrap.querySelectorAll('input[type="checkbox"]:checked')).map(c => c.value) : [];
   const budget    = document.getElementById('budgetSelect')?.value || 'medium';
-
-  decideBtn.disabled = true;
-  decideBtn.textContent = '🤖 Thinking...';
-
+  
   try {
+    console.log("[VFIED] sending", { url: `${SERVER}/v1/recommend`, mood_text, location, dietary, budget });
+  
     const res  = await fetch(`${SERVER}/v1/recommend`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' }, // no key needed for public recommend
+      headers: { 'Content-Type': 'application/json' }, // public endpoint; no key needed
       body: JSON.stringify({ location, mood_text, dietary, budget, menu_source: 'global_database' })
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Request failed');
-
-    // ... render as you already do ...
+  
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { throw new Error(`Bad JSON: ${text.slice(0,140)}…`); }
+  
+    console.log("[VFIED] response", res.status, data);
+  
+    if (!res.ok || !data?.success) throw new Error(data?.error || `HTTP ${res.status}`);
+  
+    // --- Resilient rendering (works even if some elements are missing) ---
+    const rc = document.getElementById('resultCard');
+    if (rc?.style) rc.style.display = 'block';
+  
+    const food = data.food || {};
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  
+    set('foodEmoji',     food.emoji || '🍽️');
+    set('foodName',      food.name  || 'Great Choice');
+    set('friendMessage', data.friendMessage || data.description || '');
+    set('reasoning',     data.reasoning || data.reason || '');
+    set('culturalNote',  data.culturalNote || '');
+    set('dietaryNote',   data.dietaryNote || '');
+    set('weatherNote',   data.weatherNote || data.weatherReasoning || '');
+    set('countryCode',   food.country_code ? (typeof countryCodeToEmoji === 'function' ? countryCodeToEmoji(food.country_code) : food.country_code) : '—');
+    set('confidence',    typeof data.confidence === 'number' ? `Confidence: ${data.confidence}%` : 'Confidence: —');
+    set('weatherBadge',  data?.weather?.description ? `Weather: ${data.weather.temperature}°C • ${data.weather.description}` : 'Weather: —');
+  
   } catch (e) {
-    console.error("[VFIED] Decide error:", e);
+    console.error("[VFIED] decide error", e);
     alert(`Error: ${e.message}`);
   } finally {
     decideBtn.disabled = false;
