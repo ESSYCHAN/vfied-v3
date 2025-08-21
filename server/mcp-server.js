@@ -12,14 +12,10 @@ import Joi from 'joi';
 import * as moodsModule from './data/moods.js';
 const moods = moodsModule.default || moodsModule.moods || moodsModule;
 import * as countriesModule from './data/countries.js';
-import OpenAI from "openai";
-// Normalize whatever the data file exports (default, named, object, etc.)
 
-const openai = process.env.OPENAI_API_KEY
-  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  : null;
-
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const USE_GPT = String(process.env.USE_GPT || '').toLowerCase() === 'true';
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_MODEL   = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
 function extractCountriesFromModule(mod) {
   const candidates = [];
@@ -270,7 +266,7 @@ const recommendSchema = Joi.object({
 app.post('/mcp/get_food_suggestion', async (req, res) => {
   const { mood = 'hungry', location = {}, dietary = [] } = req.body || {};
   const weather = await getWeather(location);
-  if (openai) {
+  if (USE_GPT && OPENAI_API_KEY) {
     const gpt = await recommendWithGPT({ mood_text: mood, location, dietary, weather });
     if (gpt) return res.json(gpt);
   }
@@ -284,7 +280,36 @@ app.post('/mcp/get_food_suggestion', async (req, res) => {
     dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null
   });
 });
-
+// --- GPT helpers (fetch-based, no SDK) ---
+async function gptChatJSON({ system, user, model = OPENAI_MODEL }) {
+  if (!USE_GPT || !OPENAI_API_KEY) return null;
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user',   content: user }
+        ],
+        temperature: 0.6,
+        response_format: { type: 'json_object' }
+      })
+    });
+    const text = await r.text();
+    if (!r.ok) throw new Error(`OpenAI ${r.status}: ${text.slice(0,200)}`);
+    const data = JSON.parse(text);
+    const content = data?.choices?.[0]?.message?.content || '{}';
+    return JSON.parse(content);
+  } catch (err) {
+    console.error('[GPT] fetch error:', err.message || err);
+    return null;
+  }
+}
 app.post('/mcp/get_quick_food_decision', async (req, res) => {
   const { location = {}, dietary = [] } = req.body || {};
   const pick = fallbackSuggestion(location, dietary);
@@ -401,11 +426,10 @@ app.get('/v1/analytics', authenticateApiKey, (req, res) => {
 });
 // --- GPT recommend helper ---
 async function recommendWithGPT({ mood_text = "", location = {}, dietary = [], weather = null }) {
-  if (!openai) return null; // no key → let caller use fallback
+  if (!USE_GPT || !OPENAI_API_KEY) return null;
 
-  // System & user prompts steer a small structured JSON back
-  const system = `You are VFIED, a food & culture assistant. 
-Return STRICT JSON (no prose) with fields:
+  const system = `You are VFIED, a food & culture assistant.
+Return STRICT JSON (no prose) shaped exactly like:
 {
   "success": true,
   "source": "gpt",
@@ -417,51 +441,30 @@ Return STRICT JSON (no prose) with fields:
   "confidence": number
 }`;
 
-  const user = {
-    role: "user",
-    content: JSON.stringify({
-      mood_text,
-      location,
-      dietary,
-      weather
-    })
+  const user = JSON.stringify({ mood_text, location, dietary, weather });
+
+  const out = await gptChatJSON({ system, user });
+  if (!out) return null;
+
+  // Normalize fields so the frontend is always happy
+  const cc = (location?.country_code || 'GB').toUpperCase();
+  const country = location?.country || 'United Kingdom';
+  const food = out.food || {};
+  return {
+    success: true,
+    source: 'gpt',
+    food: {
+      name: food.name || 'Chefs Choice',
+      emoji: food.emoji || '🍽️',
+      country: food.country || country,
+      country_code: (food.country_code || cc).toUpperCase()
+    },
+    friendMessage: out.friendMessage || (mood_text ? `Because you feel "${mood_text}", try ${food.name || 'something local'}.` : 'Heres a great pick.'),
+    dietaryNote: out.dietaryNote ?? (dietary?.length ? `Filtered for: ${dietary.join(', ')}` : null),
+    culturalNote: out.culturalNote ?? null,
+    weatherNote: out.weatherNote ?? (weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null),
+    confidence: typeof out.confidence === 'number' ? out.confidence : Math.floor(70 + Math.random() * 25)
   };
-
-  try {
-    const resp = await openai.chat.completions.create({
-      model: OPENAI_MODEL,
-      messages: [{ role: "system", content: system }, user],
-      temperature: 0.6,
-      response_format: { type: "json_object" }
-    });
-
-    const raw = resp.choices?.[0]?.message?.content || "{}";
-    let data;
-    try { data = JSON.parse(raw); } catch { data = {}; }
-
-    // minimal validation + fill gaps
-    const cc = (location?.country_code || "GB").toUpperCase();
-    const country = location?.country || "United Kingdom";
-    const food = data.food || {};
-    return {
-      success: true,
-      source: "gpt",
-      food: {
-        name: food.name || "Chef’s Choice",
-        emoji: food.emoji || "🍽️",
-        country: food.country || country,
-        country_code: (food.country_code || cc).toUpperCase()
-      },
-      friendMessage: data.friendMessage || (mood_text ? `Because you feel "${mood_text}", try ${food.name || "something local"}.` : "Here’s a great pick."),
-      dietaryNote: data.dietaryNote ?? (dietary?.length ? `Filtered for: ${dietary.join(", ")}` : null),
-      culturalNote: data.culturalNote ?? null,
-      weatherNote: data.weatherNote ?? (weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null),
-      confidence: typeof data.confidence === "number" ? data.confidence : Math.floor(70 + Math.random() * 25)
-    };
-  } catch (err) {
-    console.error("[GPT] recommend error:", err?.message || err);
-    return null; // caller will fallback
-  }
 }
 
 // Optional vendor recommend that prefers menu if present
@@ -503,7 +506,7 @@ app.post('/v1/recommend', async (req, res) => {
   const weather = await getWeather(location).catch(() => null);
 
   let gpt = null;
-  if (openai) {
+  if (USE_GPT && OPENAI_API_KEY) {
     gpt = await recommendWithGPT({ mood_text, location, dietary, weather });
   }
 
