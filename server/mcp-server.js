@@ -12,7 +12,15 @@ import Joi from 'joi';
 import * as moodsModule from './data/moods.js';
 const moods = moodsModule.default || moodsModule.moods || moodsModule;
 import * as countriesModule from './data/countries.js';
+import OpenAI from "openai";
 // Normalize whatever the data file exports (default, named, object, etc.)
+
+const openai = process.env.OPENAI_API_KEY
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
+
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
 function extractCountriesFromModule(mod) {
   const candidates = [];
 
@@ -247,9 +255,26 @@ const recommendSchema = Joi.object({
 });
 
 // --- Public MCP-ish endpoints (no API key) ---
+// app.post('/mcp/get_food_suggestion', async (req, res) => {
+//   const { mood = 'hungry', location = {}, dietary = [] } = req.body || {};
+//   const weather = await getWeather(location);
+//   const pick = fallbackSuggestion(location, dietary);
+//   res.json({
+//     success: true,
+//     friendMessage: `Try ${pick.name} ${pick.emoji} — ${weather?.isCold ? 'it will warm you up' : 'it suits today'}.`,
+//     food: { name: pick.name, emoji: pick.emoji, country: location.country, country_code: location.country_code },
+//     weather,
+//     dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null
+//   });
+// });
 app.post('/mcp/get_food_suggestion', async (req, res) => {
   const { mood = 'hungry', location = {}, dietary = [] } = req.body || {};
   const weather = await getWeather(location);
+  if (openai) {
+    const gpt = await recommendWithGPT({ mood_text: mood, location, dietary, weather });
+    if (gpt) return res.json(gpt);
+  }
+  // fallback (existing)
   const pick = fallbackSuggestion(location, dietary);
   res.json({
     success: true,
@@ -374,12 +399,76 @@ app.get('/v1/analytics', authenticateApiKey, (req, res) => {
     menu_status: vendorMenus.has(k.vendorId) ? 'uploaded' : 'not_uploaded'
   });
 });
+// --- GPT recommend helper ---
+async function recommendWithGPT({ mood_text = "", location = {}, dietary = [], weather = null }) {
+  if (!openai) return null; // no key → let caller use fallback
+
+  // System & user prompts steer a small structured JSON back
+  const system = `You are VFIED, a food & culture assistant. 
+Return STRICT JSON (no prose) with fields:
+{
+  "success": true,
+  "source": "gpt",
+  "food": { "name": string, "emoji": string, "country": string, "country_code": string },
+  "friendMessage": string,
+  "dietaryNote": string|null,
+  "culturalNote": string|null,
+  "weatherNote": string|null,
+  "confidence": number
+}`;
+
+  const user = {
+    role: "user",
+    content: JSON.stringify({
+      mood_text,
+      location,
+      dietary,
+      weather
+    })
+  };
+
+  try {
+    const resp = await openai.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: [{ role: "system", content: system }, user],
+      temperature: 0.6,
+      response_format: { type: "json_object" }
+    });
+
+    const raw = resp.choices?.[0]?.message?.content || "{}";
+    let data;
+    try { data = JSON.parse(raw); } catch { data = {}; }
+
+    // minimal validation + fill gaps
+    const cc = (location?.country_code || "GB").toUpperCase();
+    const country = location?.country || "United Kingdom";
+    const food = data.food || {};
+    return {
+      success: true,
+      source: "gpt",
+      food: {
+        name: food.name || "Chef’s Choice",
+        emoji: food.emoji || "🍽️",
+        country: food.country || country,
+        country_code: (food.country_code || cc).toUpperCase()
+      },
+      friendMessage: data.friendMessage || (mood_text ? `Because you feel "${mood_text}", try ${food.name || "something local"}.` : "Here’s a great pick."),
+      dietaryNote: data.dietaryNote ?? (dietary?.length ? `Filtered for: ${dietary.join(", ")}` : null),
+      culturalNote: data.culturalNote ?? null,
+      weatherNote: data.weatherNote ?? (weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null),
+      confidence: typeof data.confidence === "number" ? data.confidence : Math.floor(70 + Math.random() * 25)
+    };
+  } catch (err) {
+    console.error("[GPT] recommend error:", err?.message || err);
+    return null; // caller will fallback
+  }
+}
 
 // Optional vendor recommend that prefers menu if present
 app.post('/v1/recommend', async (req, res) => {
-  const { location = {}, dietary = [], menu_source = 'global_database', vendor_id } = req.body || {};
+  const { location = {}, dietary = [], menu_source = 'global_database', vendor_id, mood_text = "" } = req.body || {};
 
-  // If Authorization header has a known API key, prefer that vendorId
+  // Prefer uploaded menu if requested and available
   let resolvedVendorId = vendor_id;
   try {
     const auth = req.headers.authorization || '';
@@ -390,34 +479,51 @@ app.post('/v1/recommend', async (req, res) => {
     }
   } catch {}
 
-  let food;
   if ((menu_source === 'my_uploaded_menu' || resolvedVendorId) && resolvedVendorId && vendorMenus.has(resolvedVendorId)) {
     const items = vendorMenus.get(resolvedVendorId).items.filter(i => i.availability !== 'archived');
-    food = items[Math.floor(Math.random() * items.length)] || null;
-  }
-
-  if (!food) {
-    const pick = fallbackSuggestion(location, dietary);
+    const food = items[Math.floor(Math.random() * items.length)];
     return res.json({
       success: true,
-      source: 'global_database',
-      food: { name: pick.name, emoji: pick.emoji, country: location.country, country_code: location.country_code }
+      source: 'uploaded_menu',
+      food: {
+        menu_item_id: food.menu_item_id,
+        name: food.name,
+        emoji: food.emoji || '🍽️',
+        price: food.price,
+        description: food.description,
+        country_code: food.country_code
+      },
+      friendMessage: `From your menu, try ${food.name}.`,
+      confidence: 95,
+      dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null
     });
   }
 
+  // Global path → try GPT first (if key present), else fallback
+  const weather = await getWeather(location).catch(() => null);
+
+  let gpt = null;
+  if (openai) {
+    gpt = await recommendWithGPT({ mood_text, location, dietary, weather });
+  }
+
+  if (gpt && gpt.success) {
+    return res.json(gpt);
+  }
+
+  // Fallback (no key or GPT failed)
+  const pick = fallbackSuggestion(location, dietary);
   return res.json({
     success: true,
-    source: 'uploaded_menu',
-    food: {
-      menu_item_id: food.menu_item_id,
-      name: food.name,
-      emoji: food.emoji || '🍽️',
-      price: food.price,
-      description: food.description,
-      country_code: food.country_code
-    }
+    source: 'global_database',
+    food: { name: pick.name, emoji: pick.emoji, country: location.country, country_code: (location.country_code || 'GB').toUpperCase() },
+    friendMessage: mood_text ? `Because you feel "${mood_text}", I suggest ${pick.name}.` : `I suggest ${pick.name}.`,
+    confidence: Math.floor(70 + Math.random() * 25),
+    dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null,
+    weatherNote: weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null
   });
 });
+
 
 app.get('/v1/events', (req, res) => {
   const city = (req.query.city || 'Nairobi').toString();
@@ -512,3 +618,4 @@ app.use((err, _req, res, _next) => {
 app.listen(PORT, () => {
   console.log(`VFIED MCP server listening on :${PORT}`);
 });
+
