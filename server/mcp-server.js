@@ -40,7 +40,16 @@ function extractCountriesFromModule(mod) {
 
 // Build an ISO fallback (guaranteed to work)
 function buildIsoFallbackList() {
-  const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+  // Guard against minimal-ICU (Render) where Intl.DisplayNames may not exist
+  let regionNames = null;
+  try {
+    if (typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function') {
+      regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+    }
+  } catch {
+    regionNames = null;
+  }
+
   const CODES = [
     'AF','AX','AL','DZ','AS','AD','AO','AI','AQ','AG','AR','AM','AW','AU','AT','AZ',
     'BS','BH','BD','BB','BY','BE','BZ','BJ','BM','BT','BO','BQ','BA','BW','BV','BR','IO','BN','BG','BF','BI',
@@ -57,7 +66,11 @@ function buildIsoFallbackList() {
     'VU','VE','VN','VG','VI',
     'WF','EH','YE','ZM','ZW'
   ];
-  return CODES.map(code => ({ name: regionNames.of(code) || code, code }));
+
+  return CODES.map(code => ({
+    name: regionNames ? (regionNames.of(code) || code) : code,
+    code
+  }));
 }
 
 // Normalize one country object to { name, code }
@@ -329,6 +342,19 @@ app.patch('/v1/menus/availability', authenticateApiKey, (req, res) => {
   const version = bumpMenuVersion(vendorId);
   res.json({ success: true, updated, menu_version: version });
 });
+// View current vendor menu (requires API key)
+app.get('/v1/menus', authenticateApiKey, (req, res) => {
+  const vendorId = req.apiKey.vendorId;
+  const vm = vendorMenus.get(vendorId);
+  if (!vm) return res.json({ success: true, items: [], version: null, updatedAt: null });
+  res.json({
+    success: true,
+    vendor_id: vendorId,
+    version: vm.version,
+    updatedAt: vm.updatedAt,
+    items: vm.items
+  });
+});
 
 app.get('/v1/analytics', authenticateApiKey, (req, res) => {
   const k = req.apiKey;
@@ -344,11 +370,24 @@ app.get('/v1/analytics', authenticateApiKey, (req, res) => {
 // Optional vendor recommend that prefers menu if present
 app.post('/v1/recommend', async (req, res) => {
   const { location = {}, dietary = [], menu_source = 'global_database', vendor_id } = req.body || {};
+
+  // If Authorization header has a known API key, prefer that vendorId
+  let resolvedVendorId = vendor_id;
+  try {
+    const auth = req.headers.authorization || '';
+    if (auth.startsWith('Bearer ')) {
+      const key = auth.slice(7);
+      const meta = apiKeys.get(key);
+      if (meta?.vendorId) resolvedVendorId = resolvedVendorId || meta.vendorId;
+    }
+  } catch {}
+
   let food;
-  if ((menu_source === 'my_uploaded_menu' || vendor_id) && vendor_id && vendorMenus.has(vendor_id)) {
-    const items = vendorMenus.get(vendor_id).items.filter(i => i.availability !== 'archived');
+  if ((menu_source === 'my_uploaded_menu' || resolvedVendorId) && resolvedVendorId && vendorMenus.has(resolvedVendorId)) {
+    const items = vendorMenus.get(resolvedVendorId).items.filter(i => i.availability !== 'archived');
     food = items[Math.floor(Math.random() * items.length)] || null;
   }
+
   if (!food) {
     const pick = fallbackSuggestion(location, dietary);
     return res.json({
@@ -357,7 +396,8 @@ app.post('/v1/recommend', async (req, res) => {
       food: { name: pick.name, emoji: pick.emoji, country: location.country, country_code: location.country_code }
     });
   }
-  res.json({
+
+  return res.json({
     success: true,
     source: 'uploaded_menu',
     food: {
@@ -370,6 +410,7 @@ app.post('/v1/recommend', async (req, res) => {
     }
   });
 });
+
 
 // --- Countries & health ---
 app.get('/v1/countries', (_req, res) => {
