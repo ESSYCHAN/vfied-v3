@@ -196,6 +196,19 @@ decideBtn?.addEventListener('click', async () => {
     decideBtn.textContent = '🎯 Decide For Me';
   }
 });
+//------------------- EVENTS  ------------------
+document.getElementById('loadEventsBtn')?.addEventListener('click', async () => {
+  const loc = getLocation();
+  const url = `${SERVER}/v1/events?city=${encodeURIComponent(loc.city||'')}&country_code=${encodeURIComponent(loc.country_code||'')}`;
+  try {
+    const r = await fetch(url);
+    const data = await r.json();
+    const list = document.getElementById('eventsList');
+    list.innerHTML = (data.events || []).map(e => `<li>${e.title} — ${e.when}</li>`).join('') || '<li>No events found.</li>';
+  } catch (e) {
+    alert('Failed to load events');
+  }
+});
 
 
 // ------------------ ACCEPT / RETRY ------------------

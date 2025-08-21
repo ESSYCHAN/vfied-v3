@@ -114,6 +114,7 @@ app.use(cors({
     'http://localhost:3000',
     'https://vfied.vercel.app',
     'https://vfied-v3.vercel.app',
+    'https://vfied-v3-frontend.onrender.com', // Replace with your actual frontend URL
     /^https:\/\/.*\.vercel\.app$/,
     /^https:\/\/.*\.onrender\.com$/
   ],
@@ -418,7 +419,16 @@ app.post('/v1/recommend', async (req, res) => {
   });
 });
 
-
+app.get('/v1/events', (req, res) => {
+  const city = (req.query.city || 'Nairobi').toString();
+  const cc   = (req.query.country_code || 'KE').toString().toUpperCase();
+  const demo = [
+    { id: 'e1', city, country_code: cc, title: 'Jazz in the Park', when: 'Tonight 7pm', tag: 'music' },
+    { id: 'e2', city, country_code: cc, title: 'Street Food Festival', when: 'Sat 3pm', tag: 'food' },
+    { id: 'e3', city, country_code: cc, title: 'Open-Air Cinema', when: 'Sun 8pm', tag: 'film' },
+  ];
+  res.json({ success: true, events: demo });
+});
 // --- Countries & health ---
 app.get('/v1/countries', (_req, res) => {
   // Always returns something; sorted by name
