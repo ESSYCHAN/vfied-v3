@@ -496,7 +496,12 @@ app.get('/v1/travel/highlights', (req, res) => {
   res.json({ success: true, city, country_code: cc, intro: pack.intro, dishes: pack.dishes });
 });
 
-
+app.post('/v1/telemetry', (req, res) => {
+  const { event, payload } = req.body || {};
+  // In real life, write to a DB / log drain. For now, console is fine.
+  console.log('[telemetry]', event, { at: new Date().toISOString(), payload });
+  res.json({ success: true });
+});
 // --- Error handler (last) ---
 app.use((err, _req, res, _next) => {
   console.error('Server error:', err);

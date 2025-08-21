@@ -39,6 +39,10 @@ const DIETARY = [
   'vegetarian','vegan','gluten-free','dairy-free','keto','halal',
   'kosher','nut-free','paleo','pescatarian'
 ];
+const LS = {
+  get(k, d=null){ try{return JSON.parse(localStorage.getItem(k)) ?? d;}catch{return d;} },
+  set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
+};
 
 let lastPayload = null;
 
@@ -65,7 +69,34 @@ document.addEventListener('click', (e) => {
   if (!btn) return;
   activateTab(btn.dataset.tab);
 });
-document.addEventListener('DOMContentLoaded', () => activateTab('food'));
+document.addEventListener('DOMContentLoaded', () => {
+  activateTab('food');
+  
+  // Restore saved user preferences
+  const last = LS.get('vfied:lastPayload');
+  const mood = LS.get('vfied:mood');
+  const diet = LS.get('vfied:dietary', []);
+
+  if (mood) document.getElementById('moodInput').value = mood;
+  if (diet?.length) {
+    diet.forEach(v => {
+      const el = document.querySelector(`#dietaryChips input[value="${v}"]`);
+      if (el) el.checked = true;
+    });
+  }
+
+  // If you're using #citySelect with JSON options, try to match country_code
+  try {
+    const code = last?.location?.country_code;
+    const sel = document.getElementById('citySelect');
+    if (code && sel) {
+      for (const opt of sel.options) {
+        const val = JSON.parse(opt.value);
+        if (val.country_code === code) { sel.value = opt.value; break; }
+      }
+    }
+  } catch {}
+});
 // ------------------ RENDER ------------------
 function renderChips() {
   chipsWrap.innerHTML = '';
@@ -172,6 +203,12 @@ if (detectMoodBtn) {
     setTimeout(() => (detectMoodBtn.textContent = '✨ Detect Mood (AI)'), 1200);
   });
 }
+// ------------------ AUTO-SAVE USER INPUT ------------------
+document.getElementById('moodInput')?.addEventListener('input', e => LS.set('vfied:mood', e.target.value));
+document.getElementById('dietaryChips')?.addEventListener('change', () => {
+  const vals = Array.from(document.querySelectorAll('#dietaryChips input:checked')).map(x=>x.value);
+  LS.set('vfied:dietary', vals);
+});
 
 // ------------------ MAIN RECOMMEND CALL ------------------
 decideBtn?.addEventListener('click', async () => {
@@ -182,7 +219,7 @@ decideBtn?.addEventListener('click', async () => {
   const budget    = document.getElementById('budgetSelect')?.value || 'medium';
 
   lastPayload = { location, mood_text, dietary, budget, menu_source: 'global_database' };
-
+  LS.set('vfied:lastPayload', lastPayload);
   setThinking(true);
   try {
     const res  = await fetch(`${SERVER}/v1/recommend`, {
@@ -210,7 +247,11 @@ decideBtn?.addEventListener('click', async () => {
     set('countryCode', food.country_code ? countryCodeToEmoji(food.country_code) : '—');
     set('confidence', typeof data.confidence === 'number' ? `Confidence: ${data.confidence}%` : 'Confidence: —');
     set('weatherBadge', data?.weather?.description ? `Weather: ${data.weather.temperature}°C • ${data.weather.description}` : 'Weather: —');
-
+    fetch(`${SERVER}/v1/telemetry`, {
+      method: 'POST', 
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ event: 'decide_success', payload: { location, dietary } })
+    }).catch(()=>{});
   } catch (e) {
     console.error(e);
     alert(`Error: ${e.message}`);
@@ -218,6 +259,8 @@ decideBtn?.addEventListener('click', async () => {
     setThinking(false);
   }
 });
+
+
 //------------------- EVENTS  ------------------
 document.getElementById('loadEventsBtn')?.addEventListener('click', async () => {
   const grid = document.getElementById('eventsGrid');
@@ -252,6 +295,11 @@ document.getElementById('loadEventsBtn')?.addEventListener('click', async () => 
           </div>
         </div>`;
     }).join('');
+    fetch(`${SERVER}/v1/telemetry`, {
+      method: 'POST', 
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ event: 'events_view', payload: { city: loc.city, code: loc.country_code } })
+    }).catch(()=>{});
   } catch (e) {
     grid.innerHTML = '<div class="muted">Failed to load events.</div>';
   }
@@ -353,6 +401,11 @@ document.getElementById('tryAgainBtn')?.addEventListener('click', async () => {
     document.getElementById('foodEmoji').textContent = data.food?.emoji || '🍽️';
     document.getElementById('foodName').textContent  = data.food?.name  || 'Great Choice';
     document.getElementById('friendMessage').textContent = data.friendMessage || '';
+    fetch(`${SERVER}/v1/telemetry`, {
+      method: 'POST', 
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ event: 'decide_retry', payload: lastPayload })
+    }).catch(()=>{});
   } catch (e) {
     alert(`Error: ${e.message}`);
   } finally {
@@ -373,22 +426,32 @@ uploadMenuBtn.addEventListener('click', async () => {
       body: JSON.stringify({ mode: 'snapshot', menu })
     });
     const data = await res.json();
-    menuResponse.textContent = JSON.stringify(data, null, 2);
-
-    // Trigger a recommend after upload
-    const recRes = await fetch(`${SERVER}/v1/recommend`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": `Bearer ${API_KEY}` },
-      body: JSON.stringify({ menu_source: "vendor", vendor_id: "demo_vendor" })
-    });
-    const recData = await recRes.json();
-    menuResponse.textContent += "\n\nSuggestion:\n" + JSON.stringify(recData, null, 2);
+    if (data.success) {
+      alert('✅ Menu uploaded!');
+      menuResponse.textContent = JSON.stringify(data, null, 2);
+      
+      // Auto-suggest from uploaded menu
+      const recRes = await fetch(`${SERVER}/v1/recommend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${API_KEY}` },
+        body: JSON.stringify({ menu_source: "my_uploaded_menu" })
+      });
+      const recData = await recRes.json();
+      menuResponse.textContent += "\n\nSuggestion:\n" + JSON.stringify(recData, null, 2);
+    } else {
+      menuResponse.textContent = JSON.stringify(data, null, 2);
+    }
 
   } catch (e) {
     menuResponse.textContent = `Error: ${e.message}`;
   }
 });
-
+// ------------------ SERVICE WORKER ------------------
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.warn('SW reg failed', err));
+  });
+}
 viewMenuBtn.addEventListener('click', async () => {
   try {
     const res = await fetch(`${SERVER}/v1/menus`, {
