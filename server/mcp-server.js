@@ -18,8 +18,6 @@ const USE_GPT = String(process.env.USE_GPT || '').toLowerCase() === 'true';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL   = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 // Add after the fs import:
-const logPath = path.resolve(__dirname, './telemetry.log');
-function logLine(obj){ fs.appendFile(logPath, JSON.stringify(obj)+'\n', ()=>{}); }
 
 function extractCountriesFromModule(mod) {
   const candidates = [];
@@ -109,6 +107,10 @@ const countries = extractCountries(countriesModule);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+
+const logPath = path.resolve(__dirname, './telemetry.log');
+function logLine(obj){ fs.appendFile(logPath, JSON.stringify(obj)+'\n', ()=>{}); }
 
 const app = express();
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
