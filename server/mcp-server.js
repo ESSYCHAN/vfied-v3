@@ -509,11 +509,16 @@ app.post('/mcp/get_food_suggestion', async (req, res) => {
   const { mood = 'hungry', location = {}, dietary = [] } = req.body || {};
   const weather = await getWeather(location);
   
+  console.log('🔍 MCP Debug:', { USE_GPT, hasKey: !!OPENAI_API_KEY, location, mood });
+  
   if (USE_GPT && OPENAI_API_KEY) {
+    console.log('🚀 Trying GPT path...');
     const gpt = await recommendWithGPT({ mood_text: mood, location, dietary, weather });
+    console.log('🎯 GPT Result:', gpt);
     if (gpt) return res.json(gpt);
   }
   
+  console.log('📋 Using fallback path');
   // fallback (existing)
   const pick = fallbackSuggestion(location, dietary)
   res.json({
