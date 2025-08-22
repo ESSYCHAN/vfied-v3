@@ -46,6 +46,14 @@ const LS = {
 const cityInputFree = document.getElementById('cityInputFree');
 let lastPayload = null;
 
+const tabBtns = document.querySelectorAll('.tab-btn');
+const panels  = document.querySelectorAll('.tab-panel');
+tabBtns.forEach(btn => btn.addEventListener('click', () => {
+  const name = btn.dataset.tab;
+  tabBtns.forEach(b => b.classList.toggle('active', b === btn));
+  panels.forEach(p => p.style.display = p.id === `tab-${name}` ? 'block' : 'none');
+}));
+
 function setThinking(on) {
   const btn = document.getElementById('decideBtn');
   if (!btn) return;
@@ -522,4 +530,158 @@ document.getElementById('installBtn')?.addEventListener('click', async ()=>{
 });
 document.getElementById('installClose')?.addEventListener('click', ()=>{
   document.getElementById('installBanner').style.display='none';
+});
+// ---- Events ----
+const eventsGrid = document.getElementById('eventsGrid');
+const loadEventsBtn = document.getElementById('loadEventsBtn');
+
+loadEventsBtn?.addEventListener('click', async () => {
+  const loc = getLocation();
+  eventsGrid.innerHTML = '<div class="muted">Loading…</div>';
+  try {
+    const r = await fetch(`${SERVER}/v1/events?city=${encodeURIComponent(loc.city||'')}&country_code=${encodeURIComponent(loc.country_code||'')}`);
+    const data = await r.json();
+    const events = data?.events || [];
+    if (!events.length) { eventsGrid.innerHTML = '<div class="muted">No events found.</div>'; return; }
+
+    eventsGrid.innerHTML = events.map(e => {
+      const emoji = e.tag === 'music' ? '🎶' : e.tag === 'food' ? '🍢' : '🎬';
+      const mood  = e.tag === 'music' ? 'celebrating' : e.tag === 'food' ? 'adventurous' : 'relax';
+      const realUrl = `https://www.google.com/search?q=${encodeURIComponent(`${e.title} ${e.city}`)}`;
+      const tracked = `${SERVER}/v1/linkout?tag=event&url=${encodeURIComponent(realUrl)}`;
+      return `
+        <div class="event-card">
+          <div class="event-badge">${emoji}</div>
+          <div class="event-body">
+            <div class="event-title">${e.title}</div>
+            <div class="event-meta">${e.when} — ${e.city} ${e.country_code}</div>
+            <div class="row" style="gap:8px; margin-top:6px">
+              <button class="small" data-suggest-mood="${mood}">Suggest food for this</button>
+              <a class="small secondary" href="${tracked}" target="_blank" rel="noopener">Book (demo)</a>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch {
+    eventsGrid.innerHTML = '<div class="muted">Failed to load events.</div>';
+  }
+});
+
+// Delegate: click "Suggest food for this"
+eventsGrid?.addEventListener('click', async (ev) => {
+  const btn = ev.target.closest('button[data-suggest-mood]');
+  if (!btn) return;
+  const loc = getLocation();
+  const mood_text = `I'm ${btn.dataset.suggestMood} and want something local`;
+  setThinking(true);
+  try {
+    const res = await fetch(`${SERVER}/v1/recommend`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ location: loc, mood_text, dietary: getSelectedDietary(), budget: budgetSelect?.value || 'medium' })
+    });
+    const data = await res.json();
+    if (data?.success) {
+      resultCard.style.display = 'block';
+      foodEmoji.textContent = data.food?.emoji || '🍽️';
+      foodName.textContent  = data.food?.name  || 'Great Choice';
+      friendMessage.textContent = data.friendMessage || '';
+    }
+  } finally { setThinking(false); }
+});
+// ---- Travel ----
+const travelGrid = document.getElementById('travelGrid');
+const loadTravelBtn = document.getElementById('loadTravelBtn');
+
+loadTravelBtn?.addEventListener('click', async () => {
+  const loc = getLocation();
+  travelGrid.innerHTML = '<div class="muted">Loading…</div>';
+  try {
+    const r = await fetch(`${SERVER}/v1/travel/highlights?city=${encodeURIComponent(loc.city||'')}&country_code=${encodeURIComponent(loc.country_code||'')}`);
+    const data = await r.json();
+    const items = data?.highlights || [];
+    if (!items.length) { travelGrid.innerHTML = '<div class="muted">No highlights yet.</div>'; return; }
+
+    travelGrid.innerHTML = items.map(d => {
+      const maps = `https://www.google.com/maps/search/${encodeURIComponent(`${d.name} ${loc.city||''}`)}`;
+      const mapsTracked = `${SERVER}/v1/linkout?tag=maps&url=${encodeURIComponent(maps)}`;
+      return `
+        <div class="travel-card">
+          <div class="travel-badge">${d.emoji || '🗺️'}</div>
+          <div class="travel-body">
+            <div class="travel-title">${d.name}</div>
+            <div class="muted">${d.desc || ''}</div>
+            <div class="row" style="gap:8px; margin-top:6px">
+              <button class="small" data-suggest-food="${d.name}">Suggest food near here</button>
+              <a class="small secondary" href="${mapsTracked}" target="_blank" rel="noopener">Open in Maps</a>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch {
+    travelGrid.innerHTML = '<div class="muted">Failed to load highlights.</div>';
+  }
+});
+
+// Delegate: "Suggest food near here"
+travelGrid?.addEventListener('click', async (ev) => {
+  const btn = ev.target.closest('button[data-suggest-food]');
+  if (!btn) return;
+  const loc = getLocation();
+  const mood_text = `I want something near ${btn.dataset.suggestFood}, authentic and local.`;
+  setThinking(true);
+  try {
+    const res = await fetch(`${SERVER}/v1/recommend`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ location: loc, mood_text, dietary: getSelectedDietary(), budget: budgetSelect?.value || 'medium' })
+    });
+    const data = await res.json();
+    if (data?.success) {
+      resultCard.style.display = 'block';
+      foodEmoji.textContent = data.food?.emoji || '🍽️';
+      foodName.textContent  = data.food?.name  || 'Great Choice';
+      friendMessage.textContent = data.friendMessage || '';
+    }
+  } finally { setThinking(false); }
+});
+// ---- GPT Night Plan ----
+const genPlanBtn = document.getElementById('genPlanBtn');
+const planPrompt = document.getElementById('planPrompt');
+const planBox    = document.getElementById('planBox');
+
+genPlanBtn?.addEventListener('click', async () => {
+  const loc = getLocation();
+  const prompt = (planPrompt?.value?.trim()) || 'I want to try local experiences in the city tonight. Map a night plan with food and vibes.';
+  planBox.innerHTML = '<div class="muted">Planning your night…</div>';
+  try {
+    const r = await fetch(`${SERVER}/v1/travel/plan`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ location: loc, prompt })
+    });
+    const data = await r.json();
+    if (!data?.success && !data?.timeline) throw new Error('No plan');
+
+    const timeline = (data.timeline || []).map(s => {
+      const url = s.link ? `${SERVER}/v1/linkout?tag=plan&url=${encodeURIComponent(s.link)}` : null;
+      return `
+        <div class="step">
+          <span class="time">${s.time || ''}</span>
+          <span class="act">${s.emoji || ''} ${s.activity || ''}</span>
+          ${s.food ? `<div class="muted">Food: ${s.food}</div>` : ''}
+          ${s.note ? `<div class="muted">${s.note}</div>` : ''}
+          ${url ? `<div><a class="small" href="${url}" target="_blank" rel="noopener">Open link</a></div>` : ''}
+        </div>`;
+    }).join('');
+
+    planBox.innerHTML = `
+      <div class="big" style="margin-bottom:6px">${data.planTitle || 'Local Night Plan'}</div>
+      <div class="timeline">${timeline}</div>
+      ${Array.isArray(data.tips) && data.tips.length ? `
+      <div style="margin-top:8px">
+        <div class="event-title">Tips</div>
+        <ul>${data.tips.map(t => `<li>${t}</li>`).join('')}</ul>
+      </div>` : '' }
+    `;
+  } catch (e) {
+    planBox.innerHTML = `<div class="muted">Couldn't generate a plan: ${e.message}</div>`;
+  }
 });

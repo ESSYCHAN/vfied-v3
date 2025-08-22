@@ -907,3 +907,15 @@ button[disabled] { opacity: .6; cursor: not-allowed; }
 .travel-note { font-size:12px; opacity:.85; margin-top:2px; }
 .travel-cta { margin-top:8px; display:flex; gap:8px; }
 
+.tab-btn.active { outline: 2px solid #6d28d9; }
+.tab-panel .event-card,
+.tab-panel .travel-card {
+  display:flex; gap:12px; background:#0b1220; border:1px solid #263247;
+  padding:12px; border-radius:12px; align-items:flex-start;
+}
+.event-badge, .travel-badge { font-size:24px; }
+.event-title, .travel-title { font-weight:700; }
+.event-meta { font-size:12px; opacity:.8; }
+.timeline { border-left:2px solid #263247; margin-left:6px; padding-left:10px; }
+.timeline .step { margin:8px 0; }
+.timeline .time { font-weight:700; margin-right:6px; }

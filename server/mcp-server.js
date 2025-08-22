@@ -388,6 +388,54 @@ async function gptChatJSON({ system, user, model = OPENAI_MODEL }) {
     return null;
   }
 }
+// ---------- Travel/Events helpers ----------
+function sampleEventsFor(city = '', cc = 'GB') {
+  const C = (cc || 'GB').toUpperCase();
+  const cityName = city || (C === 'KE' ? 'Nairobi' : C === 'JP' ? 'Tokyo' : C === 'US' ? 'New York' : 'London');
+  const base = [
+    { id: 'e1', city: cityName, country_code: C, title: 'Jazz in the Park',   when: 'Tonight 7pm', tag: 'music' },
+    { id: 'e2', city: cityName, country_code: C, title: 'Street Food Market', when: 'Sat 3pm',     tag: 'food'  },
+    { id: 'e3', city: cityName, country_code: C, title: 'Open-Air Cinema',    when: 'Sun 8pm',     tag: 'film'  },
+  ];
+  return base;
+}
+
+function sampleHighlights(city = '', cc = 'GB') {
+  const C = (cc || 'GB').toUpperCase();
+  const cityName = city || (C === 'KE' ? 'Nairobi' : C === 'JP' ? 'Tokyo' : C === 'US' ? 'New York' : 'London');
+  return [
+    { id: 'h1', type: 'must_try',  name: 'Local Signature Dish', emoji: '🍽️', desc: `A beloved staple in ${cityName}.` },
+    { id: 'h2', type: 'street',    name: 'Night Street Market',  emoji: '🍢', desc: `Best for snacks & vibey walks.` },
+    { id: 'h3', type: 'experience',name: 'Neighborhood Crawl',   emoji: '🗺️', desc: `Explore authentic spots with locals.` },
+  ];
+}
+
+// GPT Night Plan builder
+async function gptTravelPlan({ city, country_code, prompt }) {
+  const system = `You are VFIED, a local culture and food guide. Return STRICT JSON with:
+{
+  "success": true,
+  "city": string,
+  "country_code": string,
+  "planTitle": string,
+  "timeline": [
+    { "time": "18:30", "activity": "Short line", "food": "Dish", "emoji": "🍜", "note": "why it's good", "link": "https://..." }
+  ],
+  "tips": ["short bullet", "short bullet"]
+}`;
+  const user = JSON.stringify({ city, country_code, prompt });
+  const out = await gptChatJSON({ system, user });
+  if (!out) return null;
+  // Minimal normalization
+  out.success = true;
+  out.city = out.city || city;
+  out.country_code = (out.country_code || country_code || 'GB').toUpperCase();
+  if (!Array.isArray(out.timeline)) out.timeline = [];
+  if (!Array.isArray(out.tips)) out.tips = [];
+  return out;
+}
+
+
 app.post('/mcp/get_quick_food_decision', async (req, res) => {
   const { location = {}, dietary = [] } = req.body || {};
   const pick = fallbackSuggestion(location, dietary);
@@ -735,14 +783,9 @@ app.get('/v1/admin/summary', authenticateApiKey, (_req, res) => {
 });
 
 app.get('/v1/events', (req, res) => {
-  const city = (req.query.city || 'Nairobi').toString();
-  const cc   = (req.query.country_code || 'KE').toString().toUpperCase();
-  const demo = [
-    { id: 'e1', city, country_code: cc, title: 'Jazz in the Park', when: 'Tonight 7pm', tag: 'music' },
-    { id: 'e2', city, country_code: cc, title: 'Street Food Festival', when: 'Sat 3pm', tag: 'food' },
-    { id: 'e3', city, country_code: cc, title: 'Open-Air Cinema', when: 'Sun 8pm', tag: 'film' },
-  ];
-  res.json({ success: true, events: demo });
+  const city = String(req.query.city || '');
+  const cc   = String(req.query.country_code || 'GB').toUpperCase();
+  res.json({ success: true, events: sampleEventsFor(city, cc) });
 });
 // --- Countries & health ---
 app.get('/v1/countries', (_req, res) => {
@@ -783,54 +826,36 @@ app.get('/health', (_req, res) => {
 
 // Phase-2: Travel highlights (mock data, region-aware)
 app.get('/v1/travel/highlights', (req, res) => {
-  const city = String(req.query.city || 'Nairobi');
-  const cc   = String(req.query.country_code || 'KE').toUpperCase();
+  const city = String(req.query.city || '');
+  const cc   = String(req.query.country_code || 'GB').toUpperCase();
+  res.json({ success: true, highlights: sampleHighlights(city, cc) });
+});
 
-  const DB = {
-    KE: {
-      intro: `Essential Kenyan bites in ${city}`,
-      dishes: [
-        { name: 'Nyama Choma', emoji: '🍖', note: 'Grilled goat/beef, classic weekend vibe' },
-        { name: 'Ugali & Sukuma', emoji: '🥬', note: 'Cornmeal with greens — true staple' },
-        { name: 'Pilau', emoji: '🍚', note: 'Spiced rice with coastal aroma' },
-        { name: 'Mutura', emoji: '🌭', note: 'Street sausage, late-night legend' },
-        { name: 'Tilapia Fry', emoji: '🐟', note: 'Lakeside crispy fish' }
-      ]
-    },
-    GB: {
-      intro: `Must-try UK comfort in ${city}`,
-      dishes: [
-        { name: 'Fish and Chips', emoji: '🍟', note: 'Seaside classic, vinegar mandatory' },
-        { name: 'Full English', emoji: '🍳', note: 'Hearty breakfast plate' },
-        { name: 'Chicken Tikka Masala', emoji: '🍛', note: 'Brit-Indian icon' },
-        { name: 'Sunday Roast', emoji: '🥩', note: 'Yorkshire puds + gravy' },
-        { name: 'Sticky Toffee Pudding', emoji: '🍰', note: 'Dessert royalty' }
-      ]
-    },
-    JP: {
-      intro: `Essentials of Japan in ${city}`,
-      dishes: [
-        { name: 'Ramen', emoji: '🍜', note: 'Broth & noodles heaven' },
-        { name: 'Sushi', emoji: '🍣', note: 'Nigiri/rolls — go fresh' },
-        { name: 'Okonomiyaki', emoji: '🥞', note: 'Savory pancake' },
-        { name: 'Katsu Curry', emoji: '🍛', note: 'Crispy cutlet + curry' },
-        { name: 'Takoyaki', emoji: '🧆', note: 'Octopus balls street snack' }
-      ]
-    },
-    US: {
-      intro: `American hits in ${city}`,
-      dishes: [
-        { name: 'Burger', emoji: '🍔', note: 'Smash or stacked' },
-        { name: 'BBQ Brisket', emoji: '🥩', note: 'Low & slow' },
-        { name: 'New York Slice', emoji: '🍕', note: 'Fold and go' },
-        { name: 'Poke Bowl', emoji: '🥗', note: 'Hawaiian fresh' },
-        { name: 'Chicken & Waffles', emoji: '🧇', note: 'Sweet + savory brunch' }
-      ]
-    }
-  };
+app.post('/v1/travel/plan', async (req, res) => {
+  const { location = {}, prompt = 'I want to try local experiences and food tonight' } = req.body || {};
+  const city = location.city || '';
+  const cc   = (location.country_code || 'GB').toUpperCase();
 
-  const pack = DB[cc] || { intro: `Local picks in ${city}`, dishes: [{ name:'Chef’s choice', emoji:'🍽️', note:'Explore nearby' }] };
-  res.json({ success: true, city, country_code: cc, intro: pack.intro, dishes: pack.dishes });
+  // Try GPT
+  const plan = await gptTravelPlan({ city, country_code: cc, prompt });
+  if (plan) {
+    return res.json(plan);
+  }
+
+  // Fallback plan (no GPT)
+  const timeline = [
+    { time: '18:30', activity: 'Golden hour walk through Old Town', food: 'Street samosas', emoji: '🥟', note: 'Light bite to start', link: 'https://example.com' },
+    { time: '19:30', activity: 'Live jazz bar', food: 'Local pilsner', emoji: '🍺', note: 'Music + easy vibes', link: 'https://example.com' },
+    { time: '21:00', activity: 'Late dinner at casual spot', food: 'Signature dish', emoji: '🍽️', note: 'Hearty & authentic', link: 'https://example.com' },
+    { time: '22:30', activity: 'Dessert walk / night market', food: 'Sweet street snack', emoji: '🍧', note: 'Sweet finish', link: 'https://example.com' }
+  ];
+  res.json({
+    success: true,
+    city, country_code: cc,
+    planTitle: 'Local Night Plan',
+    timeline,
+    tips: ['Carry cash for markets', 'Ask locals for their favorite stall']
+  });
 });
 // Add POST /v1/quick_decision
 app.post('/v1/quick_decision', async (req, res) => {

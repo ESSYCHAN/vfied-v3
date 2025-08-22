@@ -50,15 +50,16 @@
   <div class="container">
     <h1>🍽️ VFIED — One-Tap Food Decision</h1>
     <div class="muted">Hooked to your local server at <code class="mono">http://localhost:3001</code></div>
+        <!-- TABS -->
+    <div class="row" style="gap:8px; margin:14px 0">
+      <button class="secondary tab-btn active" data-tab="food">🍽️ Food</button>
+      <button class="secondary tab-btn" data-tab="events">🎉 Events</button>
+      <button class="secondary tab-btn" data-tab="travel">🧭 Travel</button>
+    </div>
 
-    <!-- TABS -->
-    <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="food"   role="tab" aria-selected="true">🍲 Food</button>
-      <button class="tab"         data-tab="events" role="tab" aria-selected="false">🎶 Events</button>
-      <button class="tab"         data-tab="travel" role="tab" aria-selected="false">🧭 Travel</button>
-    </nav>
+    
 
-    <section id="tab-food" class="tabpanel" role="tabpanel" aria-labelledby="tab-food-btn">
+    <div id="tab-food" class="tab-panel" style="display:block">
       <!-- Decision Card -->
       <div class="card">
         <div class="grid grid-2">
@@ -152,9 +153,9 @@
           <div>
             <label>Menu JSON</label>
             <textarea id="menuTextarea" rows="7" style="width:100%; margin-top:6px">[
-  {"name":"Ugali Mayai","country_code":"KE","price":"8.99","tags":["vegetarian","comfort","protein"],"kcal":420,"protein_g":22,"carbs_g":60,"fat_g":10},
-  {"name":"Fried Tilapia","country_code":"KE","price":"12.50","tags":["pescatarian","protein","healthy"],"kcal":500,"protein_g":40,"carbs_g":5,"fat_g":25}
-]</textarea>
+              {"name":"Ugali Mayai","country_code":"KE","price":"8.99","tags":["vegetarian","comfort","protein"],"kcal":420,"protein_g":22,"carbs_g":60,"fat_g":10},
+              {"name":"Fried Tilapia","country_code":"KE","price":"12.50","tags":["pescatarian","protein","healthy"],"kcal":500,"protein_g":40,"carbs_g":5,"fat_g":25}
+            ]</textarea>
             <div class="row" style="margin-top:8px">
               <button id="uploadMenuBtn">Upload Menu</button>
               <button id="viewMenuBtn" class="secondary">View My Menu</button>
@@ -166,40 +167,33 @@
           </div>
         </div>
       </div>
-    </section>
+    </div>
 
-    <section id="tab-events" class="tabpanel hidden" role="tabpanel" aria-labelledby="tab-events-btn">
+    <div id="tab-events" class="tab-panel" style="display:none">
       <div class="card">
-        <h2 style="margin:0 0 8px;">🎶 What's happening near me?</h2>
-        <p class="muted small" style="margin:6px 0 12px;">
-          Uses your current city/country selection.
-        </p>
-        <div class="row" style="gap:8px;">
-          <button id="loadEventsBtn" class="secondary">Load events</button>
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <h2 style="margin:0">🎉 Events Near You</h2>
+          <button id="loadEventsBtn">Load Events</button>
         </div>
+        <div id="eventsGrid" class="grid" style="margin-top:10px"></div>
       </div>
+    </div>
 
+    <div id="tab-travel" class="tab-panel" style="display:none">
       <div class="card">
-        <div id="eventsGrid" class="events-grid"></div>
-      </div>
-    </section>
-
-    <section id="tab-travel" class="tabpanel hidden" role="tabpanel" aria-labelledby="tab-travel-btn">
-      <div class="card">
-        <h2 style="margin:0 0 8px;">🧭 Travel: Must-try in your city</h2>
-        <p class="muted small" style="margin:6px 0 12px;">
-          Uses your current location selection (city/country).
-        </p>
-        <div class="row" style="gap:8px;">
-          <button id="loadTravelBtn" class="secondary">Show must-try</button>
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <h2 style="margin:0">🧭 Travel Highlights</h2>
+          <button id="loadTravelBtn">Show Highlights</button>
         </div>
+        <div id="travelGrid" class="grid" style="margin-top:10px"></div>
       </div>
-    
-      <div class="card">
-        <div id="travelIntro" class="muted" style="margin-bottom:8px;"></div>
-        <div id="travelGrid" class="travel-grid"></div>
+      
+      <div class="card" style="margin-top:12px">
+        <h2 style="margin:0 0 8px">🗺️ Plan a Local Night</h2>
+        <input id="planPrompt" placeholder="I want to try local experiences in the city..." style="width:100%; margin-bottom:8px" />
+        <button id="genPlanBtn">Generate Night Plan</button>
+        <div id="planBox" style="margin-top:10px"></div>
       </div>
-    </section>
   </div>
   
   <script type="module" src="/src/main.js"></script>
