@@ -524,36 +524,7 @@ app.post('/mcp/get_food_suggestion', async (req, res) => {
     dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null
   });
 });
-// --- GPT helpers (fetch-based, no SDK) ---
-async function gptChatJSON({ system, user, model = OPENAI_MODEL }) {
-  if (!USE_GPT || !OPENAI_API_KEY) return null;
-  try {
-    const r = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user',   content: user }
-        ],
-        temperature: 0.6,
-        response_format: { type: 'json_object' }
-      })
-    });
-    const text = await r.text();
-    if (!r.ok) throw new Error(`OpenAI ${r.status}: ${text.slice(0,200)}`);
-    const data = JSON.parse(text);
-    const content = data?.choices?.[0]?.message?.content || '{}';
-    return JSON.parse(content);
-  } catch (err) {
-    console.error('[GPT] fetch error:', err.message || err);
-    return null;
-  }
-}
+
 // ---------- Travel/Events helpers ----------
 function sampleEventsFor(city = '', cc = 'GB') {
   const C = (cc || 'GB').toUpperCase();
