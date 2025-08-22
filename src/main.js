@@ -39,6 +39,7 @@ const DIETARY = [
   'vegetarian','vegan','gluten-free','dairy-free','keto','halal',
   'kosher','nut-free','paleo','pescatarian'
 ];
+let lastPlanData = null; // holds the most recent plan JSON
 const LS = {
   get(k, d=null){ try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
   set(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
@@ -622,6 +623,83 @@ loadTravelBtn?.addEventListener('click', async () => {
   }
 });
 
+const copyPlanBtn = document.getElementById('copyPlanBtn');
+copyPlanBtn?.addEventListener('click', async () => {
+  try {
+    // Prefer the structured JSON (lastPlanData). Fall back to scraping the DOM if needed.
+    let text = '';
+    if (lastPlanData && (lastPlanData.timeline || lastPlanData.plan || lastPlanData.planTitle)) {
+      const city  = lastPlanData.city || '';
+      const title = lastPlanData.planTitle || `Local Night Plan${city ? ' — ' + city : ''}`;
+      const rows  = Array.isArray(lastPlanData.timeline) ? lastPlanData.timeline : [];
+      const tips  = Array.isArray(lastPlanData.tips) ? lastPlanData.tips : [];
+
+      const lines = [];
+      lines.push(title);
+      lines.push('');
+
+      rows.forEach(s => {
+        const t   = s.time ? `${s.time} ` : '';
+        const act = s.activity || s.title || '';
+        const emo = s.emoji ? `${s.emoji} ` : '';
+        lines.push(`${t}${emo}${act}`.trim());
+        if (s.food) lines.push(`  • Food: ${s.food}`);
+        if (s.note) lines.push(`  • ${s.note}`);
+        if (s.link) lines.push(`  • Link: ${s.link}`);
+        lines.push('');
+      });
+
+      if (tips.length) {
+        lines.push('Tips:');
+        tips.forEach(t => lines.push(`  • ${t}`));
+      }
+
+      text = lines.join('\n');
+    } else {
+      // Fallback: copy whatever is visible in the plan box
+      const box = document.getElementById('planBox');
+      text = box ? box.innerText.trim() : 'Night plan';
+    }
+
+    // Write to clipboard (with fallback)
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      toast('✅ Plan copied to clipboard');
+    } else {
+      // old-school fallback
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      toast('✅ Plan copied');
+    }
+  } catch (e) {
+    alert('Could not copy plan: ' + e.message);
+  }
+});
+
+// tiny toast helper (no deps)
+function toast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.position = 'fixed';
+  t.style.bottom = '16px';
+  t.style.left = '50%';
+  t.style.transform = 'translateX(-50%)';
+  t.style.background = '#0b1220';
+  t.style.border = '1px solid #263247';
+  t.style.padding = '10px 14px';
+  t.style.borderRadius = '10px';
+  t.style.color = '#e2e8f0';
+  t.style.fontSize = '14px';
+  t.style.zIndex = '9999';
+  t.style.boxShadow = '0 8px 24px rgba(0,0,0,.35)';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1500);
+}
+
 // Delegate: "Suggest food near here"
 travelGrid?.addEventListener('click', async (ev) => {
   const btn = ev.target.closest('button[data-suggest-food]');
@@ -658,6 +736,7 @@ genPlanBtn?.addEventListener('click', async () => {
       body: JSON.stringify({ location: loc, prompt })
     });
     const data = await r.json();
+    lastPlanData = data;
     if (!data?.success && !data?.timeline) throw new Error('No plan');
 
     const timeline = (data.timeline || []).map(s => {
@@ -683,5 +762,131 @@ genPlanBtn?.addEventListener('click', async () => {
     `;
   } catch (e) {
     planBox.innerHTML = `<div class="muted">Couldn't generate a plan: ${e.message}</div>`;
+  }
+});
+
+// Night Plan (demo endpoint)
+const genNightPlanBtn = document.getElementById('genNightPlanBtn');
+
+genNightPlanBtn?.addEventListener('click', async () => {
+  const loc = getLocation();
+  planBox.innerHTML = '<div class="muted">Planning your night…</div>';
+  try {
+    const r = await fetch(`${SERVER}/v1/travel/nightplan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ location: loc })
+    });
+    const data = await r.json();
+    lastPlanData = data;
+    if (!data?.success && !data?.timeline) throw new Error('No plan generated');
+
+    // Render exactly like your example
+    const timelineHtml = (data.timeline || []).map((s, idx) => {
+      const tracked = s.link ? `${SERVER}/v1/linkout?tag=nightplan&url=${encodeURIComponent(s.link)}` : null;
+      // Encode the step as data-attrs for later use
+      const stepData = {
+        time: s.time || '',
+        activity: s.activity || '',
+        food: s.food || '',
+        emoji: s.emoji || '',
+        note: s.note || ''
+      };
+      const stepAttr = encodeURIComponent(JSON.stringify(stepData));
+      return `
+        <div class="step">
+          <div class="big">${s.time || ''} ${s.emoji || ''} ${s.activity || ''}</div>
+          ${s.food ? `<div>Food: <strong>${s.food}</strong></div>` : ''}
+          ${s.note ? `<div class="muted">${s.note}</div>` : ''}
+          <div class="row" style="gap:8px; margin-top:4px">
+            <button class="small suggest-step-btn" data-step='${stepAttr}'>Suggest food for this step</button>
+            ${tracked ? `<a class="small secondary" href="${tracked}" target="_blank" rel="noopener">Open link</a>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+
+    planBox.innerHTML = `
+      <div class="big">${data.planTitle || `Local Night Plan in ${data.city || ''}`}</div>
+      <div class="timeline" style="margin-top:6px">${timelineHtml}</div>
+      ${
+        Array.isArray(data.tips) && data.tips.length
+          ? `<div style="margin-top:10px"><div class="event-title">Tips</div><ul>${
+              data.tips.map(t => `<li>${t}</li>`).join('')
+            }</ul></div>`
+          : ''
+      }
+    `;
+  } catch (e) {
+    planBox.innerHTML = `<div class="muted">Couldn't generate a plan: ${e.message}</div>`;
+  }
+});
+
+// Delegate: click "Suggest food for this step" in the Night Plan
+planBox?.addEventListener('click', async (ev) => {
+  const btn = ev.target.closest('.suggest-step-btn');
+  if (!btn) return;
+
+  // Extract step data
+  let step = {};
+  try { step = JSON.parse(decodeURIComponent(btn.dataset.step || '%7B%7D')); } catch {}
+  const loc = getLocation();
+
+  // Infer mood from step (simple, effective heuristic)
+  const a = (step.activity || '').toLowerCase();
+  const f = (step.food || '').toLowerCase();
+  let mood_text = 'local, authentic, balanced';
+  if (/walk|market|stroll|crawl|night/i.test(a)) mood_text = 'adventurous street-food vibes';
+  if (/jazz|music|bar|pub|live/i.test(a))        mood_text = 'celebrating with light bites';
+  if (/dinner|signature|restaurant|hearty/i.test(a)) mood_text = 'comforting, authentic, hearty';
+  if (/dessert|sweet|ice cream|gelato/i.test(a)) mood_text = 'sweet finish, light and fun';
+  if (f) mood_text += `, inspired by ${step.food}`;
+
+  // Show a quick loading state on the button
+  const old = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Thinking…';
+
+  try {
+    const res = await fetch(`${SERVER}/v1/recommend`, {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        location: loc,
+        mood_text,
+        dietary: (typeof getSelectedDietary === 'function') ? getSelectedDietary() : [],
+        budget: (budgetSelect?.value || 'medium'),
+        menu_source: 'global_database'
+      })
+    });
+    const data = await res.json();
+    if (!data?.success) throw new Error(data?.error || 'No suggestion');
+
+    // Render into your existing Result Card
+    if (resultCard) resultCard.style.display = 'block';
+    if (foodEmoji)  foodEmoji.textContent   = data.food?.emoji || '🍽️';
+    if (foodName)   foodName.textContent    = data.food?.name  || 'Great Choice';
+    if (friendMessage) friendMessage.textContent = data.friendMessage || `Because this step is "${step.activity}"`;
+
+    // KPIs and badges (safe if they exist)
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    set('dietaryNote', data.dietaryNote || '—');
+    set('weatherNote', data.weatherNote || data.weatherReasoning || '—');
+    set('countryCode', data.food?.country_code ? countryCodeToEmoji(data.food.country_code) : '—');
+    set('confidence', (typeof data.confidence === 'number') ? `Confidence: ${data.confidence}%` : 'Confidence: —');
+    set('weatherBadge',
+      (data?.weather?.description || (data?.weather && data.weather.temperature != null))
+        ? `Weather: ${data.weather.temperature ?? '—'}°C • ${data.weather.description ?? data.weather.condition ?? ''}`.trim()
+        : 'Weather: —'
+    );
+    const engineEl = document.getElementById('engineBadge');
+    if (engineEl) engineEl.textContent =
+      (data.source === 'gpt' || data.context?.mood_detection_method === 'ai') ? 'Engine: GPT' :
+      (data.source === 'uploaded_menu') ? 'Engine: Vendor Menu' : 'Engine: Fallback';
+
+  } catch (e) {
+    alert(`Couldn't suggest for this step: ${e.message}`);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = old;
   }
 });

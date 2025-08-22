@@ -857,6 +857,110 @@ app.post('/v1/travel/plan', async (req, res) => {
     tips: ['Carry cash for markets', 'Ask locals for their favorite stall']
   });
 });
+// --- Demo: Night plan (structured, GPT if enabled, Kisumu-local fallback) ---
+app.post('/v1/travel/nightplan', async (req, res) => {
+  const { location = {}, prompt } = req.body || {};
+  const cityIn = (location.city || '').trim();
+  const cc = (location.country_code || 'KE').toUpperCase();
+  const city = cityIn || (cc === 'KE' ? 'Nairobi' : 'London');
+
+  // If you already added gptTravelPlan() earlier, try GPT first:
+  if (typeof gptTravelPlan === 'function') {
+    const plan = await gptTravelPlan({
+      city,
+      country_code: cc,
+      prompt: prompt || 'I want to try local experiences in the city tonight. Map a night plan with food and vibes.'
+    });
+    if (plan) return res.json(plan);
+  }
+
+  // Fallbacks (no GPT or failure)
+  if (/kisumu/i.test(city)) {
+    return res.json({
+      success: true,
+      city: 'Kisumu',
+      country_code: 'KE',
+      planTitle: 'Local Food Experience in Kisumu',
+      timeline: [
+        {
+          time: '18:30',
+          activity: 'Enjoy local fish delicacies',
+          food: 'Tilapia',
+          emoji: '🐟',
+          note: 'Freshly caught from Lake Victoria, known for its unique flavor.',
+          link: 'https://www.google.com/search?q=Kisumu+Tilapia+restaurant'
+        },
+        {
+          time: '19:30',
+          activity: 'Savor traditional Ugali',
+          food: 'Ugali',
+          emoji: '🍚',
+          note: 'A staple food that pairs well with fish, made from maize flour.',
+          link: 'https://www.google.com/search?q=Ugali+Kisumu'
+        },
+        {
+          time: '20:00',
+          activity: 'Sample local beer',
+          food: 'Tusker Lager',
+          emoji: '🍺',
+          note: 'A popular Kenyan beer that complements the local cuisine.',
+          link: 'https://www.google.com/search?q=Tusker+Lager+Kisumu+bar'
+        }
+      ],
+      tips: [
+        'Try to dine by the lakeside for a beautiful sunset view.',
+        'Ask locals for their favorite spots to get authentic meals.'
+      ]
+    });
+  }
+
+  // Generic local-night fallback for any other city
+  return res.json({
+    success: true,
+    city,
+    country_code: cc,
+    planTitle: `Local Night Plan in ${city}`,
+    timeline: [
+      {
+        time: '18:30',
+        activity: 'Golden hour neighborhood walk',
+        food: 'Street snack (pick a busy stall)',
+        emoji: '🌇',
+        note: 'Start light, scout popular queues for best bites.',
+        link: `https://www.google.com/search?q=${encodeURIComponent(city + ' street food')}`
+      },
+      {
+        time: '19:30',
+        activity: 'Live music or casual pub',
+        food: 'Local lager or non-alc brew',
+        emoji: '🎶',
+        note: 'Catch a set; ask staff what pairs with the local snacks.',
+        link: `https://www.google.com/search?q=${encodeURIComponent(city + ' live music tonight')}`
+      },
+      {
+        time: '21:00',
+        activity: 'Signature local dish',
+        food: 'Chef-recommended classic',
+        emoji: '🍽️',
+        note: 'Pick a place with regional specialties; be open to seasonal sides.',
+        link: `https://www.google.com/search?q=${encodeURIComponent('best local dish ' + city)}`
+      },
+      {
+        time: '22:30',
+        activity: 'Dessert walk / night market',
+        food: 'Sweet street snack',
+        emoji: '🍧',
+        note: 'End on something sweet; try whatever has the happiest queue.',
+        link: `https://www.google.com/search?q=${encodeURIComponent(city + ' night market')}`
+      }
+    ],
+    tips: [
+      'Carry small cash for stalls.',
+      'Follow the crowds for freshness and turnover.',
+      'Ask one local: "what do you eat here?" — then order that.'
+    ]
+  });
+});
 // Add POST /v1/quick_decision
 app.post('/v1/quick_decision', async (req, res) => {
   const t0 = Date.now();
