@@ -25,11 +25,11 @@
     .kpi{background:#0b1220;border:1px solid #263247;border-radius:12px;padding:10px 12px;font-size:14px}
     .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
     .pill{display:inline-block;border:1px solid #263247;border-radius:999px;padding:2px 8px;font-size:12px;margin-left:6px}
-    .right{margin-left:auto}
     .pill.ok { background:#064e3b; border-color:#10b981; }
     .pill.warn { background:#7c2d12; border-color:#f59e0b; }
     .pill.bad { background:#5b1a1a; border-color:#ef4444; }
     .small { font-size:12px; }
+    .right{margin-left:auto}
   </style>
 </head>
 <body>
@@ -154,46 +154,42 @@
       put('percent: '+(j.usage?.percentage != null ? j.usage.percentage+'%' : '—'));
     }
 
-    // Health
+    // Health with pill
     async function loadHealth(){
-    const { base } = api();
-    const t0 = performance.now();
-    let ok = false, j = null;
-    try {
+      const { base } = api();
+      const t0 = performance.now();
+      let ok = false, j = null;
+      try {
         const r = await fetch(base+'/health');
         j = await r.json();
         ok = r.ok && j?.status === 'healthy';
-    } catch {
+      } catch {
         ok = false;
-    }
-    const ms = Math.round(performance.now() - t0);
+      }
+      const ms = Math.round(performance.now() - t0);
 
-    // Color logic:
-    // - RED if request failed or took > 2000ms
-    // - YELLOW if healthy but slow (1000–2000ms) or any core service OFF
-    // - GREEN if healthy, <1000ms, and core services OK
-    const pill = document.getElementById('healthPill');
-    const hb = document.getElementById('healthBox');
-    if (!pill || !hb) return;
+      const pill = document.getElementById('healthPill');
+      const hb = document.getElementById('healthBox');
+      if (!pill || !hb) return;
 
-    const coreOff =
-        (j?.services?.gpt === 'off' && String(process.env?.USE_GPT||'').toLowerCase()==='true') ||
+      const coreOff =
+        (j?.services?.gpt === 'off') ||
         (j?.services?.weather === 'off');
 
-    pill.classList.remove('ok','warn','bad');
+      pill.classList.remove('ok','warn','bad');
 
-    if (!ok || ms > 2000) {
+      if (!ok || ms > 2000) {
         pill.classList.add('bad');
         pill.textContent = `Unhealthy (${ms}ms)`;
-    } else if (ms > 1000 || coreOff) {
+      } else if (ms > 1000 || coreOff) {
         pill.classList.add('warn');
         pill.textContent = `Degraded (${ms}ms)`;
-    } else {
+      } else {
         pill.classList.add('ok');
         pill.textContent = `Healthy (${ms}ms)`;
-    }
+      }
 
-    hb.textContent = JSON.stringify(j || { error: 'unreachable' }, null, 2);
+      hb.textContent = JSON.stringify(j || { error: 'unreachable' }, null, 2);
     }
 
     // Menu
