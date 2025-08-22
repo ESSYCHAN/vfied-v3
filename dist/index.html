@@ -32,9 +32,23 @@
     .rowsm{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
     .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px}
     .small{font-size:12px}
+    
+    /* Tab styles */
+    .tab-btn.active { outline: 2px solid #6d28d9; }
+    .tab-panel .event-card,
+    .tab-panel .travel-card {
+      display:flex; gap:12px; background:#0b1220; border:1px solid #263247;
+      padding:12px; border-radius:12px; align-items:flex-start;
+    }
+    .event-badge, .travel-badge { font-size:24px; }
+    .event-title, .travel-title { font-weight:700; }
+    .event-meta { font-size:12px; opacity:.8; }
+    .timeline { border-left:2px solid #263247; margin-left:6px; padding-left:10px; }
+    .timeline .step { margin:8px 0; }
+    .timeline .time { font-weight:700; margin-right:6px; }
   </style>
-  <script type="module" crossorigin src="/assets/index-C0fpGD71.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-799A-Is4.css">
+  <script type="module" crossorigin src="/assets/index-Dby_a9Uv.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-CZBCS89V.css">
   <script type="module">import.meta.url;import("_").catch(()=>1);(async function*(){})().next();window.__vite_is_modern_browser=true</script>
   <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
 </head>
@@ -42,125 +56,160 @@
   <div class="container">
     <h1>🍽️ VFIED — One-Tap Food Decision</h1>
     <div class="muted">Hooked to your local server at <code class="mono">http://localhost:3001</code></div>
+    
+    <!-- TABS -->
+    <div class="row" style="gap:8px; margin:14px 0">
+      <button class="secondary tab-btn active" data-tab="food">🍽️ Food</button>
+      <button class="secondary tab-btn" data-tab="events">🎉 Events</button>
+      <button class="secondary tab-btn" data-tab="travel">🧭 Travel</button>
+    </div>
 
-    <!-- Decision Card -->
-    <div class="card">
-      <div class="grid grid-2">
-        <div>
-          <label for="moodInput">How are you feeling?</label>
-          <input id="moodInput" placeholder="e.g. stressed but want something light" style="width:100%; margin-top:6px" />
-          <div class="rowsm" style="margin-top:8px">
-            <button class="secondary" data-quick="tired">😴 Tired</button>
-            <button class="secondary" data-quick="stressed">😰 Stressed</button>
-            <button class="secondary" data-quick="celebrating">🎉 Celebrating</button>
-            <button class="secondary" data-quick="hungry">🤤 Hungry</button>
-            <button class="secondary" id="detectMoodBtn">✨ Detect Mood (AI)</button>
+    <div id="tab-food" class="tab-panel" style="display:block">
+      <!-- Decision Card -->
+      <div class="card">
+        <div class="grid grid-2">
+          <div>
+            <label for="moodInput">How are you feeling?</label>
+            <input id="moodInput" placeholder="e.g. stressed but want something light" style="width:100%; margin-top:6px" />
+            <div class="rowsm" id="quickMoods" style="margin-top:8px">
+              <button class="secondary mood-chip" data-quick="tired">😴 Tired</button>
+              <button class="secondary mood-chip" data-quick="stressed">😰 Stressed</button>
+              <button class="secondary mood-chip" data-quick="celebrating">🎉 Celebrating</button>
+              <button class="secondary mood-chip" data-quick="hungry">🤤 Hungry</button>
+            </div>
           </div>
-        </div>
+          <div>
+            <label>Location</label>
+            <div class="row" style="margin-top:6px">
+              <select id="citySelect">
+                <option value='{"city":"London","country":"United Kingdom","country_code":"GB"}'>London, GB</option>
+                <option value='{"city":"Nairobi","country":"Kenya","country_code":"KE"}'>Nairobi, KE</option>
+                <option value='{"city":"New York","country":"United States","country_code":"US"}'>New York, US</option>
+                <option value='{"city":"Tokyo","country":"Japan","country_code":"JP"}'>Tokyo, JP</option>
+              </select>
+              <input id="cityInputFree" placeholder="Type your city (optional)" style="width:180px" />
+              <input id="latInput" placeholder="lat (optional)" style="width:130px" />
+              <input id="lngInput" placeholder="lng (optional)" style="width:130px" />
+            </div>
 
-        <div>
-          <label>Location</label>
-          <div class="row" style="margin-top:6px">
-            <select id="citySelect">
-              <option value='{"city":"London","country":"United Kingdom","country_code":"GB"}'>London, GB</option>
-              <option value='{"city":"Nairobi","country":"Kenya","country_code":"KE"}'>Nairobi, KE</option>
-              <option value='{"city":"New York","country":"United States","country_code":"US"}'>New York, US</option>
-              <option value='{"city":"Tokyo","country":"Japan","country_code":"JP"}'>Tokyo, JP</option>
-            </select>
-            <input id="latInput" placeholder="lat (optional)" style="width:130px" />
-            <input id="lngInput" placeholder="lng (optional)" style="width:130px" />
-          </div>
-
-          <div style="margin-top:12px">
-            <label>Dietary</label>
-            <div class="chips" id="dietaryChips" style="margin-top:6px">
-              <!-- chips rendered by JS -->
+            <div style="margin-top:12px">
+              <label>Dietary</label>
+              <div class="chips" id="dietaryChips" style="margin-top:6px">
+                <!-- chips rendered by JS -->
+              </div>
             </div>
           </div>
         </div>
+
+        <div class="row" style="margin-top:12px">
+          <select id="budgetSelect">
+            <option value="medium">Budget: Medium</option>
+            <option value="low">Budget: Low</option>
+            <option value="high">Budget: High</option>
+          </select>
+          <button id="decideBtn" class="big">🎯 Decide For Me</button>
+        </div>
       </div>
 
-      <div class="row" style="margin-top:12px">
-        <select id="budgetSelect">
-          <option value="medium">Budget: Medium</option>
-          <option value="low">Budget: Low</option>
-          <option value="high">Budget: High</option>
-        </select>
-        <button id="decideBtn" class="big">🎯 Decide For Me</button>
-      </div>
-    </div>
-
-    <!-- Result Card -->
-    <div class="card" id="resultCard" style="display:none">
-      <div class="row" style="align-items:flex-start">
-        <div class="emoji" id="foodEmoji">🍽️</div>
-        <div class="result">
-          <div class="big" id="foodName">Your suggestion appears here</div>
-          <div class="muted" id="foodType"></div>
-          <div style="margin-top:8px" id="friendMessage"></div>
-          <div class="muted" style="margin-top:8px" id="reasoning"></div>
-          <div class="muted" style="margin-top:8px" id="culturalNote"></div>
-          <div class="muted" style="margin-top:8px" id="dietaryNote"></div>
-          <div class="muted" style="margin-top:8px" id="weatherNote"></div>
-
-          <div class="kpi" style="margin-top:10px">
-            <span id="countryCode">—</span>
-            <span id="confidence">—</span>
-            <span id="weatherBadge">—</span>
+      <!-- PWA Install Banner -->
+      <div id="installBanner" class="card" style="display:none; margin-top:8px">
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <div>📲 Install VFIED for 1-tap access</div>
+          <div class="row">
+            <button id="installBtn" class="secondary">Install</button>
+            <button id="installClose" class="secondary">✕</button>
           </div>
         </div>
       </div>
 
-      <div class="row" style="margin-top:12px">
-        <button id="acceptBtn">✅ Accept</button>
-        <button id="tryAgainBtn" class="secondary">🔄 Try Again</button>
-      </div>
-    </div>
+      <!-- Result Card -->
+      <div class="card" id="resultCard" style="display:none">
+        <div class="row" style="align-items:flex-start">
+          <div class="emoji" id="foodEmoji">🍽️</div>
+          <div class="result">
+            <div class="big" id="foodName">Your suggestion appears here</div>
+            <div class="muted" id="foodType"></div>
+            <div style="margin-top:8px" id="friendMessage"></div>
+            <div class="muted" style="margin-top:8px" id="reasoning"></div>
+            <div class="muted" style="margin-top:8px" id="culturalNote"></div>
+            <div class="muted" style="margin-top:8px" id="dietaryNote"></div>
+            <div class="muted" style="margin-top:8px" id="weatherNote"></div>
 
-    <!-- Vendor Upload (Demo) -->
-    <div class="card">
-      <div class="row" style="justify-content:space-between">
-        <h2 style="margin:0">📤 Vendor Menu Upload (demo)</h2>
-        <span class="small mono">Bearer demo_growth_key_456</span>
+            <div class="kpi" style="margin-top:10px">
+              <span id="countryCode">—</span>
+              <span id="confidence">—</span>
+              <span id="weatherBadge">—</span>
+              <span id="engineBadge">—</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px">
+          <button id="acceptBtn">✅ Accept</button>
+          <button id="tryAgainBtn" class="secondary">🔄 Try Again</button>
+          <button id="shareRecBtn" class="secondary">🔗 Share</button>
+        </div>
       </div>
-      <div class="grid grid-2" style="margin-top:8px">
-        <div>
-          <label>Menu JSON</label>
-          <textarea id="menuTextarea" rows="7" style="width:100%; margin-top:6px">[
+
+      <!-- Vendor Upload (Demo) -->
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">📤 Vendor Menu Upload (demo)</h2>
+          <span class="small mono">Bearer demo_growth_key_456</span>
+        </div>
+        <div class="grid grid-2" style="margin-top:8px">
+          <div>
+            <label>Menu JSON</label>
+            <textarea id="menuTextarea" rows="7" style="width:100%; margin-top:6px">[
   {"name":"Ugali Mayai","country_code":"KE","price":"8.99","tags":["vegetarian","comfort","protein"],"kcal":420,"protein_g":22,"carbs_g":60,"fat_g":10},
   {"name":"Fried Tilapia","country_code":"KE","price":"12.50","tags":["pescatarian","protein","healthy"],"kcal":500,"protein_g":40,"carbs_g":5,"fat_g":25}
 ]</textarea>
-          <div class="row" style="margin-top:8px">
-            <button id="uploadMenuBtn">Upload Menu</button>
-            <button id="viewMenuBtn" class="secondary">View My Menu</button>
+            <div class="row" style="margin-top:8px">
+              <button id="uploadMenuBtn">Upload Menu</button>
+              <button id="viewMenuBtn" class="secondary">View My Menu</button>
+            </div>
+          </div>
+          <div>
+            <label>Response</label>
+            <pre id="menuResponse" class="mono" style="margin-top:6px; white-space:pre-wrap; background:#0b1220; padding:10px; border-radius:10px; border:1px solid #263247; height:170px; overflow:auto">—</pre>
           </div>
         </div>
-        <div>
-          <label>Response</label>
-          <pre id="menuResponse" class="mono" style="margin-top:6px; white-space:pre-wrap; background:#0b1220; padding:10px; border-radius:10px; border:1px solid #263247; height:170px; overflow:auto">—</pre>
+        <div id="adminSummary" class="small mono" style="margin-top:6px; opacity:.85">—</div>
+      </div>
+    </div>
+
+    <div id="tab-events" class="tab-panel" style="display:none">
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <h2 style="margin:0">🎉 Events Near You</h2>
+          <button id="loadEventsBtn">Load Events</button>
         </div>
+        <div id="eventsGrid" class="grid" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <div id="tab-travel" class="tab-panel" style="display:none">
+      <div class="card">
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <h2 style="margin:0">🧭 Travel Highlights</h2>
+          <button id="loadTravelBtn">Show Highlights</button>
+        </div>
+        <div id="travelGrid" class="grid" style="margin-top:10px"></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h2 style="margin:0 0 8px">🗺️ Plan a Local Night</h2>
+        <input id="planPrompt" placeholder="I want to try local experiences in the city..." style="width:100%; margin-bottom:8px" />
+        <button id="genPlanBtn">Generate Night Plan</button>
+        <button id="genNightPlanBtn" class="secondary" style="margin-top:8px">Generate Night Plan (demo)</button>
+        <button id="copyPlanBtn" class="secondary" style="margin-top:8px">Copy plan to clipboard</button>
+        <div id="planBox" style="margin-top:10px"></div>
       </div>
     </div>
   </div>
-  <label>Country</label>
-  <select id="countrySelect"></select>
-  
-  <label>City</label>
-  <input id="cityInput" placeholder="e.g., Nairobi" />
-  
-  <label>Mood / prompt</label>
-  <input id="moodInput" placeholder="e.g., stressed but want something light" />
-  
-  <div style="margin:8px 0;"><span id="selectedFlag" style="font-size:20px;"></span></div>
-  
-  <button id="decideBtn">Decide for me</button>
-  
-  <div id="loading" style="display:none;">Thinking…</div>
-  <div id="error" style="color:#c00;"></div>
-  <div id="resultBox" class="card"></div>
   
   <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
-  <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-CH0b_HZw.js"></script>
-  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-lURDtj_W.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
+  <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-DRJ9LuuF.js"></script>
+  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-D4SkA3HI.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
 </body>
 </html>
