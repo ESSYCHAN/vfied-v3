@@ -160,7 +160,19 @@
   <script type="module">
     const $ = (id) => document.getElementById(id);
     const api = () => ({ base: $('baseUrl').value.trim().replace(/\/+$/,''), key: $('apiKey').value.trim() });
-
+    const CHECK_TIPS = {
+        decide_flow:           'Front-end should POST /v1/recommend (or /mcp/get_food_suggestion) and render the result card.',
+        countries_api:         'Ensure /v1/countries returns 150+ entries. Keep the ISO fallback in server; verify route not blocked by CORS.',
+        dietary_budget_ui:     'Send dietary[] and budget from the UI payload (chips + select) into /v1/recommend.',
+        engine_badge:          'Set Engine badge from response: GPT if source=gpt; Vendor Menu if source=uploaded_menu; else Fallback.',
+        vendor_menu_upload:    'Upload menu via POST /v1/menus with Bearer key; then GET /v1/menus to verify items exist.',
+        share_copy:            'Wire the “Share/Copy” button to navigator.share() or clipboard; include food name + friend message.',
+        feedback_wired:        'POST /v1/feedback from thumbs; confirm it appears in /v1/admin/telemetry (Firestore or file).',
+        weather_live:          'Set OPENWEATHER_API_KEY in Render → Environment and redeploy. Server already consumes it.',
+        gpt_enabled:           'Set USE_GPT=true and OPENAI_API_KEY in Render → Environment, then redeploy.',
+        events_layer:          'Use mock /v1/events now or set USE_EVENTS_PROVIDER=true and EVENTS_PROVIDER_URL to a proxy.',
+        travel_nightplan:      'Use /v1/travel/nightplan; the Travel tab should render timeline + suggest buttons per step.'
+        };
     async function jget(path){ const { base, key } = api();
       const r = await fetch(base+path, { headers: { 'Authorization': 'Bearer '+key } }); return await r.json(); }
     async function jpost(path, body){ const { base, key } = api();
@@ -291,11 +303,15 @@
         <span class="badge">menu items: ${j.counts?.menu_items ?? '—'}</span>
         </div>`;
 
-    const rows = (j.items || []).map(it => {
-        const icon = it.ok ? '✅' : '⛔';
+        const rows = (j.items || []).map(it => {
+        const icon  = it.ok ? '✅' : '⛔';
         const color = it.ok ? 'okay' : 'fail';
-        return `<li><span class="badge ${color}">${icon}</span><div>${it.label}</div></li>`;
-    }).join('');
+        const tip   = !it.ok && CHECK_TIPS[it.key] ? `<div class="small muted">Tip: ${CHECK_TIPS[it.key]}</div>` : '';
+        return `<li>
+                    <span class="badge ${color}">${icon}</span>
+                    <div>${it.label}${tip}</div>
+                </li>`;
+        }).join('');
 
     box.innerHTML = `${head}<ul class="chk" style="margin-top:10px">${rows}</ul>`;
     }
