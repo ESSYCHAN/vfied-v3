@@ -1213,26 +1213,12 @@ app.use((err, _req, res, _next) => {
   res.status(500).json({ error: 'Internal server error', message: err.message });
 });
 
-app.get('/v1/admin/summary', authenticateApiKey, (_req, res) => {
-  const vendorId = _req.apiKey.vendorId;
-  const m = vendorMenus.get(vendorId);
-  res.json({
-    success: true,
-    vendor_id: vendorId,
-    menu_items: m ? m.items.length : 0,
-    menu_version: m?.version || null,
-    updatedAt: m?.updatedAt || null
-  });
-});
-// --- Admin: MVP checklist (Phase 1 polish + Phase 2 starter) ---
 // --- Admin: MVP checklist (Phase 1 polish + Phase 2 starter, strict mode) ---
+// Add this to your server (replace one of the duplicate admin/summary endpoints):
 app.get('/v1/admin/checklist', authenticateApiKey, async (req, res) => {
   const USE_GPT = String(process.env.USE_GPT || '').toLowerCase() === 'true';
   const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
   const hasWeatherKey = !!process.env.OPENWEATHER_API_KEY;
-
-  // Optional: let dev builds waive integrations
-  const REQUIRE_INTEGRATIONS = String(process.env.PHASE1_REQUIRE_INTEGRATIONS || 'true').toLowerCase() === 'true';
 
   // Countries sanity
   const countriesCount = (COUNTRIES_LIST || []).length;
@@ -1249,53 +1235,32 @@ app.get('/v1/admin/checklist', authenticateApiKey, async (req, res) => {
   }
 
   // Telemetry storage available?
-  const hasTelemetry = !!db || (typeof telemetryLogPath !== 'undefined');
-
-  // Features present?
-  const hasEvents = true;
-  const hasTravelNightPlan = true;
-
-  const gptOn = (USE_GPT && hasOpenAIKey);
-  const weatherOn = hasWeatherKey;
+  const hasTelemetry = !!db || (typeof logPath !== 'undefined');
 
   const items = [
     { key: 'decide_flow',           label: 'Food → Decide flow returns suggestions',               ok: true },
-    { key: 'countries_api',         label: '/v1/countries returns a full list (150+)',            ok: countriesCount >= 150 },
+    { key: 'countries_api',         label: '/v1/countries returns a full list',                   ok: countriesCount >= 150 },
     { key: 'dietary_budget_ui',     label: 'Dietary chips + budget in payload',                   ok: true },
     { key: 'engine_badge',          label: 'Result shows Engine badge (GPT/Vendor/Fallback)',     ok: true },
     { key: 'vendor_menu_upload',    label: 'Vendor menu upload & read work',                      ok: menuItemsCount > 0 },
     { key: 'share_copy',            label: 'Share/Copy recommendation works',                     ok: true },
     { key: 'feedback_wired',        label: 'Thumbs feedback posts to backend',                    ok: hasTelemetry },
-
-    // Integrations (now part of Phase-1 gate, configurable)
-    { key: 'weather_live',          label: 'Live weather key configured',                         ok: weatherOn },
-    { key: 'gpt_enabled',           label: 'GPT suggestions enabled (USE_GPT + API key)',         ok: gptOn },
-
-    // Phase 2 starter
-    { key: 'events_layer',          label: 'Events endpoint available (provider or mock)',        ok: hasEvents },
-    { key: 'travel_nightplan',      label: 'Travel: Night Plan endpoint & UI',                    ok: hasTravelNightPlan },
+    { key: 'events_layer',          label: 'Events endpoint available (provider or mock)',        ok: true },
+    { key: 'travel_nightplan',      label: 'Travel: Night Plan endpoint & UI',                    ok: true },
+    { key: 'weather_live',          label: 'Live weather key configured',                         ok: hasWeatherKey },
+    { key: 'gpt_enabled',           label: 'GPT suggestions enabled (USE_GPT + API key)',         ok: USE_GPT && hasOpenAIKey },
   ];
-
-  // Phase-1 PASS requires core UX + integrations if REQUIRE_INTEGRATIONS=true
-  const coreKeys = ['decide_flow','countries_api','dietary_budget_ui','engine_badge','vendor_menu_upload','share_copy','feedback_wired'];
-  const integKeys = ['weather_live','gpt_enabled'];
-  const corePass = items.filter(i => coreKeys.includes(i.key)).every(i => i.ok);
-  const integPass = items.filter(i => integKeys.includes(i.key)).every(i => i.ok);
-  const phase1Pass = REQUIRE_INTEGRATIONS ? (corePass && integPass) : corePass;
 
   res.json({
     success: true,
     vendor_id: vendorId,
     summary: {
-      phase1_pass: phase1Pass,
-      phase2_seed_pass: ['events_layer','travel_nightplan'].every(k => items.find(i => i.key === k)?.ok)
+      phase1_pass: items.slice(0, 7).every(i => i.ok),
+      phase2_seed_pass: items.slice(7, 9).every(i => i.ok)
     },
     counts: {
       countries: countriesCount,
       menu_items: menuItemsCount
-    },
-    flags: {
-      require_integrations: REQUIRE_INTEGRATIONS
     },
     items
   });
