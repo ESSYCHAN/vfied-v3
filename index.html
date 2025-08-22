@@ -35,31 +35,31 @@
     .small{font-size:12px}
     
     /* Tab styles */
-    .tabs{display:flex; gap:0; margin:16px 0; border-bottom:1px solid #1f2937}
-    .tab{background:transparent; border:none; color:#94a3b8; padding:12px 24px; border-radius:0; font-weight:500; cursor:pointer; border-bottom:2px solid transparent; transition:all 0.2s ease}
-    .tab:hover{color:#e2e8f0; background:#1e293b}
-    .tab.active{color:#e2e8f0; border-bottom-color:#6d28d9; background:#111827}
-    .tabpanel{display:block}
-    .tabpanel.hidden{display:none}
-    
-    /* Event list styles */
-    .event-list{list-style:none; margin:0; padding:0}
+    .tab-btn.active { outline: 2px solid #6d28d9; }
+    .tab-panel .event-card,
+    .tab-panel .travel-card {
+      display:flex; gap:12px; background:#0b1220; border:1px solid #263247;
+      padding:12px; border-radius:12px; align-items:flex-start;
+    }
+    .event-badge, .travel-badge { font-size:24px; }
+    .event-title, .travel-title { font-weight:700; }
+    .event-meta { font-size:12px; opacity:.8; }
+    .timeline { border-left:2px solid #263247; margin-left:6px; padding-left:10px; }
+    .timeline .step { margin:8px 0; }
+    .timeline .time { font-weight:700; margin-right:6px; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>🍽️ VFIED — One-Tap Food Decision</h1>
     <div class="muted">Hooked to your local server at <code class="mono">http://localhost:3001</code></div>
-        <!-- TABS -->
+    
+    <!-- TABS -->
     <div class="row" style="gap:8px; margin:14px 0">
       <button class="secondary tab-btn active" data-tab="food">🍽️ Food</button>
       <button class="secondary tab-btn" data-tab="events">🎉 Events</button>
       <button class="secondary tab-btn" data-tab="travel">🧭 Travel</button>
-      <button id="genNightPlanBtn" class="secondary" style="margin-top:8px">Generate Night Plan (demo)</button>
-      <button id="copyPlanBtn" class="secondary" style="margin-top:8px">Copy plan to clipboard</button>
     </div>
-
-    
 
     <div id="tab-food" class="tab-panel" style="display:block">
       <!-- Decision Card -->
@@ -107,7 +107,8 @@
           <button id="decideBtn" class="big">🎯 Decide For Me</button>
         </div>
       </div>
-      <!-- Add after the first decision card: -->
+
+      <!-- PWA Install Banner -->
       <div id="installBanner" class="card" style="display:none; margin-top:8px">
         <div class="row" style="justify-content:space-between; align-items:center">
           <div>📲 Install VFIED for 1-tap access</div>
@@ -117,6 +118,7 @@
           </div>
         </div>
       </div>
+
       <!-- Result Card -->
       <div class="card" id="resultCard" style="display:none">
         <div class="row" style="align-items:flex-start">
@@ -142,6 +144,7 @@
         <div class="row" style="margin-top:12px">
           <button id="acceptBtn">✅ Accept</button>
           <button id="tryAgainBtn" class="secondary">🔄 Try Again</button>
+          <button id="shareRecBtn" class="secondary">🔗 Share</button>
         </div>
       </div>
 
@@ -155,9 +158,9 @@
           <div>
             <label>Menu JSON</label>
             <textarea id="menuTextarea" rows="7" style="width:100%; margin-top:6px">[
-              {"name":"Ugali Mayai","country_code":"KE","price":"8.99","tags":["vegetarian","comfort","protein"],"kcal":420,"protein_g":22,"carbs_g":60,"fat_g":10},
-              {"name":"Fried Tilapia","country_code":"KE","price":"12.50","tags":["pescatarian","protein","healthy"],"kcal":500,"protein_g":40,"carbs_g":5,"fat_g":25}
-            ]</textarea>
+  {"name":"Ugali Mayai","country_code":"KE","price":"8.99","tags":["vegetarian","comfort","protein"],"kcal":420,"protein_g":22,"carbs_g":60,"fat_g":10},
+  {"name":"Fried Tilapia","country_code":"KE","price":"12.50","tags":["pescatarian","protein","healthy"],"kcal":500,"protein_g":40,"carbs_g":5,"fat_g":25}
+]</textarea>
             <div class="row" style="margin-top:8px">
               <button id="uploadMenuBtn">Upload Menu</button>
               <button id="viewMenuBtn" class="secondary">View My Menu</button>
@@ -168,6 +171,7 @@
             <pre id="menuResponse" class="mono" style="margin-top:6px; white-space:pre-wrap; background:#0b1220; padding:10px; border-radius:10px; border:1px solid #263247; height:170px; overflow:auto">—</pre>
           </div>
         </div>
+        <div id="adminSummary" class="small mono" style="margin-top:6px; opacity:.85">—</div>
       </div>
     </div>
 
@@ -194,8 +198,11 @@
         <h2 style="margin:0 0 8px">🗺️ Plan a Local Night</h2>
         <input id="planPrompt" placeholder="I want to try local experiences in the city..." style="width:100%; margin-bottom:8px" />
         <button id="genPlanBtn">Generate Night Plan</button>
+        <button id="genNightPlanBtn" class="secondary" style="margin-top:8px">Generate Night Plan (demo)</button>
+        <button id="copyPlanBtn" class="secondary" style="margin-top:8px">Copy plan to clipboard</button>
         <div id="planBox" style="margin-top:10px"></div>
       </div>
+    </div>
   </div>
   
   <script type="module" src="/src/main.js"></script>

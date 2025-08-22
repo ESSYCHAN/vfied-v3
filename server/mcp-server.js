@@ -782,11 +782,38 @@ app.get('/v1/admin/summary', authenticateApiKey, (_req, res) => {
   });
 });
 
-app.get('/v1/events', (req, res) => {
+const USE_EVENTS_PROVIDER = String(process.env.USE_EVENTS_PROVIDER || '').toLowerCase() === 'true';
+const EVENTS_PROVIDER_URL = process.env.EVENTS_PROVIDER_URL || '';
+
+async function fetchRealEvents(city, cc) {
+  if (!USE_EVENTS_PROVIDER || !EVENTS_PROVIDER_URL) return null;
+  try {
+    const r = await fetch(`${EVENTS_PROVIDER_URL}?city=${encodeURIComponent(city)}&cc=${encodeURIComponent(cc)}`, { timeout: 6000 });
+    if (!r.ok) throw new Error(String(r.status));
+    const data = await r.json();
+    return (data.items || []).map(x => ({
+      id: x.id || crypto.randomUUID(),
+      city,
+      country_code: cc,
+      title: x.title || x.name || 'Event',
+      when: x.when || x.date || 'Tonight',
+      tag: (x.tag || x.category || 'event').toLowerCase().includes('food') ? 'food' :
+           (x.tag || '').toLowerCase().includes('music') ? 'music' : 'event'
+    }));
+  } catch (e) {
+    console.error('[events provider]', e.message);
+    return null;
+  }
+}
+
+app.get('/v1/events', async (req, res) => {
   const city = String(req.query.city || '');
   const cc   = String(req.query.country_code || 'GB').toUpperCase();
-  res.json({ success: true, events: sampleEventsFor(city, cc) });
+  const real = await fetchRealEvents(city, cc);
+  if (real && real.length) return res.json({ success: true, events: real });
+  return res.json({ success: true, events: sampleEventsFor(city, cc) });
 });
+
 // --- Countries & health ---
 app.get('/v1/countries', (_req, res) => {
   const out = [...COUNTRIES_LIST]
@@ -801,24 +828,28 @@ app.get('/v1/countries', (_req, res) => {
 });
 
 app.get('/health', (_req, res) => {
+  const USE_GPT = String(process.env.USE_GPT || '').toLowerCase() === 'true';
+  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+  const hasWeatherKey = !!process.env.OPENWEATHER_API_KEY;
+  const USE_EVENTS_PROVIDER = String(process.env.USE_EVENTS_PROVIDER || '').toLowerCase() === 'true';
+
   res.json({
     status: 'healthy',
     service: 'VFIED MCP Server',
     version: '2.1.0',
     features: [
-      'recommend/global',
-      'recommend/vendor',
-      'countries',
-      'moods',
-      'quick_decision',
-      'dietary_validation',
-      'cultural_context',
-      'events_mock',
-      'travel_highlights'
+      'global_recommend',
+      'vendor_menus',
+      'countries_lookup',
+      'moods_mapping',
+      'events',
+      'travel_highlights',
+      'travel_plan'
     ],
     services: {
-      weather: !!process.env.OPENWEATHER_API_KEY,
-      gpt: !!(process.env.USE_GPT && process.env.OPENAI_API_KEY)
+      gpt: (USE_GPT && hasOpenAIKey) ? 'on' : 'off',
+      weather: hasWeatherKey ? 'on' : 'off',
+      events_provider: USE_EVENTS_PROVIDER ? 'on' : 'off'
     },
     timestamp: new Date().toISOString()
   });
@@ -1026,18 +1057,34 @@ app.post('/mcp/get_cultural_food_context', (req, res) => {
     location: `${city} (${cc})`
   });
 });
-app.post('/v1/telemetry', (req, res) => {
+app.post('/v1/telemetry', (req,res)=>{
   const { event, payload } = req.body || {};
   const line = { type:'telemetry', event, payload, at:new Date().toISOString() };
   console.log('[telemetry]', line); 
   logLine(line);
-  res.json({ success: true });
+  res.json({ success:true });
+});
+const telemetryLogPath = path.resolve(__dirname, './telemetry.log');
+
+app.get('/v1/admin/telemetry', authenticateApiKey, (req, res) => {
+  const limit = Math.max(1, Math.min(500, parseInt(req.query.limit || '100', 10)));
+  try {
+    if (!fs.existsSync(telemetryLogPath)) return res.json({ success: true, items: [] });
+    const raw = fs.readFileSync(telemetryLogPath, 'utf8').trim().split('\n');
+    const slice = raw.slice(-limit);
+    const items = slice.map(line => {
+      try { return JSON.parse(line); } catch { return { type: 'unknown', raw: line }; }
+    });
+    res.json({ success: true, items });
+  } catch (e) {
+    res.status(500).json({ success: false, error: 'telemetry_read_failed', message: e.message });
+  }
 });
 // --- Feedback endpoint ---
 app.post('/v1/feedback', (req, res) => {
   const { interactionId, vote, payload } = req.body || {};
   const line = { type:'feedback', interactionId, vote, payload, at:new Date().toISOString() };
-  console.log('[feedback]', line); 
+  console.log('[feedback]', line);
   logLine(line);
   res.json({ success: true });
 });
@@ -1053,6 +1100,18 @@ app.get('/v1/linkout', (req, res) => {
 app.use((err, _req, res, _next) => {
   console.error('Server error:', err);
   res.status(500).json({ error: 'Internal server error', message: err.message });
+});
+
+app.get('/v1/admin/summary', authenticateApiKey, (_req, res) => {
+  const vendorId = _req.apiKey.vendorId;
+  const m = vendorMenus.get(vendorId);
+  res.json({
+    success: true,
+    vendor_id: vendorId,
+    menu_items: m ? m.items.length : 0,
+    menu_version: m?.version || null,
+    updatedAt: m?.updatedAt || null
+  });
 });
 
 // --- Start ---
