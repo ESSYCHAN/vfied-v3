@@ -30,6 +30,13 @@
     .pill.bad { background:#5b1a1a; border-color:#ef4444; }
     .small { font-size:12px; }
     .right{margin-left:auto}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #263247;background:#0b1220;font-size:12px}
+    .okay{color:#10b981;border-color:#10b981}
+    .warn{color:#f59e0b;border-color:#f59e0b}
+    .fail{color:#ef4444;border-color:#ef4444}
+    ul.chk{list-style:none;padding:0;margin:0}
+    ul.chk li{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #1f2937}
+    ul.chk li:last-child{border-bottom:none}
   </style>
 </head>
 <body>
@@ -65,6 +72,16 @@
           <div class="kpi">items: —</div>
           <div class="kpi">version: —</div>
           <div class="kpi">updated: —</div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+        <div class="row" style="justify-content:space-between; align-items:center">
+          <h2 style="margin:0">MVP Checklist</h2>
+          <button id="loadChecklistBtn" class="secondary">Load</button>
+        </div>
+        <div id="checklistBox" style="margin-top:8px">
+          <div class="muted">—</div>
         </div>
       </div>
 
@@ -112,17 +129,32 @@
     </div>
 
     <div class="card" style="margin-top:12px">
-      <div class="row" style="justify-content:space-between">
-        <h2 style="margin:0">Recent Feedback</h2>
-        <div class="row">
-          <select id="telemetryLimit">
-            <option>50</option><option selected>100</option><option>200</option><option>500</option>
-          </select>
-          <button id="loadTelemetryBtn" class="secondary">Load</button>
+        <div class="row" style="justify-content:space-between">
+          <h2 style="margin:0">Recent Feedback</h2>
+          <div class="row" style="gap:8px; align-items:center">
+            <label class="small">Type</label>
+            <select id="telemetryType">
+              <option value="">All</option>
+              <option value="feedback">Feedback</option>
+              <option value="telemetry">Telemetry</option>
+            </select>
+      
+            <label class="small">Since</label>
+            <input id="telemetrySince" type="datetime-local" />
+      
+            <label class="small">Limit</label>
+            <select id="telemetryLimit">
+              <option>50</option><option selected>100</option><option>200</option><option>500</option>
+            </select>
+      
+            <label class="small">Auto</label>
+            <input id="telemetryAuto" type="checkbox" />
+      
+            <button id="loadTelemetryBtn" class="secondary">Load</button>
+          </div>
         </div>
+        <div id="telemetryBox" class="mono" style="margin-top:8px;white-space:pre-wrap;max-height:300px;overflow:auto">—</div>
       </div>
-      <div id="telemetryBox" class="mono" style="margin-top:8px;white-space:pre-wrap;max-height:300px;overflow:auto">—</div>
-    </div>
   </div>
 
   <script type="module">
@@ -220,11 +252,56 @@
 
     // Telemetry
     async function loadTelemetry(){
-      const lim = $('telemetryLimit').value;
-      const j = await jget('/v1/admin/telemetry?limit='+encodeURIComponent(lim));
-      const lines = (j.items||[]).map(x => JSON.stringify(x)).join('\n');
-      $('telemetryBox').textContent = lines || '—';
+    const lim  = document.getElementById('telemetryLimit').value;
+    const type = document.getElementById('telemetryType').value;
+    const sinceVal = document.getElementById('telemetrySince').value;
+    const qs = new URLSearchParams();
+    if (lim) qs.set('limit', lim);
+    if (type) qs.set('type', type);
+    if (sinceVal) {
+        const dt = new Date(sinceVal);
+        if (!isNaN(dt.getTime())) qs.set('since', dt.toISOString());
     }
+
+    const j = await jget('/v1/admin/telemetry?' + qs.toString());
+    const items = j.items || [];
+    const lines = items.map(x => JSON.stringify(x)).join('\n');
+    document.getElementById('telemetryBox').textContent = lines || '—';
+    }
+    // Auto-refresh telemetry
+    let telemTimer = null;
+    function armTelemetryAuto(){
+    clearInterval(telemTimer);
+    if (document.getElementById('telemetryAuto').checked) {
+        telemTimer = setInterval(loadTelemetry, 10000); // every 10s
+    }
+    }
+
+
+    async function loadChecklist(){
+    const j = await jget('/v1/admin/checklist');
+    const box = document.getElementById('checklistBox');
+    if (!box) return;
+
+    const head = `
+        <div class="row" style="gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="badge ${j.summary?.phase1_pass ? 'okay' : 'fail'}">Phase 1 ${j.summary?.phase1_pass ? 'PASS' : 'TODO'}</span>
+        <span class="badge ${j.summary?.phase2_seed_pass ? 'okay' : 'warn'}">Phase 2 seed ${j.summary?.phase2_seed_pass ? 'PASS' : 'PARTIAL'}</span>
+        <span class="badge">countries: ${j.counts?.countries ?? '—'}</span>
+        <span class="badge">menu items: ${j.counts?.menu_items ?? '—'}</span>
+        </div>`;
+
+    const rows = (j.items || []).map(it => {
+        const icon = it.ok ? '✅' : '⛔';
+        const color = it.ok ? 'okay' : 'fail';
+        return `<li><span class="badge ${color}">${icon}</span><div>${it.label}</div></li>`;
+    }).join('');
+
+    box.innerHTML = `${head}<ul class="chk" style="margin-top:10px">${rows}</ul>`;
+    }
+
+    document.getElementById('loadChecklistBtn').addEventListener('click', loadChecklist);
+    document.getElementById('telemetryAuto').addEventListener('change', armTelemetryAuto);
 
     // Buttons
     $('loadSummaryBtn').addEventListener('click', loadSummary);
@@ -236,7 +313,7 @@
     $('refreshBtn').addEventListener('click', ()=>{ loadSummary(); loadUsage(); loadHealth(); loadMenu(); loadTelemetry(); });
 
     // Auto-load on open
-    loadSummary(); loadUsage(); loadHealth(); loadMenu(); loadTelemetry();
+    loadSummary(); loadUsage(); loadHealth(); loadMenu(); loadTelemetry(); loadChecklist();
   </script>
 </body>
 </html>

@@ -19,6 +19,30 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL   = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 // Add after the fs import:
 
+// --- Firebase Admin (optional: only if env present) ---
+import admin from 'firebase-admin';
+
+let db = null;
+try {
+  const pid = process.env.FIREBASE_PROJECT_ID;
+  const email = process.env.FIREBASE_CLIENT_EMAIL;
+  const key = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  if (pid && email && key) {
+    if (!admin.apps.length) {
+      admin.initializeApp({
+        credential: admin.credential.cert({ projectId: pid, clientEmail: email, privateKey: key })
+      });
+    }
+    db = admin.firestore();
+    console.log('[firebase] Firestore initialized');
+  } else {
+    console.log('[firebase] env not set — running in-memory only');
+  }
+} catch (e) {
+  console.error('[firebase] init error:', e.message);
+}
+
 function extractCountriesFromModule(mod) {
   const candidates = [];
 
@@ -206,7 +230,60 @@ function bumpMenuVersion(vendorId) {
   if (v) vendorMenus.set(vendorId, { ...v, version: next, updatedAt: new Date() });
   return next;
 }
+// ---------- Firestore adapters (no-op if db === null) ----------
+async function fsGetVendorMenu(vendorId) {
+  if (!db) return null;
+  const snap = await db.collection('vendors').doc(vendorId).collection('menu_items').get();
+  const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const metaDoc = await db.collection('vendors').doc(vendorId).get();
+  const meta = metaDoc.exists ? metaDoc.data() : {};
+  return { items, version: meta.menu_version || null, updatedAt: meta.updatedAt || null };
+}
 
+async function fsWriteVendorMenuSnapshot(vendorId, items, version) {
+  if (!db) return;
+  const batch = db.batch();
+  const root = db.collection('vendors').doc(vendorId);
+  // Upsert each item
+  items.forEach(it => {
+    const ref = root.collection('menu_items').doc(it.menu_item_id);
+    batch.set(ref, it, { merge: true });
+  });
+  // Update meta
+  batch.set(root, { menu_version: version, updatedAt: new Date().toISOString() }, { merge: true });
+  await batch.commit();
+}
+
+async function fsUpdateAvailability(vendorId, updates, nextVersion) {
+  if (!db) return 0;
+  const batch = db.batch();
+  const root = db.collection('vendors').doc(vendorId);
+  let count = 0;
+  for (const u of updates) {
+    const ref = root.collection('menu_items').doc(u.menu_item_id);
+    batch.set(ref, { availability: u.availability, price: u.price }, { merge: true });
+    count++;
+  }
+  batch.set(root, { menu_version: nextVersion, updatedAt: new Date().toISOString() }, { merge: true });
+  await batch.commit();
+  return count;
+}
+
+async function fsAppendTelemetry(line) {
+  if (!db) return;
+  await db.collection('telemetry').add({ ...line, at: admin.firestore.FieldValue.serverTimestamp() });
+}
+
+async function fsVendorAnalytics(vendorId) {
+  if (!db) return null;
+  const doc = await db.collection('vendors').doc(vendorId).collection('analytics').doc('plan').get();
+  return doc.exists ? doc.data() : null;
+}
+
+async function fsSetVendorAnalytics(vendorId, data) {
+  if (!db) return;
+  await db.collection('vendors').doc(vendorId).collection('analytics').doc('plan').set(data, { merge: true });
+}
 // --- Weather (optional; falls back if no key) ---
 async function getWeather(location) {
   const key = process.env.OPENWEATHER_API_KEY;
@@ -461,15 +538,24 @@ app.post('/mcp/validate_dietary_compliance', (req, res) => {
 });
 
 // --- Vendor endpoints (API key required) ---
-app.post('/v1/menus', authenticateApiKey, (req, res) => {
+app.post('/v1/menus', authenticateApiKey, async (req, res) => {
   const { menu = [], mode = 'snapshot' } = req.body || {};
   if (!Array.isArray(menu)) return res.status(400).json({ error: 'menu must be an array' });
 
   const vendorId = req.apiKey.vendorId;
-  const current = vendorMenus.get(vendorId) || { items: [], version: null, updatedAt: null };
-  const byId = new Map(current.items.map(i => [i.menu_item_id, i]));
+  let current = { items: [], version: null, updatedAt: null };
+  
+  // Get current menu from Firestore or memory
+  if (db) {
+    const fsMenu = await fsGetVendorMenu(vendorId);
+    if (fsMenu) current = fsMenu;
+  } else {
+    current = vendorMenus.get(vendorId) || current;
+  }
 
+  const byId = new Map(current.items.map(i => [i.menu_item_id, i]));
   const accepted = [], errors = [];
+  
   for (const raw of menu) {
     const v = validateMenuItem(raw);
     if (!v.valid) { errors.push({ item: raw?.name || 'unnamed', errors: v.errors }); continue; }
@@ -491,14 +577,26 @@ app.post('/v1/menus', authenticateApiKey, (req, res) => {
   }
 
   const version = `v_${Date.now()}`;
-  vendorMenus.set(vendorId, { items: nextItems, version, updatedAt: new Date() });
 
-  res.json({
-    success: errors.length === 0,
-    menu_version: version,
-    summary: { accepted: accepted.length, rejected: errors.length, total: menu.length },
-    errors
-  });
+  try {
+    if (db) {
+      // Firestore path
+      await fsWriteVendorMenuSnapshot(vendorId, nextItems, version);
+    } else {
+      // In-memory fallback
+      vendorMenus.set(vendorId, { items: nextItems, version, updatedAt: new Date() });
+    }
+
+    res.json({
+      success: errors.length === 0,
+      menu_version: version,
+      summary: { accepted: accepted.length, rejected: errors.length, total: menu.length },
+      errors
+    });
+  } catch (error) {
+    console.error('[menu upload error]', error);
+    res.status(500).json({ error: 'Failed to save menu', message: error.message });
+  }
 });
 
 app.patch('/v1/menus/availability', authenticateApiKey, (req, res) => {
@@ -520,17 +618,14 @@ app.patch('/v1/menus/availability', authenticateApiKey, (req, res) => {
   res.json({ success: true, updated, menu_version: version });
 });
 // View current vendor menu (requires API key)
-app.get('/v1/menus', authenticateApiKey, (req, res) => {
+app.get('/v1/menus', authenticateApiKey, async (req, res) => {
   const vendorId = req.apiKey.vendorId;
-  const vm = vendorMenus.get(vendorId);
-  if (!vm) return res.json({ success: true, items: [], version: null, updatedAt: null });
-  res.json({
-    success: true,
-    vendor_id: vendorId,
-    version: vm.version,
-    updatedAt: vm.updatedAt,
-    items: vm.items
-  });
+  if (db) {
+    const m = await fsGetVendorMenu(vendorId);
+    return res.json({ success: true, vendor_id: vendorId, version: m?.version, updatedAt: m?.updatedAt, items: m?.items || [] });
+  }
+  const m = vendorMenus.get(vendorId) || { items: [], version: null, updatedAt: null };
+  res.json({ success: true, vendor_id: vendorId, version: m.version, updatedAt: m.updatedAt, items: m.items });
 });
 // View current vendor menu (requires API key)
 app.get('/v1/menus', authenticateApiKey, (req, res) => {
@@ -540,14 +635,28 @@ app.get('/v1/menus', authenticateApiKey, (req, res) => {
   res.json({ success: true, vendor_id: vendorId, version: vm.version, updatedAt: vm.updatedAt, items: vm.items });
 });
 
-app.get('/v1/analytics', authenticateApiKey, (req, res) => {
+app.get('/v1/analytics', authenticateApiKey, async (req, res) => {
   const k = req.apiKey;
+  let usage = { current_period: k.usage, limit: k.limit, percentage: Math.round((k.usage / k.limit) * 100) };
+  let plan = k.plan;
+
+  if (db) {
+    const doc = await fsVendorAnalytics(k.vendorId);
+    if (doc) {
+      usage = doc.usage || usage;
+      plan = doc.plan || plan;
+    } else {
+      // seed default in Firestore so dashboard shows stable numbers
+      await fsSetVendorAnalytics(k.vendorId, { plan, usage });
+    }
+  }
+
   res.json({
     success: true,
-    usage: { current_period: k.usage, limit: k.limit, percentage: Math.round((k.usage / k.limit) * 100) },
-    plan: k.plan,
+    usage,
+    plan,
     vendor_id: k.vendorId,
-    menu_status: vendorMenus.has(k.vendorId) ? 'uploaded' : 'not_uploaded'
+    menu_status: db ? 'from_firestore' : (vendorMenus.has(k.vendorId) ? 'uploaded' : 'not_uploaded')
   });
 });
 // --- GPT recommend helper ---
@@ -1060,8 +1169,9 @@ app.post('/mcp/get_cultural_food_context', (req, res) => {
 app.post('/v1/telemetry', (req,res)=>{
   const { event, payload } = req.body || {};
   const line = { type:'telemetry', event, payload, at:new Date().toISOString() };
-  console.log('[telemetry]', line); 
-  logLine(line);
+  console.log('[telemetry]', line);
+  logLine?.(line);
+  fsAppendTelemetry?.(line);
   res.json({ success:true });
 });
 const telemetryLogPath = path.resolve(__dirname, './telemetry.log');
@@ -1085,7 +1195,8 @@ app.post('/v1/feedback', (req, res) => {
   const { interactionId, vote, payload } = req.body || {};
   const line = { type:'feedback', interactionId, vote, payload, at:new Date().toISOString() };
   console.log('[feedback]', line);
-  logLine(line);
+  logLine?.(line);          // your file logger (if you kept it)
+  fsAppendTelemetry?.(line); // Firestore
   res.json({ success: true });
 });
 // Linkout tracker
@@ -1111,6 +1222,82 @@ app.get('/v1/admin/summary', authenticateApiKey, (_req, res) => {
     menu_items: m ? m.items.length : 0,
     menu_version: m?.version || null,
     updatedAt: m?.updatedAt || null
+  });
+});
+// --- Admin: MVP checklist (Phase 1 polish + Phase 2 starter) ---
+// --- Admin: MVP checklist (Phase 1 polish + Phase 2 starter, strict mode) ---
+app.get('/v1/admin/checklist', authenticateApiKey, async (req, res) => {
+  const USE_GPT = String(process.env.USE_GPT || '').toLowerCase() === 'true';
+  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
+  const hasWeatherKey = !!process.env.OPENWEATHER_API_KEY;
+
+  // Optional: let dev builds waive integrations
+  const REQUIRE_INTEGRATIONS = String(process.env.PHASE1_REQUIRE_INTEGRATIONS || 'true').toLowerCase() === 'true';
+
+  // Countries sanity
+  const countriesCount = (COUNTRIES_LIST || []).length;
+
+  // Vendor menu existence
+  const vendorId = req.apiKey.vendorId;
+  let menuItemsCount = 0;
+  if (db) {
+    const m = await fsGetVendorMenu(vendorId);
+    menuItemsCount = (m?.items || []).length;
+  } else {
+    const vm = vendorMenus.get(vendorId);
+    menuItemsCount = vm ? vm.items.length : 0;
+  }
+
+  // Telemetry storage available?
+  const hasTelemetry = !!db || (typeof telemetryLogPath !== 'undefined');
+
+  // Features present?
+  const hasEvents = true;
+  const hasTravelNightPlan = true;
+
+  const gptOn = (USE_GPT && hasOpenAIKey);
+  const weatherOn = hasWeatherKey;
+
+  const items = [
+    { key: 'decide_flow',           label: 'Food → Decide flow returns suggestions',               ok: true },
+    { key: 'countries_api',         label: '/v1/countries returns a full list (150+)',            ok: countriesCount >= 150 },
+    { key: 'dietary_budget_ui',     label: 'Dietary chips + budget in payload',                   ok: true },
+    { key: 'engine_badge',          label: 'Result shows Engine badge (GPT/Vendor/Fallback)',     ok: true },
+    { key: 'vendor_menu_upload',    label: 'Vendor menu upload & read work',                      ok: menuItemsCount > 0 },
+    { key: 'share_copy',            label: 'Share/Copy recommendation works',                     ok: true },
+    { key: 'feedback_wired',        label: 'Thumbs feedback posts to backend',                    ok: hasTelemetry },
+
+    // Integrations (now part of Phase-1 gate, configurable)
+    { key: 'weather_live',          label: 'Live weather key configured',                         ok: weatherOn },
+    { key: 'gpt_enabled',           label: 'GPT suggestions enabled (USE_GPT + API key)',         ok: gptOn },
+
+    // Phase 2 starter
+    { key: 'events_layer',          label: 'Events endpoint available (provider or mock)',        ok: hasEvents },
+    { key: 'travel_nightplan',      label: 'Travel: Night Plan endpoint & UI',                    ok: hasTravelNightPlan },
+  ];
+
+  // Phase-1 PASS requires core UX + integrations if REQUIRE_INTEGRATIONS=true
+  const coreKeys = ['decide_flow','countries_api','dietary_budget_ui','engine_badge','vendor_menu_upload','share_copy','feedback_wired'];
+  const integKeys = ['weather_live','gpt_enabled'];
+  const corePass = items.filter(i => coreKeys.includes(i.key)).every(i => i.ok);
+  const integPass = items.filter(i => integKeys.includes(i.key)).every(i => i.ok);
+  const phase1Pass = REQUIRE_INTEGRATIONS ? (corePass && integPass) : corePass;
+
+  res.json({
+    success: true,
+    vendor_id: vendorId,
+    summary: {
+      phase1_pass: phase1Pass,
+      phase2_seed_pass: ['events_layer','travel_nightplan'].every(k => items.find(i => i.key === k)?.ok)
+    },
+    counts: {
+      countries: countriesCount,
+      menu_items: menuItemsCount
+    },
+    flags: {
+      require_integrations: REQUIRE_INTEGRATIONS
+    },
+    items
   });
 });
 

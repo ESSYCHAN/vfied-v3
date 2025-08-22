@@ -4,13 +4,13 @@
   "type": "module",
   "private": true,
   "scripts": {
-  "start": "node server/mcp-server.js",
-  "dev:server": "node --watch server/mcp-server.js",
-  "dev:app": "vite",
-  "dev": "npm-run-all -p dev:server dev:app",
-  "build": "vite build --config app/vite.config.js",
-  "preview": "vite preview --config app/vite.config.js"
-},
+    "start": "node server/mcp-server.js",
+    "dev:server": "node --watch server/mcp-server.js",
+    "dev:app": "vite",
+    "dev": "npm-run-all -p dev:server dev:app",
+    "build": "vite build --config app/vite.config.js",
+    "preview": "vite preview --config app/vite.config.js"
+  },
   "dependencies": {
     "@capacitor/app": "^5.0.8",
     "@capacitor/core": "^5.7.8",
@@ -22,6 +22,7 @@
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "firebase": "^10.7.1",
+    "firebase-admin": "^13.4.0",
     "helmet": "^7.1.0",
     "joi": "^17.11.0",
     "uuid": "^9.0.1",
