@@ -17,8 +17,97 @@ import * as countriesModule from './data/countries.js';
 const USE_GPT = String(process.env.USE_GPT || '').toLowerCase() === 'true';
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const OPENAI_MODEL   = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-// Add after the fs import:
 
+async function gptChatJSON({ system, user, max_tokens = 900 }) {
+  if (!USE_GPT || !OPENAI_API_KEY) return null;
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: user }
+        ],
+        temperature: 0.8,
+        max_tokens
+      })
+    });
+    if (!r.ok) throw new Error(String(r.status));
+    const j = await r.json();
+    const raw = j.choices?.[0]?.message?.content?.trim();
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  } catch (e) {
+    console.warn('[gptChatJSON] fail:', e.message);
+    return null;
+  }
+}
+
+function getGlobalFoodExamples(countryCode = '') {
+  const ex = {
+    'KE': `KENYA ROTATION:
+- Staples: Ugali + Sukuma, Githeri, Rice + Beans, Chapati
+- Proteins: Nyama Choma, Tilapia, Chicken Stew, Goat Curry
+- Street: Mutura, Samosas, Mandazi, Roasted Maize
+- Special: Pilau, Swahili Biriyani, Coastal Coconut Stews`,
+    'NG': `NIGERIA ROTATION:
+- Staples: Jollof Rice, Pounded Yam, Fufu, Rice & Beans
+- Proteins: Suya, Pepper Soup, Grilled Fish, Beef Stew
+- Street: Akara, Boli, Puff-Puff
+- Special: Egusi, Party Jollof, Ofe Nsala`,
+    'IN': `INDIA ROTATION:
+- Staples: Dal Rice, Chapati, Biryani, Khichdi
+- Proteins: Tandoori Chicken, Fish Curry, Paneer
+- Street: Chaat, Samosa, Vada Pav, Dosa
+- Special: Thali, Regional Curries`,
+    'GB': `UK ROTATION:
+- Staples: Fish & Chips, Pie & Mash, Sunday Roast, Jacket Potato
+- Proteins: Shepherd's Pie, Roast Chicken, Curry (adopted)
+- Street: Pasty, Sandwich, Kebab
+- Special: Full English, Pub Classics`,
+    'JP': `JAPAN ROTATION:
+- Staples: Rice Bowls, Ramen, Udon, Onigiri
+- Proteins: Sushi, Yakitori, Tempura
+- Street: Takoyaki, Taiyaki
+- Special: Kaiseki, Bento`,
+    'FR': `FRANCE ROTATION:
+- Staples: Baguette & Cheese, Crepes
+- Proteins: Coq au Vin, Bouillabaisse, Steak Frites
+- Street: Croque Monsieur, Galettes
+- Special: Regional Specialties`,
+    'MX': `MEXICO ROTATION:
+- Staples: Tacos, Rice & Beans, Quesadillas
+- Proteins: Carnitas, Fish Tacos, Mole
+- Street: Elote, Tamales, Churros
+- Special: Mole Negro, Regional Feasts`,
+    'TH': `THAILAND ROTATION:
+- Staples: Pad Thai, Fried Rice, Noodle Soups
+- Proteins: Tom Yum, Green Curry, Grilled Fish
+- Street: Som Tam, Satay, Mango Sticky Rice
+- Special: Royal Thai, Regional Curries`,
+    'IT': `ITALY ROTATION:
+- Staples: Pasta, Pizza, Risotto, Polenta
+- Proteins: Osso Buco, Seafood
+- Street: Panini, Arancini, Gelato
+- Special: Regional Courses`,
+    'US': `USA ROTATION:
+- Staples: Burgers, Mac & Cheese, BBQ
+- Proteins: Steaks, Fried Chicken, Seafood
+- Street: Hot Dogs, Food Trucks
+- Special: Regional BBQ, Holiday Plates`
+  };
+  return ex[countryCode?.toUpperCase()] || `GLOBAL GUIDELINES:
+- Staples: Local grains/breads/rice/noodles
+- Proteins: Regional meat/fish/plant proteins
+- Street: Markets/snacks/vendor favorites
+- Special: Celebration/regional signature dishes`;
+}
 // --- Firebase Admin (optional: only if env present) ---
 import admin from 'firebase-admin';
 
@@ -660,48 +749,49 @@ app.get('/v1/analytics', authenticateApiKey, async (req, res) => {
   });
 });
 // --- GPT recommend helper ---
-async function recommendWithGPT({ mood_text = "", location = {}, dietary = [], weather = null }) {
+async function recommendWithGPT({ mood_text = '', location = {}, dietary = [], weather = null }) {
   if (!USE_GPT || !OPENAI_API_KEY) return null;
 
-  const system = `You are VFIED, a food & culture assistant.
-Return STRICT JSON (no prose) shaped exactly like:
+  const system = `You are VFIED, a global food expert who suggests AUTHENTIC and DIVERSE foods.
+
+CRITICAL DIVERSITY RULE:
+- 30% Staples (grains/breads/rice/noodle dishes)
+- 35% Proteins (meat/seafood/plant-protein mains)
+- 20% Street foods (snacks/markets)
+- 15% Special dishes (celebration/regional signatures)
+Avoid repeating the same category repeatedly across sessions.
+
+LOCATION: ${location.city || 'Unknown'}, ${location.country || 'Unknown'} (${location.country_code || '—'})
+MOOD: ${mood_text || '—'}
+DIETARY: ${dietary.join(', ') || 'none'}
+WEATHER: ${weather ? `${weather.temperature}°C, ${weather.condition}` : 'unknown'}
+
+Examples for this region:
+${getGlobalFoodExamples(location.country_code)}
+
+Return STRICT JSON:
 {
   "success": true,
   "source": "gpt",
-  "food": { "name": string, "emoji": string, "country": string, "country_code": string },
-  "friendMessage": string,
-  "dietaryNote": string|null,
-  "culturalNote": string|null,
-  "weatherNote": string|null,
-  "confidence": number
+  "food": {
+    "name": "specific local dish",
+    "emoji": "emoji",
+    "country": "${location.country || 'Local'}",
+    "country_code": "${(location.country_code || 'GB').toUpperCase()}",
+    "category": "staple|protein|street|special"
+  },
+  "friendMessage": "short friendly why-this pick",
+  "culturalNote": "authenticity context",
+  "dietaryNote": ${dietary?.length ? `"Compatible with ${dietary.join(', ')}"` : 'null'},
+  "weatherNote": ${weather ? `"Good for ${weather.temperature}°C"` : 'null'},
+  "confidence": 85
 }`;
 
   const user = JSON.stringify({ mood_text, location, dietary, weather });
-
-  const out = await gptChatJSON({ system, user });
-  if (!out) return null;
-
-  // Normalize fields so the frontend is always happy
-  const cc = (location?.country_code || 'GB').toUpperCase();
-  const country = location?.country || 'United Kingdom';
-  const food = out.food || {};
-  return {
-    success: true,
-    source: 'gpt',
-    food: {
-      name: food.name || 'Chefs Choice',
-      emoji: food.emoji || '🍽️',
-      country: food.country || country,
-      country_code: (food.country_code || cc).toUpperCase()
-    },
-    friendMessage: out.friendMessage || (mood_text ? `Because you feel "${mood_text}", try ${food.name || 'something local'}.` : 'Heres a great pick.'),
-    dietaryNote: out.dietaryNote ?? (dietary?.length ? `Filtered for: ${dietary.join(', ')}` : null),
-    culturalNote: out.culturalNote ?? null,
-    weatherNote: out.weatherNote ?? (weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null),
-    confidence: typeof out.confidence === 'number' ? out.confidence : Math.floor(70 + Math.random() * 25)
-  };
+  return await gptChatJSON({ system, user });
 }
 
+// Optional vendor recommend that prefers menu if present
 // Optional vendor recommend that prefers menu if present
 app.post('/v1/recommend', async (req, res) => {
   const t0 = Date.now();
@@ -721,62 +811,59 @@ app.post('/v1/recommend', async (req, res) => {
   } catch {}
 
   if ((menu_source === 'my_uploaded_menu' || resolvedVendorId) && resolvedVendorId && vendorMenus.has(resolvedVendorId)) {
-  const items = vendorMenus.get(resolvedVendorId).items.filter(i => i.availability !== 'archived');
-  const food = items[Math.floor(Math.random() * items.length)];
-  const weather = await getWeather(location).catch(() => null);
-  if (gpt && gpt.success) {
-    console.log('[VFIED] recommend → using GPT', { city: location?.city, cc: location?.country_code, mood: mood_text });
-    return res.json(gpt);
-  } 
-  return res.json({
-    success: true,
-    request_id,
-    context: {
-      original_mood_text: mood_text || null,
-      resolved_moods: [],
-      mood_detection_method: mood_text ? 'regex_fallback' : 'explicit',
-      location,
-      dietary,
-      source: 'uploaded_menu'
-    },
-    food: {
-      menu_item_id: food.menu_item_id,
-      name: food.name,
-      emoji: food.emoji || '🍽️',
-      price: food.price,
-      description: food.description,
-      country_code: food.country_code
-    },
-    friendMessage: `From your menu, try ${food.name}.`,
-    reasoning: '',
-    culturalNote: null,
-    personalNote: null,
-    weatherNote: weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null,
-    availabilityNote: 'From uploaded vendor menu',
-    alternatives: [],
-    confidence: 95,
-    dietaryCompliance: { compliant: true, source: 'fallback' },
-    dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null,
-    weather: weather ? {
-      temperature: weather.temperature,
-      condition: weather.condition,
-      description: weather.condition,
-      isRaining: !!weather.isRaining,
-      isCold: !!weather.isCold,
-      isHot: !!weather.isHot,
-      isComfortable: !(weather.isCold || weather.isHot),
-      simulated: false
-    } : null,
-    interactionId: `ix_${Date.now().toString(36)}`,
-    processingTimeMs: Date.now() - t0,
-    meta: {
-      hasWeather: !!weather,
-      hasDietary: dietary.length > 0,
-      dietaryRestrictions: dietary,
-      timestamp: new Date().toISOString()
-    }
-  });
-}
+    const items = vendorMenus.get(resolvedVendorId).items.filter(i => i.availability !== 'archived');
+    const food = items[Math.floor(Math.random() * items.length)];
+    const weather = await getWeather(location).catch(() => null);
+    
+    return res.json({
+      success: true,
+      request_id,
+      context: {
+        original_mood_text: mood_text || null,
+        resolved_moods: [],
+        mood_detection_method: mood_text ? 'regex_fallback' : 'explicit',
+        location,
+        dietary,
+        source: 'uploaded_menu'
+      },
+      food: {
+        menu_item_id: food.menu_item_id,
+        name: food.name,
+        emoji: food.emoji || 'ðŸ½ï¸',
+        price: food.price,
+        description: food.description,
+        country_code: food.country_code
+      },
+      friendMessage: `From your menu, try ${food.name}.`,
+      reasoning: '',
+      culturalNote: null,
+      personalNote: null,
+      weatherNote: weather ? `Weather is ${weather.temperature}Â°C â€¢ ${weather.condition}` : null,
+      availabilityNote: 'From uploaded vendor menu',
+      alternatives: [],
+      confidence: 95,
+      dietaryCompliance: { compliant: true, source: 'fallback' },
+      dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null,
+      weather: weather ? {
+        temperature: weather.temperature,
+        condition: weather.condition,
+        description: weather.condition,
+        isRaining: !!weather.isRaining,
+        isCold: !!weather.isCold,
+        isHot: !!weather.isHot,
+        isComfortable: !(weather.isCold || weather.isHot),
+        simulated: false
+      } : null,
+      interactionId: `ix_${Date.now().toString(36)}`,
+      processingTimeMs: Date.now() - t0,
+      meta: {
+        hasWeather: !!weather,
+        hasDietary: dietary.length > 0,
+        dietaryRestrictions: dietary,
+        timestamp: new Date().toISOString()
+      }
+    });
+  }
 
   // Global path → try GPT first (if key present), else fallback
   const weather = await getWeather(location).catch(() => null);
@@ -832,7 +919,6 @@ app.post('/v1/recommend', async (req, res) => {
 
   // Fallback (no key or GPT failed)
   const pick = fallbackSuggestion(location, dietary);
-  // Fallback (no key or GPT failed)
   const resolved_moods = detectMoodIds(mood_text);
   const mood_detection_method = mood_text ? (resolved_moods.length ? 'regex_fallback' : 'regex_fallback') : 'explicit';
 
@@ -852,7 +938,7 @@ app.post('/v1/recommend', async (req, res) => {
     reasoning: '',
     culturalNote: null,
     personalNote: null,
-    weatherNote: weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null,
+    weatherNote: weather ? `Weather is ${weather.temperature}Â°C â€¢ ${weather.condition}` : null,
     availabilityNote: 'Widely available',
     alternatives: [],
     confidence: Math.floor(70 + Math.random() * 25),
@@ -1207,6 +1293,169 @@ app.get('/v1/linkout', (req, res) => {
   console.log('[linkout]', { tag, url, at:new Date().toISOString() });
   res.redirect(url);
 });
+// --- City Guide (GPT + fallback) ---
+async function generateCityGuide(city, countryCode) {
+  const system = `You are a local food & culture expert for ${city}. Create a comprehensive city guide focused on authentic food.
+
+Return STRICT JSON:
+{
+  "success": true,
+  "city": "${city}",
+  "country_code": "${countryCode}",
+  "food_scene": {
+    "signature_dishes": ["dish1","dish2","dish3"],
+    "street_food_areas": ["area1","area2"],
+    "local_markets": ["market1","market2"],
+    "must_try_restaurants": [
+      {"name":"Restaurant","specialty":"dish","price_range":"low|medium|high"}
+    ]
+  },
+  "cultural_highlights": [
+    {"name":"Site","type":"cultural","food_nearby":"local dish"}
+  ],
+  "neighborhoods": [
+    {"name":"Area","vibe":"description","food_specialty":"what to eat"}
+  ],
+  "local_tips": ["tip1","tip2","tip3"],
+  "food_etiquette": "how locals eat/order",
+  "best_times": {
+    "breakfast":"6-9am","lunch":"12-2pm","dinner":"7-10pm","street_food":"5-9pm"
+  }
+}`;
+  const user = `Create a food-focused city guide for ${city}, ${countryCode}. Authentic, local, non-touristy.`;
+  return await gptChatJSON({ system, user, max_tokens: 1100 });
+}
+
+function getFallbackCityGuide(city, cc) {
+  return {
+    success: true,
+    city, country_code: cc,
+    food_scene: {
+      signature_dishes: ['Signature stew','Grilled fish','Market snack'],
+      street_food_areas: ['Central Market','Night Market'],
+      local_markets: ['City Market','Farmers Market'],
+      must_try_restaurants: [{ name: 'Local Kitchen', specialty: 'House special', price_range: 'medium' }]
+    },
+    cultural_highlights: [{ name: 'Old Town Walk', type: 'cultural', food_nearby: 'Street snacks' }],
+    neighborhoods: [{ name: 'Riverside', vibe: 'lively', food_specialty: 'grilled dishes' }],
+    local_tips: ['Carry small cash', 'Ask locals for hidden spots', 'Eat where its busy'],
+    food_etiquette: 'Be polite, try sharing plates, queue kindly.',
+    best_times: { breakfast:'6-9am', lunch:'12-2pm', dinner:'7-10pm', street_food:'5-9pm' }
+  };
+}
+
+// --- Day Itinerary (GPT + fallback) ---
+async function generateItinerary(location, duration, interests, budget) {
+  const city = location?.city || 'City';
+  const cc = (location?.country_code || 'US').toUpperCase();
+  const system = `You are VFIED's city planner. Build a ${duration} food + culture itinerary in ${city}.
+Return STRICT JSON:
+{
+  "success": true,
+  "city": "${city}",
+  "country_code": "${cc}",
+  "duration": "${duration}",
+  "steps": [
+    { "time":"09:00", "title":"Breakfast at...", "why":"reason", "link":"", "neighborhood":"", "tags":["food"] }
+  ],
+  "budget": "${budget}",
+  "interests": ${JSON.stringify(interests)}
+}`;
+  const user = `Plan a ${duration} day in ${city}, ${cc}, budget=${budget}, interests=${interests.join(',')}. Avoid tourist traps; prioritize authentic places and walkable clusters.`;
+  return await gptChatJSON({ system, user, max_tokens: 1100 });
+}
+
+function getFallbackItinerary(location, duration) {
+  const city = location?.city || 'City';
+  const cc = (location?.country_code || 'US').toUpperCase();
+  return {
+    success: true,
+    city, country_code: cc, duration,
+    steps: [
+      { time: '09:00', title: 'Local breakfast', why: 'Start authentic', link: '', neighborhood: 'Market area', tags: ['food'] },
+      { time: '12:30', title: 'Street food lunch', why: 'Busy vendors = fresh', link: '', neighborhood: 'Old town', tags: ['food','street'] },
+      { time: '15:00', title: 'Cultural stop', why: 'Digest + learn', link: '', neighborhood: 'Museum district', tags: ['culture'] },
+      { time: '19:00', title: 'Neighborhood dinner', why: 'Signature dish', link: '', neighborhood: 'Riverside', tags: ['food'] }
+    ],
+    budget: 'medium',
+    interests: ['food','culture']
+  };
+}
+
+// --- Food Crawl (GPT + fallback) ---
+async function generateFoodCrawl(location, crawlType, duration) {
+  const city = location?.city || 'City';
+  const cc = (location?.country_code || 'US').toUpperCase();
+  if (USE_GPT && OPENAI_API_KEY) {
+    const system = `You are VFIED's food crawl expert. Design a ${duration} ${crawlType} crawl in ${city}.
+
+CRAWL TYPES:
+- street_food (markets, snacks)
+- restaurant_hop (3–4 spots)
+- cultural_food (traditional)
+- late_night (after-dark eats)
+
+Return STRICT JSON:
+{
+  "success": true,
+  "crawl_title": "Creative name",
+  "city": "${city}",
+  "duration": "${duration}",
+  "type": "${crawlType}",
+  "stops": [
+    {"order":1,"time":"18:30","location":"Place","food":"What to order","emoji":"🍖","reason":"Why","cost":"$","tip":"insider tip"}
+  ],
+  "total_cost": "$",
+  "walking_distance": "2km",
+  "pro_tips": ["tip1","tip2"],
+  "backup_spots": ["alt1","alt2"]
+}`;
+    const user = `Design a ${duration} ${crawlType} crawl for ${city}, ${cc}. Authentic, local, walkable; mix price points.`;
+    const result = await gptChatJSON({ system, user, max_tokens: 1000 });
+    if (result) return result;
+  }
+  // Fallback
+  return {
+    success: true,
+    crawl_title: `${city} Food Discovery`,
+    city, duration, type: crawlType,
+    stops: [
+      { order: 1, time: '18:00', location: 'Local Market', food: 'Street snacks', emoji: '🍢', reason: 'Start with local flavors', cost: '$5–10', tip: 'Ask vendors what\'s best today' },
+      { order: 2, time: '19:30', location: 'Traditional Restaurant', food: 'Signature dish', emoji: '🍽️', reason: 'Core local cuisine', cost: '$15–25', tip: 'Try the house special' }
+    ],
+    total_cost: '$20–35', walking_distance: '1.5km',
+    pro_tips: ['Bring cash', 'Busy = fresh'], backup_spots: ['Late-night stalls']
+  };
+}
+// -------- Travel: City Guide --------
+app.get('/v1/travel/guide/:city', async (req, res) => {
+  const city = String(req.params.city || '').trim();
+  const country_code = String(req.query.country_code || 'US').toUpperCase();
+
+  if (USE_GPT && OPENAI_API_KEY) {
+    const guide = await generateCityGuide(city, country_code);
+    if (guide) return res.json(guide);
+  }
+  return res.json(getFallbackCityGuide(city, country_code));
+});
+
+// -------- Travel: Day Itinerary --------
+app.post('/v1/travel/itinerary', async (req, res) => {
+  const { location = {}, duration = 'one_day', interests = ['food','culture'], budget = 'medium' } = req.body || {};
+  if (USE_GPT && OPENAI_API_KEY) {
+    const it = await generateItinerary(location, duration, interests, budget);
+    if (it) return res.json(it);
+  }
+  return res.json(getFallbackItinerary(location, duration));
+});
+
+// -------- Travel: Food Crawl --------
+app.post('/v1/travel/food-crawl', async (req, res) => {
+  const { location = {}, crawl_type = 'street_food', duration = '3_hours' } = req.body || {};
+  const crawl = await generateFoodCrawl(location, crawl_type, duration);
+  res.json(crawl);
+});
+
 // --- Error handler (last) ---
 app.use((err, _req, res, _next) => {
   console.error('Server error:', err);
