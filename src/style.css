@@ -1,107 +1,130 @@
-/* VFIED — Drop‑in Theme for index.html
-   Purpose: make the app look sleek (dark, glassy, consistent)
-   Usage: <link rel="stylesheet" href="/vfied-theme.css" /> AFTER your old CSS or replace it.
-*/
+/* === VFIED Polish Pack (matches the mock-up) === */
 
-:root{
-  --bg:#0b0f1a; --card:#0e1526; --text:#e5ecff; --muted:#9fb0c9;
-  --brand:#7c3aed; --brand2:#6366f1; --ok:#22c55e; --warn:#f59e0b;
-  --surface:rgba(255,255,255,.08); --border:rgba(255,255,255,.18);
+/* Base & background */
+body {
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important;
+  background:
+    radial-gradient(80rem 50rem at 20% -10%, #1d2350 0%, transparent 60%),
+    radial-gradient(60rem 40rem at 120% 10%, #174a2b 0%, transparent 50%),
+    linear-gradient(180deg, #0a0e19, #070b14) !important;
 }
 
-/* Base */
-*{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
-  color:var(--text);
-  background:radial-gradient(80rem 50rem at 20% -10%,#1d2350 0%,transparent 60%),
-             radial-gradient(60rem 40rem at 120% 10%,#174a2b 0%,transparent 50%),
-             linear-gradient(180deg,#0a0e19,#070b14);
+/* Phone-width column on desktop */
+@media (min-width: 900px){
+  .one-button-main,
+  .tabpanel,
+  #social-proof,
+  [style*="max-width: 900px"] {
+    max-width: 430px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
 }
 
-/* Page container */
-#app{max-width:980px;margin:0 auto;padding:24px 16px 100px}
+/* Header bits */
+.app-title {
+  font-weight: 900 !important;
+  font-size: 28px !important;
+  letter-spacing: .2px !important;
+  background: linear-gradient(90deg, #fff, #c7d2fe);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+#context-info {
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18);
+  border-radius: 999px; padding: 6px 10px; color: #9fb0c9;
+}
 
-/* Header */
-.simple-header{background:transparent;text-align:left;padding:0;margin-bottom:14px}
-.app-title{font-size:28px;font-weight:900;letter-spacing:.2px;margin:0;background:linear-gradient(90deg,#fff,#c7d2fe);-webkit-text-fill-color:transparent;-webkit-background-clip:text}
-#context-info{display:inline-block;margin-top:6px;padding:6px 10px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--muted)}
+/* Inputs */
+#mood-input {
+  background: rgba(255,255,255,.08) !important;
+  border: 1px solid rgba(255,255,255,.18) !important;
+  color: #e5ecff !important; border-radius: 12px !important;
+}
+.mood-detect-btn {
+  border-radius: 12px; border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.10); color:#e5ecff; font-weight: 700;
+}
 
-/* Sections */
-main section{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;margin:12px 0;backdrop-filter:blur(10px)}
-
-/* Mood box */
-.mood-section h3{margin:0 0 8px;font-size:15px;font-weight:800;color:#cbd5ff}
-.mood-input-container{display:flex;gap:8px;flex-wrap:wrap}
-#mood-input{flex:1;min-width:220px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.08);color:#fff}
-#mood-input::placeholder{color:#b8c0d9}
-#mood-input:focus{outline:2px solid rgba(124,58,237,.5)}
-#mood-match-text{font-size:13px;color:var(--muted)}
-
-/* Decide button */
-#decide-button{width:100%;padding:16px;border:0;border-radius:16px;font-weight:900;letter-spacing:.3px;color:#fff;
-  background:linear-gradient(90deg,var(--brand),var(--brand2));
-  box-shadow:0 18px 40px rgba(124,58,237,.35)}
-#decide-button:hover{transform:translateY(-2px)}
-#decide-button .button-subtitle{opacity:.9;font-weight:600}
+/* Decide button (gradient) */
+#decide-button {
+  width:100%; padding:16px; border:0; border-radius:16px;
+  font-weight:900; letter-spacing:.3px; color:#fff;
+  background: linear-gradient(90deg, #7c3aed, #6366f1) !important;
+  box-shadow: 0 16px 48px rgba(124,58,237,.35);
+}
+#decide-button .button-subtitle { opacity:.9; font-weight:600; }
 
 /* Friend chips */
-#friend-chips{display:flex;gap:8px;flex-wrap:wrap}
-.friend-chip{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:1px solid var(--border);border-radius:999px;padding:8px 12px;font-weight:700}
-.friend-chip:hover{transform:translateY(-1px);background:rgba(255,255,255,.2)}
-.friend-avatar{width:22px;height:22px;border-radius:50%;border:2px solid rgba(255,255,255,.25);object-fit:cover}
+.friend-chip {
+  display:inline-flex; align-items:center; gap:8px;
+  background: rgba(255,255,255,.10) !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+  border-radius: 999px; padding:8px 12px; font-weight:800;
+}
+.friend-avatar { width:22px; height:22px; border-radius:50%; object-fit:cover; }
 
-/* Suggestion card */
-#suggestion-result{padding:0;overflow:hidden}
-.suggestion-card{background:var(--surface);border:1px solid var(--border);border-radius:16px}
-#social-signals{padding:10px 16px 0}
-.social-signal{border-radius:12px;padding:10px 12px;margin-bottom:8px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.28)}
-.social-signal.local-signal{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.28)}
-.food-emoji,#result-emoji{font-size:40px;margin:10px 16px 0}
-.food-name,#result-name{font-size:20px;font-weight:900;margin:6px 16px 2px}
-.food-description,#result-description{margin:0 16px 8px;opacity:.96;line-height:1.4}
-#restaurant-info{margin:0 16px 12px;opacity:.92}
+/* Card “glass” look */
+main section,
+.suggestion-card,
+.gem-card,
+.travel-card,
+.event-card {
+  background: rgba(255,255,255,.06) !important;
+  border: 1px solid rgba(255,255,255,.14) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 12px 30px rgba(0,0,0,.25);
+}
 
-/* Actions */
-.decision-actions,.action-buttons{padding:0 16px 16px;display:flex;gap:10px}
-.action-btn{border:0;border-radius:12px;font-weight:800;color:#fff;padding:12px 14px}
-.action-btn.accept{background:linear-gradient(135deg,#22c55e,#16a34a)}
-.action-btn.try-again{background:rgba(255,255,255,.16);border:1px solid var(--border)}
+/* Suggestion hierarchy */
+#result-emoji { font-size: 42px; margin-top: 8px; }
+#result-name { font-size: 22px; font-weight: 900; margin: 4px 16px 2px; letter-spacing:.2px; }
+#result-description { opacity:.95; margin: 0 16px 8px; line-height:1.45; }
+#restaurant-info { opacity:.9; margin: 0 16px 12px; }
 
 /* Insights */
-.ai-insights{padding:0 16px 16px}
-#insights-toggle{width:100%;border:1px solid var(--border);background:rgba(255,255,255,.10);padding:10px 12px;border-radius:12px;font-weight:800;color:#fff}
-#insights-content{margin-top:10px}
-#insights-content > div{background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
-
-/* Local gems */
-#local-gems-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
-.gem-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px}
-.gem-emoji{font-size:22px}
-.gem-name{font-weight:900;margin-top:6px}
-.gem-area{opacity:.9;font-size:13px}
-
-/* Tabs */
-.tabs{display:flex;gap:8px;margin:12px 0 16px;border-bottom:1px solid rgba(255,255,255,.14);padding-bottom:6px}
-.tab-btn,.tab{background:#0b1220;border:1px solid #263247;color:#e2e8f0;padding:10px 12px;border-radius:10px;font-weight:700}
-.tab-btn.active,.tab.active{background:var(--brand);border-color:var(--brand);color:#fff}
-
-/* Skeletons & toasts (lightweight) */
-.skeleton{position:relative;overflow:hidden;background:rgba(255,255,255,.12);border-radius:12px}
-.skeleton::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.25),transparent);animation:shimmer 1.2s infinite}
-@keyframes shimmer{100%{transform:translateX(100%)}}
-.toast-wrap{position:fixed;left:50%;transform:translateX(-50%);bottom:24px;display:flex;flex-direction:column;gap:8px;z-index:9999;width:min(92%,440px);pointer-events:none}
-.toast{pointer-events:auto;background:rgba(15,23,42,.92);border:1px solid var(--border);color:#fff;padding:12px 14px;border-radius:12px;display:flex;gap:10px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.3)}
-.toast.ok{border-color:rgba(34,197,94,.45)}
-.toast.warn{border-color:rgba(245,158,11,.45)}
-.toast.err{border-color:rgba(239,68,68,.45)}
-
-/* Footer */
-footer{position:fixed;left:0;right:0;bottom:0;background:rgba(0,0,0,.22);backdrop-filter:blur(10px);padding:10px 16px;border-top:1px solid rgba(255,255,255,.14)}
-footer p{margin:2px 0;font-size:13px;opacity:.9}
-
-/* Responsive */
-@media (max-width:640px){
-  #app{padding:18px 12px 92px}
-  .decision-actions,.action-buttons{flex-direction:column}
+#insights-toggle {
+  border-radius: 12px; font-weight: 800;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
 }
+#insights-content > div {
+  background: rgba(255,255,255,.07);
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 10px; padding: 10px 12px;
+}
+
+/* Segmented tabs */
+.tabs {
+  display:inline-flex; gap:6px; padding:6px;
+  background: rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.14); border-radius:14px;
+}
+.tab {
+  border:0; padding:8px 12px; font-weight:800;
+  color:#cbd5e1; background:transparent; border-radius:10px; cursor:pointer;
+}
+.tab.active {
+  color:#fff; background: linear-gradient(90deg, #7c3aed, #6366f1);
+}
+
+/* Travel/Events cards */
+.travel-card, .event-card { display:flex; gap:10px; padding:12px; }
+.travel-emoji, .event-badge { font-size:22px; min-width:22px; }
+.travel-title, .event-title { font-weight:800; }
+.event-cta .insights-toggle {
+  padding:6px 8px; border-radius:10px;
+  border:1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
+}
+
+/* Sticky actions on mobile */
+@media (max-width: 640px){
+  .decision-actions{
+    position: sticky; bottom: 10px; z-index: 20;
+    background: rgba(10,14,25,.78); backdrop-filter: blur(12px);
+    border:1px solid rgba(255,255,255,.14); border-radius: 14px;
+    padding: 10px; gap: 8px;
+  }
+  .action-btn{ flex:1; }
+}
+
+/* iPhone safe area */
+.bottom-safe-area { height: calc(env(safe-area-inset-bottom) + 8px); }
