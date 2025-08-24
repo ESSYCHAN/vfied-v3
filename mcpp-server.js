@@ -968,6 +968,7 @@ class WeatherService {
     }
   }
 
+
   getSimulatedWeather(location) {
     const temp = this.getSimulatedTemp(location);
     const condition = this.getSimulatedCondition();
@@ -1462,7 +1463,37 @@ app.post('/mcp/get_food_suggestion', async (req, res) => {
     });
   }
 });
-
+// Main recommendation endpoint
+app.post('/v1/recommend', async (req, res) => {
+  try {
+    const { location, mood_text, dietary = [], budget = 'medium' } = req.body;
+    
+    console.log('📥 Recommendation request:', { location: location?.city, mood: mood_text, dietary });
+    
+    if (location) {
+      aiFoodService.setLocationFromRequest(location);
+    }
+    
+    const suggestion = await aiFoodService.getPersonalizedFoodSuggestion(mood_text || 'hungry', {
+      dietary,
+      budget,
+      quick: false
+    });
+    
+    res.json({
+      success: true,
+      ...suggestion,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('Recommendation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
 // Quick Weather + Dietary Decision
 app.post('/mcp/get_quick_food_decision', async (req, res) => {
   try {
