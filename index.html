@@ -5,6 +5,116 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VFIED – One Button Food Intelligence</title>
   <link rel="stylesheet" href="./src/style.css" />
+  <style>
+    /* Social Layer Styles */
+    .friend-chips {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin: 1rem 0;
+    }
+
+    .friend-chip {
+      background: rgba(255,255,255,0.1);
+      padding: 0.5rem 1rem;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .friend-chip:hover {
+      background: rgba(255,255,255,0.2);
+      transform: translateY(-1px);
+    }
+
+    .local-gems-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0;
+    }
+
+    .gem-card {
+      background: rgba(255,255,255,0.1);
+      padding: 1rem;
+      border-radius: 12px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .gem-card:hover {
+      background: rgba(255,255,255,0.2);
+      transform: translateY(-2px);
+    }
+
+    .gem-emoji {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .gem-name {
+      font-weight: 600;
+      margin-bottom: 0.25rem;
+    }
+
+    .gem-area {
+      font-size: 0.8rem;
+      opacity: 0.8;
+    }
+
+    .social-signals {
+      margin: 1rem 0;
+    }
+
+    .social-signal {
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      padding: 0.75rem;
+      border-radius: 8px;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .social-signal.friend-signal {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.3);
+    }
+
+    .social-signal.local-signal {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+
+    .signal-icon {
+      font-size: 1.1rem;
+    }
+
+    .signal-text {
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .thinking {
+      opacity: 0.7;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.7; }
+      50% { opacity: 1; }
+    }
+  </style>
 </head>
 <body>
   <div id="app">
@@ -12,13 +122,19 @@
       <h1>VFIED 🍽️</h1>
       <p id="context-info">🤖 Initializing your food intelligence...</p>
     </header>
-
+    
     <main>
       <!-- Mood input -->
       <section>
         <input id="mood-input" placeholder="How are you feeling?" />
         <button id="detect-mood-btn">Detect Mood</button>
         <div id="detected-moods" class="hidden"></div>
+      </section>
+
+      <!-- Social proof section -->
+      <section id="social-proof">
+        <h3>👥 Ask Your Friends</h3>
+        <div id="friend-chips"></div>
       </section>
 
       <!-- Decide button -->
@@ -30,27 +146,30 @@
         </button>
       </section>
 
-      <!-- AI suggestion -->
+      <!-- AI suggestion with social context -->
       <section id="suggestion-result" class="hidden">
+        <!-- Social signals will be inserted here dynamically -->
+        <div id="social-signals" class="social-signals"></div>
+        
         <div id="result-emoji">🍔</div>
         <h2 id="result-name">Your food suggestion</h2>
         <p id="result-description"></p>
         <p id="restaurant-info"></p>
-      </section>
 
-      <!-- NEW: Social proof -->
-      <section id="social-proof">
-        <h3>👥 What your friends are saying</h3>
-        <div id="friend-chips"></div>
+        <!-- Action buttons -->
+        <div class="action-buttons" style="margin-top: 1rem; display: flex; gap: 1rem;">
+          <button id="accept-btn" style="flex: 1; background: #22c55e;">✅ Accept</button>
+          <button id="try-again-btn" style="flex: 1; background: #6b7280;">🔄 Try Again</button>
+        </div>
       </section>
 
       <!-- AI insights -->
       <section id="insights">
         <button id="insights-toggle">🤖 Why this choice? ↓</button>
         <div id="insights-content" class="hidden">
-          <p id="cultural-note"></p>
-          <p id="personal-note"></p>
-          <p id="weather-note"></p>
+          <div id="cultural-note"></div>
+          <div id="personal-note"></div>
+          <div id="weather-note"></div>
         </div>
       </section>
 
