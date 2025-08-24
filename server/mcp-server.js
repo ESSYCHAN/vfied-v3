@@ -1493,6 +1493,6 @@ app.get('/v1/admin/checklist', authenticateApiKey, async (req, res) => {
 
 // --- Start ---
 app.listen(PORT, () => {
-  console.log(`VFIED MCP server listening on :${PORT}`);
+  console.log(`🌦️ VFIED Enhanced MCP Server with Menu Upload System running on port ${PORT}`);
 });
 
