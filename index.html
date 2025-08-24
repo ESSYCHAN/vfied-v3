@@ -40,7 +40,15 @@
           <div class="button-subtitle">I'll figure it out for you</div>
         </button>
       </section>
-
+      <!-- Loading skeleton for suggestion -->
+      <section id="suggestion-skeleton" class="suggestion-result hidden">
+        <div class="suggestion-card skeleton suggestion-skeleton">
+          <div class="skel-emoji"></div>
+          <div class="skel-line" style="width: 65%; margin: 10px auto;"></div>
+          <div class="skel-line" style="width: 85%; margin: 10px auto;"></div>
+          <div class="skel-line" style="width: 55%; margin: 10px auto;"></div>
+        </div>
+      </section>
       <!-- Suggestion -->
       <section id="suggestion-result" class="suggestion-result hidden">
         <div class="suggestion-card" id="resultCard">
@@ -125,5 +133,7 @@
     window.__API__ = window.__API__ || 'http://localhost:3001';
   </script>
   <script type="module" src="./src/main.js"></script>
+  <!-- Toast container -->
+<div id="toast-wrap" class="toast-wrap"></div>
 </body>
 </html>
