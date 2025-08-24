@@ -21,7 +21,15 @@ const whitelist = new Set([
   'https://vfied-v3.vercel.app',
 ]);
 const vercelRegex = /^https:\/\/[^.]+\.vercel\.app$/;
-
+// TEMPORARY DEBUG - Add this after your CORS config
+app.use((req, res, next) => {
+  console.log(`🔍 ${req.method} ${req.url} - Origin: ${req.get('Origin')}`);
+  console.log('🔍 CORS headers:', {
+    'Access-Control-Allow-Origin': res.get('Access-Control-Allow-Origin'),
+    'Access-Control-Allow-Methods': res.get('Access-Control-Allow-Methods'),
+  });
+  next();
+});
 const corsOptionsDelegate = (req, cb) => {
   const origin = req.header('Origin');
   const isAllowed =
