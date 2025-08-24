@@ -1,6 +1,14 @@
 // VFIED Unified Main (Food + Social + Travel + Events) — with Toasts, Skeletons, Fallback & Stats
-// API base: prefers window.__API__ if present (Render/Prod), else local dev.
-const API_BASE = (typeof window !== 'undefined' && window.__API__) || 'https://vfied-v3.onrender.com';
+
+// ---- Robust API base resolution ----
+const qpApi = new URLSearchParams(location.search).get('api');
+if (qpApi) localStorage.setItem('vfied_api', qpApi);
+
+const storedApi = localStorage.getItem('vfied_api');
+const runtimeApi = (typeof window !== 'undefined' && window.__API__) || ''; // '' = same-origin
+export const API_BASE = (qpApi || storedApi || runtimeApi || '').replace(/\/$/, '');
+
+console.log('API_BASE ->', API_BASE || '(same-origin)');
 
 // ---------------- Demo / Fallback Data ----------------
 const demoFriends = [
@@ -9,7 +17,7 @@ const demoFriends = [
   { name: 'Aisha', comment: '👌 Perfect comfort food when tired', emoji: '🍲', avatar: 'https://i.pravatar.cc/80?img=58' },
 ];
 
-// If /v1/recommend fails, we’ll pick one of these locally:
+// If /v1/recommend fails, we'll pick one of these locally:
 const fallbackSuggestions = [
   {
     food: { emoji: '🍜', name: 'Tonkotsu Ramen' },
@@ -31,7 +39,7 @@ const fallbackSuggestions = [
     food: { emoji: '🥙', name: 'Mezze Plate' },
     friendMessage: 'Shareable, bright flavors, and not heavy.',
     availabilityNote: 'Check Arabica Borough or a local Levantine spot',
-    culturalNote: 'London’s Middle Eastern scene is strong — Borough & Edgware Road.',
+    culturalNote: 'Londons Middle Eastern scene is strong — Borough & Edgware Road.',
     weatherNote: 'Good in any weather; easy on the stomach.',
     source: 'local-fallback',
   },
@@ -102,6 +110,7 @@ function wireCoreEvents() {
     if (e.target === modal) closeModal(modal);
   });
 }
+
 // Toggle the "thinking" state of the Decide button
 function setThinking(btn, on = true) {
   try {
@@ -127,6 +136,7 @@ function setThinking(btn, on = true) {
     console.warn('setThinking failed:', e);
   }
 }
+
 async function handleDecision() {
   const decideBtn = byId('decide-button');
   setThinking(decideBtn, true);
@@ -145,7 +155,9 @@ async function handleDecision() {
       menu_source: 'global_database',
     };
 
-    const res = await fetch(`${API_BASE}/v1/recommend`, {
+    // Updated URL construction to avoid double slashes
+    const url = API_BASE ? `${API_BASE}/v1/recommend` : `/v1/recommend`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -223,7 +235,7 @@ function renderFriendChips() {
 function askFriend(name) {
   const f = demoFriends.find((x) => x.name === name);
   if (!f) return;
-  toast(`💬 Asking ${f.name}: “${f.comment}”`, 'info');
+  toast(`💬 Asking ${f.name}: "${f.comment}"`, 'info');
   const moodInput = byId('mood-input');
   if (moodInput) {
     if (f.emoji === '🍜') moodInput.value = 'need something warming and comforting';
@@ -241,12 +253,12 @@ function addSocialSignals(suggestion) {
   suggestion.socialSignal = {
     type: 'friend',
     friend,
-    message: `${friend.name}: “${friend.comment}”`,
+    message: `${friend.name}: "${friend.comment}"`,
   };
 
   if (localGems.length) {
     const g = localGems[Math.floor(Math.random() * localGems.length)];
-    suggestion.localSignal = { type: 'local_list', list: g, message: `Popular in “${g.name}” (${g.area})` };
+    suggestion.localSignal = { type: 'local_list', list: g, message: `Popular in "${g.name}" (${g.area})` };
   }
   return suggestion;
 }
@@ -276,7 +288,8 @@ function renderSocialSignals(s) {
 // ---------------- Local Gems ----------------
 async function loadLocalGems() {
   try {
-    const res = await fetch('/data/local_lists.json', { cache: 'no-store' });
+    const url = API_BASE ? `${API_BASE}/data/local_lists.json` : `/data/local_lists.json`;
+    const res = await fetch(url, { cache: 'no-store' });
     localGems = await res.json();
   } catch {
     localGems = []; // fallback
@@ -328,7 +341,8 @@ function populateGemsModal() {
 // ---------------- Travel ----------------
 async function loadTravelLists() {
   try {
-    const res = await fetch('/data/travel_lists.json', { cache: 'no-store' });
+    const url = API_BASE ? `${API_BASE}/data/travel_lists.json` : `/data/travel_lists.json`;
+    const res = await fetch(url, { cache: 'no-store' });
     travelLists = await res.json();
   } catch {
     travelLists = {};
@@ -378,7 +392,8 @@ function tryTravel(city, itemName) {
 // ---------------- Events Near Me ----------------
 async function loadEvents() {
   try {
-    const res = await fetch('/data/events.json', { cache: 'no-store' });
+    const url = API_BASE ? `${API_BASE}/data/events.json` : `/data/events.json`;
+    const res = await fetch(url, { cache: 'no-store' });
     eventItems = await res.json();
   } catch {
     eventItems = [];
@@ -429,7 +444,6 @@ function renderEvents() {
     grid.appendChild(card);
   });
 }
-
 
 function goEvent(title) {
   toast(`🎪 ${title}\n(Integrate ticket link or detail view here)`, 'info');

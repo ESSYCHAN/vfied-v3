@@ -4,13 +4,13 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "start": "node server/mcp-server.js",
-    "dev:server": "node --watch server/mcp-server.js",
-    "dev:app": "vite",
-    "dev": "npm-run-all -p dev:server dev:app",
-    "build": "vite build --config app/vite.config.js",
-    "preview": "vite preview --config app/vite.config.js"
-  },
+  "start": "node server/mcp-server.js",
+  "dev:server": "node --watch server/mcp-server.js",
+  "dev:app": "vite",
+  "dev": "npm-run-all -p dev:server dev:app",
+  "build": "vite build",
+  "preview": "vite preview"
+},
   "dependencies": {
     "@capacitor/app": "^5.0.8",
     "@capacitor/core": "^5.7.8",

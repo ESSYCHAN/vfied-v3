@@ -10,20 +10,34 @@ const app = express();
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
 
 // Middleware
-app.use(cors({
-  origin: [
-    'http://localhost:5166',
-    'http://localhost:3000',
-    'http://localhost:5167',  
-    'http://localhost:5173',
-    'https://vfied.vercel.app',
-    'https://vfied-v3.vercel.app',
-    /^https:\/\/.*\.vercel\.app$/
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+const whitelist = new Set([
+  'http://localhost:5168',
+  'http://localhost:5169',        // vite preview
+  'http://127.0.0.1:5168',
+  'http://127.0.0.1:5169',
+  'http://localhost:5173',        // vite dev default
+  'http://localhost:3000',
+  'https://vfied.vercel.app',
+  'https://vfied-v3.vercel.app',
+]);
+const vercelRegex = /^https:\/\/[^.]+\.vercel\.app$/;
+
+const corsOptionsDelegate = (req, cb) => {
+  const origin = req.header('Origin');
+  const isAllowed =
+    !origin || whitelist.has(origin) || vercelRegex.test(origin);
+
+  cb(null, {
+    origin: isAllowed,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400
+  });
+};
+
+app.use(cors(corsOptionsDelegate));
+app.options('*', cors(corsOptionsDelegate));
 app.use(express.json());
 
 // Sophisticated AI Food Service (with OpenAI + Weather + Cultural Intelligence)

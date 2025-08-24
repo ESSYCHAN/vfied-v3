@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
   <!-- Styles (cache-busted) -->
-  <link rel="stylesheet" href="/src/style.css?v=launch2" />
+  <link rel="stylesheet" href="/src/style.css?v=launch3" />
 </head>
 <body>
   <div id="app">
@@ -148,10 +148,10 @@
   <!-- API base (HTTPS in prod). Comment the local line when deploying. -->
   <script>
     // For local dev:
-    // window.__API__ = 'http://localhost:3001';
-
+    window.__API__ = 'http://localhost:3001';
+    console.log('VFIED __API__ =', window.__API__);
     // For production:
-    window.__API__ = 'https://vfied-v3.onrender.com';
+    // window.__API__ = 'https://vfied-v3.onrender.com';
   </script>
 
   <!-- Register Service Worker (for offline + updates) -->
