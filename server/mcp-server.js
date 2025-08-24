@@ -1490,6 +1490,33 @@ app.get('/v1/admin/checklist', authenticateApiKey, async (req, res) => {
     items
   });
 });
+// --- Simple travel/events endpoints (optional) ---
+// app.get('/v1/travel/guide/:city', (req, res) => {
+//   try {
+//     const city = req.params.city;
+//     // In real use, load from DB — here we read the static JSON file
+//     const fs = await import('fs');
+//     const path = await import('path');
+//     const p = path.resolve(process.cwd(), 'public', 'data', 'travel_lists.json');
+//     const raw = fs.readFileSync(p, 'utf8');
+//     const data = JSON.parse(raw);
+//     return res.json({ city, items: data[city] || [] });
+//   } catch (e) {
+//     return res.status(500).json({ error: 'travel_guide_failed', details: e.message });
+//   }
+// });
+// app.get('/v1/events/nearby', (req, res) => {
+//   try {
+//     const fs = await import('fs');
+//     const path = await import('path');
+//     const p = path.resolve(process.cwd(), 'public', 'data', 'events.json');
+//     const raw = fs.readFileSync(p, 'utf8');
+//     const data = JSON.parse(raw);
+//     return res.json({ city: 'London', items: data });
+//   } catch (e) {
+//     return res.status(500).json({ error: 'events_failed', details: e.message });
+//   }
+// });
 
 // --- Start ---
 app.listen(PORT, () => {

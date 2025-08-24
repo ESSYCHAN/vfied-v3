@@ -4,189 +4,126 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>VFIED – One Button Food Intelligence</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./src/style.css" />
-  <style>
-    /* Social Layer Styles */
-    .friend-chips {
-      display: flex;
-      gap: 0.5rem;
-      flex-wrap: wrap;
-      margin: 1rem 0;
-    }
-
-    .friend-chip {
-      background: rgba(255,255,255,0.1);
-      padding: 0.5rem 1rem;
-      border-radius: 20px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: 1px solid rgba(255,255,255,0.2);
-    }
-
-    .friend-chip:hover {
-      background: rgba(255,255,255,0.2);
-      transform: translateY(-1px);
-    }
-
-    .local-gems-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 1rem;
-      margin: 1rem 0;
-    }
-
-    .gem-card {
-      background: rgba(255,255,255,0.1);
-      padding: 1rem;
-      border-radius: 12px;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      border: 1px solid rgba(255,255,255,0.15);
-    }
-
-    .gem-card:hover {
-      background: rgba(255,255,255,0.2);
-      transform: translateY(-2px);
-    }
-
-    .gem-emoji {
-      font-size: 2rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .gem-name {
-      font-weight: 600;
-      margin-bottom: 0.25rem;
-    }
-
-    .gem-area {
-      font-size: 0.8rem;
-      opacity: 0.8;
-    }
-
-    .social-signals {
-      margin: 1rem 0;
-    }
-
-    .social-signal {
-      background: rgba(34, 197, 94, 0.15);
-      border: 1px solid rgba(34, 197, 94, 0.3);
-      padding: 0.75rem;
-      border-radius: 8px;
-      margin-bottom: 0.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      animation: fadeIn 0.3s ease;
-    }
-
-    .social-signal.friend-signal {
-      background: rgba(59, 130, 246, 0.15);
-      border-color: rgba(59, 130, 246, 0.3);
-    }
-
-    .social-signal.local-signal {
-      background: rgba(245, 158, 11, 0.15);
-      border-color: rgba(245, 158, 11, 0.3);
-    }
-
-    .signal-icon {
-      font-size: 1.1rem;
-    }
-
-    .signal-text {
-      font-size: 0.9rem;
-      font-weight: 500;
-    }
-
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    .thinking {
-      opacity: 0.7;
-      animation: pulse 1.5s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 0.7; }
-      50% { opacity: 1; }
-    }
-  </style>
 </head>
 <body>
   <div id="app">
-    <header>
-      <h1>VFIED 🍽️</h1>
-      <p id="context-info">🤖 Initializing your food intelligence...</p>
+    <!-- Header -->
+    <header class="simple-header">
+      <h1 class="app-title">VFIED 🍽️</h1>
+      <p id="context-info" class="context-info">🤖 Initializing your food intelligence...</p>
     </header>
-    
-    <main>
-      <!-- Mood input -->
-      <section>
-        <input id="mood-input" placeholder="How are you feeling?" />
-        <button id="detect-mood-btn">Detect Mood</button>
-        <div id="detected-moods" class="hidden"></div>
+
+    <!-- One-Button Section -->
+    <main class="one-button-main">
+      <!-- Mood -->
+      <section class="mood-section">
+        <h3>🧠 Mood-aware suggestions</h3>
+        <div class="mood-input-container">
+          <input id="mood-input" class="mood-input" placeholder="How are you feeling? (e.g., stressed but want something light)" />
+          <button id="detect-mood-btn" class="mood-detect-btn">Detect Mood</button>
+        </div>
+        <div id="detected-moods" class="detected-moods hidden"></div>
       </section>
 
-      <!-- Social proof section -->
-      <section id="social-proof">
-        <h3>👥 Ask Your Friends</h3>
-        <div id="friend-chips"></div>
+      <!-- Social proof -->
+      <section id="social-proof" style="max-width: 500px;margin: 1rem auto 0;">
+        <h3 style="margin: 1rem 0 .5rem;">👥 Ask Your Friends</h3>
+        <div id="friend-chips" class="friend-chips"></div>
       </section>
 
-      <!-- Decide button -->
-      <section>
-        <button id="decide-button">
-          <span id="button-icon">🎯</span>
-          <span id="button-text">DECIDE FOR ME</span>
+      <!-- Decide -->
+      <section class="decision-area">
+        <button id="decide-button" class="giant-decide-button">
+          <span id="button-icon" class="button-icon">🎯</span>
+          <span id="button-text" class="button-text">DECIDE FOR ME</span>
           <div class="button-subtitle">I'll figure it out for you</div>
         </button>
       </section>
 
-      <!-- AI suggestion with social context -->
-      <section id="suggestion-result" class="hidden">
-        <!-- Social signals will be inserted here dynamically -->
-        <div id="social-signals" class="social-signals"></div>
-        
-        <div id="result-emoji">🍔</div>
-        <h2 id="result-name">Your food suggestion</h2>
-        <p id="result-description"></p>
-        <p id="restaurant-info"></p>
+      <!-- Suggestion -->
+      <section id="suggestion-result" class="suggestion-result hidden">
+        <div class="suggestion-card" id="resultCard">
+          <div id="social-signals" class="social-signals"></div>
 
-        <!-- Action buttons -->
-        <div class="action-buttons" style="margin-top: 1rem; display: flex; gap: 1rem;">
-          <button id="accept-btn" style="flex: 1; background: #22c55e;">✅ Accept</button>
-          <button id="try-again-btn" style="flex: 1; background: #6b7280;">🔄 Try Again</button>
+          <div id="mood-context" class="mood-context hidden">
+            <div id="mood-match-text" class="mood-match"></div>
+          </div>
+
+          <div id="result-emoji" class="food-emoji">🍔</div>
+          <h2 id="result-name" class="food-name">Your food suggestion</h2>
+          <p id="result-description" class="food-description"></p>
+          <div id="restaurant-info" class="restaurant-info"></div>
+        </div>
+
+        <div class="decision-actions">
+          <button id="accept-btn" class="action-btn accept">✅ Accept</button>
+          <button id="try-again-btn" class="action-btn try-again">🔄 Try Again</button>
+        </div>
+
+        <div class="ai-insights">
+          <button id="insights-toggle" class="insights-toggle">🤖 Why this choice? ↓</button>
+          <div id="insights-content" class="insights-content hidden">
+            <div id="cultural-note" class="cultural-note"></div>
+            <div id="personal-note" class="personal-note"></div>
+            <div id="weather-note" class="weather-note"></div>
+          </div>
         </div>
       </section>
 
-      <!-- AI insights -->
-      <section id="insights">
-        <button id="insights-toggle">🤖 Why this choice? ↓</button>
-        <div id="insights-content" class="hidden">
-          <div id="cultural-note"></div>
-          <div id="personal-note"></div>
-          <div id="weather-note"></div>
+      <!-- Local Gems -->
+      <section style="max-width: 900px;margin: 1.5rem auto 0;padding: 0 12px;">
+        <h3 style="margin-bottom:.5rem;">🌍 Local Gems</h3>
+        <div id="local-gems-grid" class="local-gems-grid"></div>
+        <div style="text-align:center;margin-top:10px;">
+          <button id="see-more-gems" class="insights-toggle" style="display:inline-block;max-width:240px;">See more gems</button>
         </div>
       </section>
 
-      <!-- Browse mode -->
-      <section id="browse">
-        <h3>🌍 Local Gems</h3>
-        <div id="local-gems-grid"></div>
+      <!-- Tabs -->
+      <div class="tabs" style="max-width: 900px;margin: 1.5rem auto 0;padding: 0 12px;">
+        <button class="tab tab-btn active" data-tab="tabTravel">✈️ Travel</button>
+        <button class="tab tab-btn" data-tab="tabEvents">🎪 Events</button>
+      </div>
+
+      <!-- Travel tab -->
+      <section id="tabTravel" class="tabpanel" style="max-width: 900px;margin: 0 auto;padding: 0 12px;">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
+          <label for="travel-city-select">City:</label>
+          <select id="travel-city-select" class="setting-input" style="max-width:240px;">
+            <!-- populated by JS -->
+          </select>
+        </div>
+        <div id="travel-grid" class="travel-grid"></div>
+      </section>
+
+      <!-- Events tab -->
+      <section id="tabEvents" class="tabpanel hidden" style="max-width: 900px;margin: 0 auto;padding: 0 12px;">
+        <div id="events-grid" class="events-grid"></div>
       </section>
     </main>
 
-    <footer>
-      <p id="ai-status">🎯 Ready</p>
-      <p>Decisions made: <span id="decisions-count">0</span> | Time saved: <span id="time-saved">0</span> min</p>
+    <!-- Footer -->
+    <footer class="simple-footer">
+      <div class="stats-line">Decisions made: <span id="decisions-count">0</span> • Time saved: <span id="time-saved">0</span> min</div>
+      <div id="ai-status" class="ai-status">🎯 Ready</div>
+      <div class="bottom-safe-area"></div>
     </footer>
   </div>
 
+  <!-- Local Gems Modal -->
+  <div id="gems-modal" class="modal" aria-hidden="true">
+    <div class="modal-content">
+      <button id="gems-modal-close" class="modal-close">×</button>
+      <h3>🌍 Local Gems</h3>
+      <ul id="gems-modal-list" class="modal-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    /* Optional: set API base for production if you deploy server separately */
+    window.__API__ = window.__API__ || 'http://localhost:3001';
+  </script>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>

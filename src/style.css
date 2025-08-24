@@ -1184,3 +1184,35 @@ footer {
   border-top: 1px solid rgba(255,255,255,0.14);
 }
 footer p { margin: 2px 0; font-size: 13px; opacity: .9; }
+/* Friend avatars */
+.friend-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-right: 8px;
+  border: 2px solid rgba(255,255,255,0.25);
+}
+
+/* Modal (Local Gems) */
+.modal {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: none; align-items: center; justify-content: center;
+  z-index: 999;
+}
+.modal.open { display: flex; }
+.modal-content {
+  background: #0b1220; color: #e2e8f0;
+  border: 1px solid #263247; border-radius: 16px;
+  width: min(560px, 92%); padding: 18px;
+  max-height: 80vh; overflow: auto;
+}
+.modal-close {
+  position: absolute; right: 14px; top: 8px;
+  background: transparent; border: none; color: #fff;
+  font-size: 24px; cursor: pointer;
+}
+.modal-list { list-style: none; margin-top: 10px; }
+.modal-list li { padding: 8px 0; border-bottom: 1px dashed #263247; }
