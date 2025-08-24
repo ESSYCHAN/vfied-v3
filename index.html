@@ -2,57 +2,69 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>VFIED App</title>
-  <link rel="stylesheet" href="./src/style.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VFIED – One Button Food Intelligence</title>
+  <link rel="stylesheet" href="./src/style.css" />
 </head>
 <body>
-  <div class="app-container">
-    <!-- Instant Mode -->
-    <div id="instant-mode">
-      <div class="instant-suggestion">
-        <div id="suggestion-emoji" class="suggestion-food">🍽️</div>
-        <div id="suggestion-name" class="suggestion-name">Loading...</div>
-        <div id="suggestion-tagline" class="suggestion-tagline">Please wait</div>
-      </div>
+  <div id="app">
+    <header>
+      <h1>VFIED 🍽️</h1>
+      <p id="context-info">🤖 Initializing your food intelligence...</p>
+    </header>
 
-      <!-- ✅ NEW: Social Proof -->
-      <div id="social-proof" style="margin:1rem 0; font-size:0.9rem; opacity:0.85;"></div>
+    <main>
+      <!-- Mood input -->
+      <section>
+        <input id="mood-input" placeholder="How are you feeling?" />
+        <button id="detect-mood-btn">Detect Mood</button>
+        <div id="detected-moods" class="hidden"></div>
+      </section>
 
-      <button id="refresh-btn" class="btn">🔄 Refresh Suggestion</button>
-    </div>
+      <!-- Decide button -->
+      <section>
+        <button id="decide-button">
+          <span id="button-icon">🎯</span>
+          <span id="button-text">DECIDE FOR ME</span>
+          <div class="button-subtitle">I'll figure it out for you</div>
+        </button>
+      </section>
 
-    <!-- Browse Mode -->
-    <div id="browse-mode" style="display:none;">
-      <h2 style="margin:1rem 0;">🌟 Local Gems</h2>
-      <div id="local-gems-grid" class="food-grid">
-        <!-- Filled dynamically -->
-      </div>
-    </div>
+      <!-- AI suggestion -->
+      <section id="suggestion-result" class="hidden">
+        <div id="result-emoji">🍔</div>
+        <h2 id="result-name">Your food suggestion</h2>
+        <p id="result-description"></p>
+        <p id="restaurant-info"></p>
+      </section>
 
-    <!-- Preferences -->
-    <div class="preferences">
-      <h3>⚙️ Preferences</h3>
-      <label><input type="checkbox" name="dietary" value="vegetarian"> Vegetarian</label>
-      <label><input type="checkbox" name="dietary" value="vegan"> Vegan</label>
-      <label><input type="checkbox" name="dietary" value="gluten-free"> Gluten Free</label>
+      <!-- NEW: Social proof -->
+      <section id="social-proof">
+        <h3>👥 What your friends are saying</h3>
+        <div id="friend-chips"></div>
+      </section>
 
-      <div>
-        <label>Budget:</label>
-        <select name="budget">
-          <option value="low">£</option>
-          <option value="medium" selected>££</option>
-          <option value="high">£££</option>
-        </select>
-      </div>
-      <button id="save-prefs-btn" class="btn">💾 Save Preferences</button>
-    </div>
+      <!-- AI insights -->
+      <section id="insights">
+        <button id="insights-toggle">🤖 Why this choice? ↓</button>
+        <div id="insights-content" class="hidden">
+          <p id="cultural-note"></p>
+          <p id="personal-note"></p>
+          <p id="weather-note"></p>
+        </div>
+      </section>
 
-    <!-- Navigation -->
-    <div class="nav-bar">
-      <button onclick="showInstant()">🎯 Instant</button>
-      <button onclick="showBrowse()">🔍 Browse</button>
-    </div>
+      <!-- Browse mode -->
+      <section id="browse">
+        <h3>🌍 Local Gems</h3>
+        <div id="local-gems-grid"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p id="ai-status">🎯 Ready</p>
+      <p>Decisions made: <span id="decisions-count">0</span> | Time saved: <span id="time-saved">0</span> min</p>
+    </footer>
   </div>
 
   <script type="module" src="./src/main.js"></script>

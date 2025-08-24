@@ -1,114 +1,127 @@
-// VFIED v4 Main App Logic - Connected + Demo Social + Local Lists
+import { getAIServiceStatus, getAILocationContext } from './services/aiFoodService.js';
 
-const MCP_CONFIG = {
-  baseUrl: 'http://localhost:3001',
-  timeout: 5000
-};
+const API_BASE = 'http://localhost:3001';
 
-async function fetchRecommendation(moodText = "hungry") {
+// --- Fake friends for demo ---
+const demoFriends = [
+  { name: 'Sarah', comment: '🔥 Best ramen spot ever!', emoji: '🍜' },
+  { name: 'James', comment: '💯 Always go for the sushi here', emoji: '🍣' },
+  { name: 'Aisha', comment: '👌 Perfect comfort food when tired', emoji: '🍲' },
+];
+
+// --- Init app ---
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('🚀 VFIED UI loaded');
+
+  const decideBtn = document.getElementById('decide-button');
+  const detectBtn = document.getElementById('detect-mood-btn');
+
+  decideBtn.addEventListener('click', handleDecision);
+  detectBtn.addEventListener('click', detectMood);
+
+  renderFriendChips();
+  loadLocalGems();
+  loadUserPrefs();
+});
+
+// --- Decision handler ---
+async function handleDecision() {
+  const mood = document.getElementById('mood-input').value || 'hungry';
+
   try {
-    const prefs = loadPreferences();
+    const payload = {
+      location: {
+        city: 'London',
+        country: 'United Kingdom',
+        country_code: 'GB',
+      },
+      mood_text: mood,
+      dietary: getUserPrefs().dietary || [],
+      budget: getUserPrefs().budget || 'medium',
+      menu_source: 'global_database',
+    };
 
-    const response = await fetch(`${MCP_CONFIG.baseUrl}/v1/recommend`, {
+    const res = await fetch(`${API_BASE}/v1/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mood_text: moodText,
-        dietary: prefs.dietary || [],
-        budget: prefs.budget || 'medium',
-        location: prefs.location || {
-          city: 'London',
-          country: 'United Kingdom',
-          country_code: 'GB'
-        },
-        menu_source: 'global_database'
-      })
+      body: JSON.stringify(payload),
     });
 
-    const data = await response.json();
-    renderSuggestion(data);
+    const suggestion = await res.json();
+    console.log('✅ Suggestion:', suggestion);
+
+    showSuggestion(suggestion);
   } catch (err) {
-    console.error("Recommendation failed", err);
-    document.getElementById("suggestion-name").textContent = "⚠️ Error loading suggestion";
-    document.getElementById("suggestion-tagline").textContent = "Try again shortly";
+    console.error('❌ Error:', err);
+    showError('Server unavailable');
   }
 }
 
-// === UI RENDER ===
-function renderSuggestion(data) {
-  const food = data.food || {};
-  document.getElementById("suggestion-emoji").textContent = food.emoji || "🍽️";
-  document.getElementById("suggestion-name").textContent = food.name || "Surprise Dish";
-  document.getElementById("suggestion-tagline").textContent =
-    data.friendMessage || data.reasoning || "Perfect match for your vibe";
+// --- Show suggestion ---
+function showSuggestion(s) {
+  const section = document.getElementById('suggestion-result');
+  section.classList.remove('hidden');
 
-  // Add fake social proof
-  const social = document.getElementById("social-proof");
-  social.innerHTML = `
-    👩 Sarah says: "Always get sushi when stressed!" <br>
-    👨 James recommends: "Burger hits every time."
-  `;
+  document.getElementById('result-emoji').textContent = s.food?.emoji || '🍽️';
+  document.getElementById('result-name').textContent = s.food?.name || 'Something tasty';
+  document.getElementById('result-description').textContent =
+    s.friendMessage || s.reasoning || 'Perfect for your mood!';
+  document.getElementById('restaurant-info').textContent =
+    s.availabilityNote || '';
+
+  document.getElementById('cultural-note').textContent = s.culturalNote || '';
+  document.getElementById('personal-note').textContent = s.personalNote || '';
+  document.getElementById('weather-note').textContent = s.weatherNote || '';
 }
 
-// === LOCAL GEMS ===
+// --- Show friend chips ---
+function renderFriendChips() {
+  const container = document.getElementById('friend-chips');
+  container.innerHTML = demoFriends
+    .map(f => `<span class="friend-chip">${f.emoji} <strong>${f.name}</strong>: ${f.comment}</span>`)
+    .join('');
+}
+
+// --- Load local gems ---
 async function loadLocalGems() {
   try {
-    const response = await fetch('/data/local_lists.json');
-    const gems = await response.json();
+    const res = await fetch('/data/local_lists.json');
+    const gems = await res.json();
 
-    const grid = document.getElementById("local-gems-grid");
-    grid.innerHTML = gems.map(g => `
-      <div class="food-card">
-        <div class="food-card-emoji">${g.emoji}</div>
-        <div class="food-card-name">${g.name}</div>
-        <div class="food-card-time">${g.neighborhood}</div>
-      </div>
-    `).join('');
+    const grid = document.getElementById('local-gems-grid');
+    grid.innerHTML = gems
+      .map(
+        g => `
+      <div class="gem-card">
+        <div class="gem-emoji">${g.emoji}</div>
+        <div class="gem-name">${g.name}</div>
+        <div class="gem-area">${g.area}</div>
+      </div>`
+      )
+      .join('');
   } catch (err) {
-    console.error("Failed loading local gems", err);
+    console.error('❌ Failed to load local gems', err);
   }
 }
 
-// === PREFERENCES ===
-function savePreferences() {
-  const prefs = {
-    dietary: Array.from(document.querySelectorAll("input[name='dietary']:checked")).map(i => i.value),
-    budget: document.querySelector("select[name='budget']").value
-  };
-  localStorage.setItem("vfied_prefs", JSON.stringify(prefs));
-  alert("✅ Preferences saved!");
+// --- User prefs (dietary/budget) ---
+function saveUserPrefs(prefs) {
+  localStorage.setItem('vfied_prefs', JSON.stringify(prefs));
+}
+function getUserPrefs() {
+  return JSON.parse(localStorage.getItem('vfied_prefs') || '{}');
+}
+function loadUserPrefs() {
+  console.log('⚙️ Loaded user prefs:', getUserPrefs());
 }
 
-function loadPreferences() {
-  try {
-    return JSON.parse(localStorage.getItem("vfied_prefs")) || {};
-  } catch {
-    return {};
-  }
+// --- Mood detection placeholder ---
+function detectMood() {
+  const mood = document.getElementById('mood-input').value;
+  alert(`🧠 Pretending to detect mood: ${mood}`);
 }
 
-// === NAVIGATION ===
-function showInstant() {
-  document.getElementById("instant-mode").style.display = 'block';
-  document.getElementById("browse-mode").style.display = 'none';
+// --- Error display ---
+function showError(msg) {
+  document.getElementById('context-info').textContent = `⚠️ ${msg}`;
 }
-
-function showBrowse() {
-  document.getElementById("instant-mode").style.display = 'none';
-  document.getElementById("browse-mode").style.display = 'block';
-}
-
-// === INIT ===
-document.addEventListener("DOMContentLoaded", () => {
-  console.log("🚀 VFIED App Ready");
-
-  // Default suggestion
-  fetchRecommendation("hungry");
-
-  // Load local gems
-  loadLocalGems();
-
-  // Hook buttons
-  document.getElementById("refresh-btn").addEventListener("click", () => fetchRecommendation("hungry"));
-  document.getElementById("save-prefs-btn").addEventListener("click", savePreferences);
-});
