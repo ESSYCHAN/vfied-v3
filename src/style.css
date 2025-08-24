@@ -956,3 +956,68 @@ button[disabled] { opacity: .6; cursor: not-allowed; }
   -webkit-backdrop-filter: blur(14px);
   box-shadow: 0 6px 18px rgba(0,0,0,.15);
 }
+
+/* --- VFIED Social Layer Polish Overrides --- */
+
+/* Use modern font */
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Suggestion + gem cards + social signals → glassy look */
+.suggestion-card,
+.gem-card,
+.social-signal {
+  background: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  border-radius: 16px !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.15);
+  padding: 1rem;
+}
+
+/* Friend chips → pill style */
+.friend-chip {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border: 1px solid rgba(255, 255, 255, 0.24) !important;
+  border-radius: 999px !important;
+  padding: 8px 14px !important;
+  font-weight: 600;
+  transition: background .2s, transform .1s;
+}
+.friend-chip:hover {
+  background: rgba(255,255,255,.22) !important;
+  transform: translateY(-1px);
+}
+
+/* Accept / Try again → proper CTAs */
+.action-btn {
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+  letter-spacing: .2px;
+  padding: 12px 16px !important;
+}
+.action-btn.accept {
+  background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 20px rgba(22,163,74,.35);
+}
+.action-btn.try-again {
+  background: rgba(255,255,255,.12) !important;
+  border: 1px solid rgba(255,255,255,.25) !important;
+  color: #fff !important;
+}
+
+/* Food result → hero card */
+.food-name {
+  font-size: 1.6rem !important;
+  font-weight: 800 !important;
+  margin-bottom: 6px !important;
+  color: #fff !important;
+}
+.food-description {
+  font-size: 1rem !important;
+  color: #e0e7ff !important;
+  line-height: 1.5 !important;
+}
