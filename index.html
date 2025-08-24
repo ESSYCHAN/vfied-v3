@@ -2,9 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+  />
   <title>VFIED – One Button Food Intelligence</title>
-  <link rel="stylesheet" href="./src/style.css" />
+
+  <!-- PWA + theme -->
+  <meta name="theme-color" content="#0b0f1a" />
+  <link rel="manifest" href="/manifest.json" />
+
+  <!-- Styles (cache-busted) -->
+  <link rel="stylesheet" href="/src/style.css?v=launch1" />
 </head>
 <body>
   <div id="app">
@@ -20,7 +29,8 @@
       <section class="mood-section">
         <h3>🧠 Mood-aware suggestions</h3>
         <div class="mood-input-container">
-          <input id="mood-input" class="mood-input" placeholder="How are you feeling? (e.g., stressed but want something light)" />
+          <input id="mood-input" class="mood-input"
+            placeholder="How are you feeling? (e.g., stressed but want something light)" />
           <button id="detect-mood-btn" class="mood-detect-btn">Detect Mood</button>
         </div>
         <div id="detected-moods" class="detected-moods hidden"></div>
@@ -40,7 +50,8 @@
           <div class="button-subtitle">I'll figure it out for you</div>
         </button>
       </section>
-      <!-- Loading skeleton for suggestion -->
+
+      <!-- Loading skeleton -->
       <section id="suggestion-skeleton" class="suggestion-result hidden">
         <div class="suggestion-card skeleton suggestion-skeleton">
           <div class="skel-emoji"></div>
@@ -49,8 +60,9 @@
           <div class="skel-line" style="width: 55%; margin: 10px auto;"></div>
         </div>
       </section>
-      <!-- Suggestion -->
-      <section id="suggestion-result" class="suggestion-result hidden">
+
+      <!-- Suggestion (aria-live for accessibility) -->
+      <section id="suggestion-result" class="suggestion-result hidden" aria-live="polite">
         <div class="suggestion-card" id="resultCard">
           <div id="social-signals" class="social-signals"></div>
 
@@ -128,12 +140,26 @@
     </div>
   </div>
 
-  <script>
-    /* Optional: set API base for production if you deploy server separately */
-    window.__API__ = window.__API__ || 'http://localhost:3001';
-  </script>
-  <script type="module" src="./src/main.js"></script>
   <!-- Toast container -->
-<div id="toast-wrap" class="toast-wrap"></div>
+  <div id="toast-wrap" class="toast-wrap"></div>
+
+  <!-- API base (HTTPS in prod). Comment the local line when deploying. -->
+  <script>
+    // For local dev:
+    // window.__API__ = 'http://localhost:3001';
+
+    // For production:
+    window.__API__ = 'https://vfied-v3.onrender.com';
+  </script>
+
+  <!-- Register Service Worker (for offline + updates) -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  </script>
+
+  <!-- App logic -->
+  <script type="module" src="/src/main.js"></script>
 </body>
 </html>

@@ -102,7 +102,31 @@ function wireCoreEvents() {
     if (e.target === modal) closeModal(modal);
   });
 }
+// Toggle the "thinking" state of the Decide button
+function setThinking(btn, on = true) {
+  try {
+    // accept element or lookup by id
+    const el = btn || document.getElementById('decide-button');
+    if (!el) return;
 
+    // disable/enable for UX
+    el.disabled = !!on;
+
+    // update icon/text if present
+    const icon = document.getElementById('button-icon');   // 🎯 span
+    const text = document.getElementById('button-text');   // DECIDE FOR ME span
+
+    if (on) {
+      if (icon) icon.textContent = '⏳';
+      if (text) text.textContent = 'Thinking…';
+    } else {
+      if (icon) icon.textContent = '🎯';
+      if (text) text.textContent = 'DECIDE FOR ME';
+    }
+  } catch (e) {
+    console.warn('setThinking failed:', e);
+  }
+}
 async function handleDecision() {
   const decideBtn = byId('decide-button');
   setThinking(decideBtn, true);
@@ -138,11 +162,9 @@ async function handleDecision() {
     incrementStats({ timeSavedMin: 3 }); // optimistic: ~3 min saved per quick decision
   } catch (err) {
     console.error(err);
-    // Fallback to local suggestion so the app always “does something”
-    const fallback = addSocialSignals(
-      fallbackSuggestions[Math.floor(Math.random() * fallbackSuggestions.length)]
-    );
+    const fallback = addSocialSignals(sample(fallbackSuggestions));
     showSuggestion(fallback);
+    updateContext('⚠️ Server unavailable — using a local fallback.');
     toast('⚠️ Using offline suggestion (server unavailable).', 'warn');
   } finally {
     hideSuggestionSkeleton();
@@ -185,16 +207,17 @@ function renderFriendChips() {
   const container = byId('friend-chips');
   if (!container) return;
 
-  container.innerHTML = demoFriends
-    .map(
-      (f) => `
-      <button class="friend-chip" onclick="VFIED.askFriend('${f.name}')">
-        <img class="friend-avatar" src="${f.avatar}" alt="${f.name}" />
-        <span>${f.emoji} <strong>${f.name}</strong></span>
-      </button>
-    `
-    )
-    .join('');
+  container.innerHTML = '';
+  demoFriends.forEach((f) => {
+    const btn = document.createElement('button');
+    btn.className = 'friend-chip';
+    btn.innerHTML = `
+      <img class="friend-avatar" src="${f.avatar}" alt="${escapeHtml(f.name)}" />
+      <span>${f.emoji} <strong>${escapeHtml(f.name)}</strong></span>
+    `;
+    btn.addEventListener('click', () => askFriend(f.name));
+    container.appendChild(btn);
+  });
 }
 
 function askFriend(name) {
@@ -264,17 +287,20 @@ async function loadLocalGems() {
 function renderLocalGemsGrid() {
   const grid = byId('local-gems-grid');
   if (!grid) return;
+
   const first = localGems.slice(0, 8);
-  grid.innerHTML = first
-    .map(
-      (g) => `
-      <div class="gem-card" onclick="VFIED.exploreGem('${g.name}')">
-        <div class="gem-emoji">${g.emoji}</div>
-        <div class="gem-name">${g.name}</div>
-        <div class="gem-area">${g.area}</div>
-      </div>`
-    )
-    .join('');
+  grid.innerHTML = '';
+  first.forEach((g) => {
+    const card = document.createElement('div');
+    card.className = 'gem-card';
+    card.innerHTML = `
+      <div class="gem-emoji">${g.emoji}</div>
+      <div class="gem-name">${escapeHtml(g.name)}</div>
+      <div class="gem-area">${escapeHtml(g.area)}</div>
+    `;
+    card.addEventListener('click', () => exploreGem(g.name));
+    grid.appendChild(card);
+  });
 }
 
 function exploreGem(name) {
@@ -327,18 +353,20 @@ function renderTravelGrid() {
   const grid = byId('travel-grid');
   if (!grid) return;
 
-  grid.innerHTML = items
-    .map(
-      (t) => `
-      <div class="travel-card" onclick="VFIED.tryTravel('${city}','${t.name}')">
-        <div class="travel-emoji">${t.emoji}</div>
-        <div class="travel-body">
-          <div class="travel-title">${t.name}</div>
-          <div class="travel-note">${t.note || ''}</div>
-        </div>
-      </div>`
-    )
-    .join('');
+  grid.innerHTML = '';
+  items.forEach((t) => {
+    const card = document.createElement('div');
+    card.className = 'travel-card';
+    card.innerHTML = `
+      <div class="travel-emoji">${t.emoji}</div>
+      <div class="travel-body">
+        <div class="travel-title">${escapeHtml(t.name)}</div>
+        <div class="travel-note">${escapeHtml(t.note || '')}</div>
+      </div>
+    `;
+    card.addEventListener('click', () => tryTravel(city, t.name));
+    grid.appendChild(card);
+  });
 }
 
 function tryTravel(city, itemName) {
@@ -361,23 +389,47 @@ async function loadEvents() {
 function renderEvents() {
   const grid = byId('events-grid');
   if (!grid) return;
-  grid.innerHTML = eventItems
-    .map(
-      (e) => `
-      <div class="event-card">
-        <div class="event-badge">${e.emoji}</div>
-        <div class="event-body">
-          <div class="event-title">${e.title}</div>
-          <div class="event-meta">${e.date} • ${e.area} • ${e.price || 'Free'}</div>
-          <div class="event-cta">
-            <button class="insights-toggle" onclick="VFIED.goEvent('${e.title}')">Details</button>
-            <button class="insights-toggle" onclick="VFIED.goMaps('${encodeURIComponent(e.map || e.title)}')">Directions</button>
-          </div>
-        </div>
-      </div>`
-    )
-    .join('');
+
+  grid.innerHTML = '';
+  eventItems.forEach((e) => {
+    const card = document.createElement('div');
+    card.className = 'event-card';
+
+    const badge = document.createElement('div');
+    badge.className = 'event-badge';
+    badge.textContent = e.emoji;
+
+    const body = document.createElement('div');
+    body.className = 'event-body';
+
+    const title = document.createElement('div');
+    title.className = 'event-title';
+    title.textContent = e.title;
+
+    const meta = document.createElement('div');
+    meta.className = 'event-meta';
+    meta.textContent = `${e.date} • ${e.area} • ${e.price || 'Free'}`;
+
+    const cta = document.createElement('div');
+    cta.className = 'event-cta';
+
+    const detailsBtn = document.createElement('button');
+    detailsBtn.className = 'insights-toggle';
+    detailsBtn.textContent = 'Details';
+    detailsBtn.addEventListener('click', () => goEvent(e.title));
+
+    const mapsBtn = document.createElement('button');
+    mapsBtn.className = 'insights-toggle';
+    mapsBtn.textContent = 'Directions';
+    mapsBtn.addEventListener('click', () => goMaps(encodeURIComponent(e.map || e.title)));
+
+    cta.append(detailsBtn, mapsBtn);
+    body.append(title, meta, cta);
+    card.append(badge, body);
+    grid.appendChild(card);
+  });
 }
+
 
 function goEvent(title) {
   toast(`🎪 ${title}\n(Integrate ticket link or detail view here)`, 'info');
@@ -429,20 +481,17 @@ function updateStatsUI() {
 
 // ---------------- Skeleton UI ----------------
 function showSuggestionSkeleton() {
-  const sect = byId('suggestion-result');
-  if (!sect) return;
-  sect.classList.remove('hidden');
-  sect.innerHTML = `
-    <div class="skeleton-card">
-      <div class="sk-line sk-emoji"></div>
-      <div class="sk-line sk-title"></div>
-      <div class="sk-line sk-sub"></div>
-      <div class="sk-line sk-sub short"></div>
-    </div>
-  `;
+  // show the skeleton section and hide the real result container
+  const skel = byId('suggestion-skeleton');
+  const res = byId('suggestion-result');
+  if (skel) skel.classList.remove('hidden');
+  if (res) res.classList.add('hidden');
 }
+
 function hideSuggestionSkeleton() {
-  // no-op; replaced by real content in showSuggestion()
+  // hide the skeleton; showSuggestion() will reveal the real result
+  const skel = byId('suggestion-skeleton');
+  if (skel) skel.classList.add('hidden');
 }
 
 // ---------------- Toasts ----------------
@@ -540,7 +589,15 @@ function hide(id) {
 function updateContext(msg) {
   setText('context-info', msg);
 }
+function sample(a) {
+  return a[Math.floor(Math.random() * a.length)];
+}
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (m) => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]
+  ));
+}
 // User prefs (stub for now)
 function getUserPrefs() {
   try {

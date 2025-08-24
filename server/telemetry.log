@@ -69,3 +69,5 @@
 {"type":"telemetry","event":"decide_success","payload":{"location":{"city":"London","country":"United Kingdom","country_code":"GB"},"dietary":[]},"at":"2025-08-24T07:56:24.074Z"}
 {"type":"telemetry","event":"decide_success","payload":{"location":{"city":"London","country":"United Kingdom","country_code":"GB"},"dietary":[]},"at":"2025-08-24T07:56:24.299Z"}
 {"type":"telemetry","event":"events_view","payload":{"city":"London","code":"GB"},"at":"2025-08-24T17:04:03.071Z"}
+{"type":"telemetry","event":"events_view","payload":{"city":"London","code":"GB"},"at":"2025-08-24T17:46:31.889Z"}
+{"type":"telemetry","event":"decide_success","payload":{"location":{"city":"London","country":"United Kingdom","country_code":"GB"},"dietary":[]},"at":"2025-08-24T17:46:37.019Z"}

@@ -1,4 +1,4 @@
-const VERSION = 'vfied-v2';;
+const VERSION = 'vfied-v3';
 const ASSETS = [
   '/', '/index.html',
   '/src/style.css',
