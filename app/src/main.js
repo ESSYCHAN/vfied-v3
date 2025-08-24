@@ -288,7 +288,7 @@ function renderSocialSignals(s) {
 // ---------------- Local Gems ----------------
 async function loadLocalGems() {
   try {
-    const url = API_BASE ? `${API_BASE}/data/local_lists.json` : `/data/local_lists.json`;
+    const url = `/data/local_lists.json`;
     const res = await fetch(url, { cache: 'no-store' });
     localGems = await res.json();
   } catch {
@@ -341,7 +341,8 @@ function populateGemsModal() {
 // ---------------- Travel ----------------
 async function loadTravelLists() {
   try {
-    const url = API_BASE ? `${API_BASE}/data/travel_lists.json` : `/data/travel_lists.json`;
+    // const url = API_BASE ? `${API_BASE}/data/travel_lists.json` : `/data/travel_lists.json`;
+    const url = `/data/travel_lists.json`;
     const res = await fetch(url, { cache: 'no-store' });
     travelLists = await res.json();
   } catch {
@@ -392,7 +393,7 @@ function tryTravel(city, itemName) {
 // ---------------- Events Near Me ----------------
 async function loadEvents() {
   try {
-    const url = API_BASE ? `${API_BASE}/data/events.json` : `/data/events.json`;
+    const url = `/data/events.json`;
     const res = await fetch(url, { cache: 'no-store' });
     eventItems = await res.json();
   } catch {
