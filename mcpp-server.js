@@ -8,7 +8,15 @@ import crypto from 'crypto';
 
 const app = express();
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
-
+// TEMPORARY DEBUG - Add this after your CORS config
+app.use((req, res, next) => {
+  console.log(`🔍 ${req.method} ${req.url} - Origin: ${req.get('Origin')}`);
+  console.log('🔍 CORS headers:', {
+    'Access-Control-Allow-Origin': res.get('Access-Control-Allow-Origin'),
+    'Access-Control-Allow-Methods': res.get('Access-Control-Allow-Methods'),
+  });
+  next();
+});
 // Middleware
 const whitelist = new Set([
   'http://localhost:5168',
@@ -21,15 +29,7 @@ const whitelist = new Set([
   'https://vfied-v3.vercel.app',
 ]);
 const vercelRegex = /^https:\/\/[^.]+\.vercel\.app$/;
-// TEMPORARY DEBUG - Add this after your CORS config
-app.use((req, res, next) => {
-  console.log(`🔍 ${req.method} ${req.url} - Origin: ${req.get('Origin')}`);
-  console.log('🔍 CORS headers:', {
-    'Access-Control-Allow-Origin': res.get('Access-Control-Allow-Origin'),
-    'Access-Control-Allow-Methods': res.get('Access-Control-Allow-Methods'),
-  });
-  next();
-});
+
 const corsOptionsDelegate = (req, cb) => {
   const origin = req.header('Origin');
   const isAllowed =
