@@ -8,23 +8,26 @@ import crypto from 'crypto';
 
 const app = express();
 const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
-// TEMPORARY DEBUG - Add this after your CORS config
+
+// EMERGENCY CORS FIX - Add this here
 app.use((req, res, next) => {
   console.log(`🔍 ${req.method} ${req.url} - Origin: ${req.get('Origin')}`);
   
-  // Force CORS headers for debugging
-  res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
+  // Force allow all origins for debugging
+  res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Credentials', 'false'); // Set to false when using *
   
+  // Handle preflight OPTIONS requests
   if (req.method === 'OPTIONS') {
-    console.log('🔍 Handling OPTIONS preflight');
+    console.log('🔍 Handling OPTIONS preflight request');
     return res.status(200).end();
   }
   
   next();
 });
+
 // Middleware
 const whitelist = new Set([
   'http://localhost:5168',
