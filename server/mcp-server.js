@@ -232,7 +232,7 @@ const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
 app.set('trust proxy', 1);
 app.use(cors({
   origin: [
-    'http://localhost:5166',
+    'http://localhost:5168',
     'http://localhost:5173',
     'http://localhost:3000',
     'https://vfied.vercel.app',
