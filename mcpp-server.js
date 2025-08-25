@@ -11,10 +11,18 @@ const PORT = process.env.MCP_PORT || process.env.PORT || 3001;
 // TEMPORARY DEBUG - Add this after your CORS config
 app.use((req, res, next) => {
   console.log(`🔍 ${req.method} ${req.url} - Origin: ${req.get('Origin')}`);
-  console.log('🔍 CORS headers:', {
-    'Access-Control-Allow-Origin': res.get('Access-Control-Allow-Origin'),
-    'Access-Control-Allow-Methods': res.get('Access-Control-Allow-Methods'),
-  });
+  
+  // Force CORS headers for debugging
+  res.header('Access-Control-Allow-Origin', req.get('Origin') || '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    console.log('🔍 Handling OPTIONS preflight');
+    return res.status(200).end();
+  }
+  
   next();
 });
 // Middleware
