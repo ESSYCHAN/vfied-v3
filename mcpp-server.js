@@ -55,8 +55,8 @@ const corsOptionsDelegate = (req, cb) => {
   });
 };
 
-app.use(cors(corsOptionsDelegate));
-app.options('*', cors(corsOptionsDelegate));
+// app.use(cors(corsOptionsDelegate));
+// app.options('*', cors(corsOptionsDelegate));
 app.use(express.json());
 
 // Sophisticated AI Food Service (with OpenAI + Weather + Cultural Intelligence)
