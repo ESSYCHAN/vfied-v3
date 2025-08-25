@@ -1,130 +1,328 @@
-/* === VFIED Polish Pack (matches the mock-up) === */
+/* === UI FIXES FOR VFIED === */
 
-/* Base & background */
+/* Fix the basic layout structure */
 body {
-  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif !important;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   background:
     radial-gradient(80rem 50rem at 20% -10%, #1d2350 0%, transparent 60%),
     radial-gradient(60rem 40rem at 120% 10%, #174a2b 0%, transparent 50%),
-    linear-gradient(180deg, #0a0e19, #070b14) !important;
+    linear-gradient(180deg, #0a0e19, #070b14);
+  color: #e5ecff;
+  line-height: 1.5;
 }
 
-/* Phone-width column on desktop */
-@media (min-width: 900px){
-  .one-button-main,
-  .tabpanel,
-  #social-proof,
-  [style*="max-width: 900px"] {
-    max-width: 430px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-  }
+#app {
+  max-width: 100%;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* Header bits */
+/* Header fixes */
+.simple-header {
+  text-align: center;
+  padding: 20px 16px;
+  background: rgba(0,0,0,0.2);
+  backdrop-filter: blur(10px);
+}
+
 .app-title {
-  font-weight: 900 !important;
-  font-size: 28px !important;
-  letter-spacing: .2px !important;
+  font-weight: 900;
+  font-size: 28px;
+  letter-spacing: 0.2px;
   background: linear-gradient(90deg, #fff, #c7d2fe);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0 0 8px 0;
 }
+
 #context-info {
-  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.18);
-  border-radius: 999px; padding: 6px 10px; color: #9fb0c9;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  padding: 6px 12px;
+  color: #9fb0c9;
+  font-size: 14px;
+  display: inline-block;
+  margin: 0;
 }
 
-/* Inputs */
+/* Main content area */
+.one-button-main {
+  flex: 1;
+  padding: 16px;
+  max-width: 430px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Section spacing */
+.one-button-main > section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+}
+
+/* Mood section fixes */
+.mood-section h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.mood-input-container {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
 #mood-input {
-  background: rgba(255,255,255,.08) !important;
-  border: 1px solid rgba(255,255,255,.18) !important;
-  color: #e5ecff !important; border-radius: 12px !important;
+  flex: 1;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
+  color: #e5ecff;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 14px;
 }
+
+#mood-input::placeholder {
+  color: rgba(229,236,255,0.5);
+}
+
 .mood-detect-btn {
-  border-radius: 12px; border: 1px solid rgba(255,255,255,.18);
-  background: rgba(255,255,255,.10); color:#e5ecff; font-weight: 700;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.10);
+  color: #e5ecff;
+  font-weight: 700;
+  padding: 12px 16px;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
 }
 
-/* Decide button (gradient) */
-#decide-button {
-  width:100%; padding:16px; border:0; border-radius:16px;
-  font-weight:900; letter-spacing:.3px; color:#fff;
-  background: linear-gradient(90deg, #7c3aed, #6366f1) !important;
-  box-shadow: 0 16px 48px rgba(124,58,237,.35);
+/* Social section fixes */
+#social-proof {
+  max-width: 430px;
+  margin: 0 auto 20px;
+  padding: 0 16px;
 }
-#decide-button .button-subtitle { opacity:.9; font-weight:600; }
 
-/* Friend chips */
+#social-proof h3 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.friend-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .friend-chip {
-  display:inline-flex; align-items:center; gap:8px;
-  background: rgba(255,255,255,.10) !important;
-  border: 1px solid rgba(255,255,255,.16) !important;
-  border-radius: 999px; padding:8px 12px; font-weight:800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.16);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
 }
-.friend-avatar { width:22px; height:22px; border-radius:50%; object-fit:cover; }
 
-/* Card “glass” look */
-main section,
-.suggestion-card,
+.friend-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* Decision button fixes */
+.decision-area {
+  text-align: center;
+  margin: 24px 0;
+}
+
+#decide-button {
+  width: 100%;
+  padding: 20px;
+  border: 0;
+  border-radius: 16px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  color: #fff;
+  background: linear-gradient(90deg, #7c3aed, #6366f1);
+  box-shadow: 0 16px 48px rgba(124,58,237,0.35);
+  cursor: pointer;
+  font-size: 18px;
+  transition: transform 0.2s ease;
+}
+
+#decide-button:hover {
+  transform: translateY(-2px);
+}
+
+.button-icon {
+  font-size: 24px;
+  margin-right: 8px;
+}
+
+.button-subtitle {
+  opacity: 0.9;
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 4px;
+}
+
+/* Suggestion result fixes */
+.suggestion-result {
+  margin: 24px 0;
+}
+
+.suggestion-card {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.25);
+  padding: 24px 16px;
+  text-align: center;
+}
+
+#result-emoji {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+#result-name {
+  font-size: 24px;
+  font-weight: 900;
+  margin: 0 0 8px 0;
+  letter-spacing: 0.2px;
+}
+
+#result-description {
+  opacity: 0.9;
+  margin: 0 0 16px 0;
+  line-height: 1.45;
+}
+
+/* Action buttons */
+.decision-actions {
+  display: flex;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.08);
+  color: #e5ecff;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.action-btn.accept {
+  background: linear-gradient(90deg, #059669, #10b981);
+  border-color: #10b981;
+}
+
+/* Tabs fixes */
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 14px;
+  margin: 20px auto;
+  width: fit-content;
+}
+
+.tab {
+  border: 0;
+  padding: 8px 16px;
+  font-weight: 700;
+  color: #cbd5e1;
+  background: transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tab.active {
+  color: #fff;
+  background: linear-gradient(90deg, #7c3aed, #6366f1);
+}
+
+/* Local gems fixes */
+.local-gems-grid {
+  display: grid;
+  gap: 12px;
+}
+
 .gem-card,
 .travel-card,
 .event-card {
-  background: rgba(255,255,255,.06) !important;
-  border: 1px solid rgba(255,255,255,.14) !important;
-  border-radius: 16px !important;
-  box-shadow: 0 12px 30px rgba(0,0,0,.25);
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
-/* Suggestion hierarchy */
-#result-emoji { font-size: 42px; margin-top: 8px; }
-#result-name { font-size: 22px; font-weight: 900; margin: 4px 16px 2px; letter-spacing:.2px; }
-#result-description { opacity:.95; margin: 0 16px 8px; line-height:1.45; }
-#restaurant-info { opacity:.9; margin: 0 16px 12px; }
-
-/* Insights */
-#insights-toggle {
-  border-radius: 12px; font-weight: 800;
-  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14);
-}
-#insights-content > div {
-  background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.14);
-  border-radius: 10px; padding: 10px 12px;
+/* Hidden class */
+.hidden {
+  display: none !important;
 }
 
-/* Segmented tabs */
-.tabs {
-  display:inline-flex; gap:6px; padding:6px;
-  background: rgba(255,255,255,.06);
-  border:1px solid rgba(255,255,255,.14); border-radius:14px;
-}
-.tab {
-  border:0; padding:8px 12px; font-weight:800;
-  color:#cbd5e1; background:transparent; border-radius:10px; cursor:pointer;
-}
-.tab.active {
-  color:#fff; background: linear-gradient(90deg, #7c3aed, #6366f1);
+/* Footer fixes */
+.simple-footer {
+  background: rgba(0,0,0,0.3);
+  backdrop-filter: blur(10px);
+  padding: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: #9fb0c9;
 }
 
-/* Travel/Events cards */
-.travel-card, .event-card { display:flex; gap:10px; padding:12px; }
-.travel-emoji, .event-badge { font-size:22px; min-width:22px; }
-.travel-title, .event-title { font-weight:800; }
-.event-cta .insights-toggle {
-  padding:6px 8px; border-radius:10px;
-  border:1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08);
+.stats-line {
+  margin-bottom: 8px;
 }
 
-/* Sticky actions on mobile */
-@media (max-width: 640px){
-  .decision-actions{
-    position: sticky; bottom: 10px; z-index: 20;
-    background: rgba(10,14,25,.78); backdrop-filter: blur(12px);
-    border:1px solid rgba(255,255,255,.14); border-radius: 14px;
-    padding: 10px; gap: 8px;
+#ai-status {
+  font-weight: 600;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .one-button-main {
+    padding: 12px;
   }
-  .action-btn{ flex:1; }
+  
+  .mood-input-container {
+    flex-direction: column;
+  }
+  
+  .mood-detect-btn {
+    align-self: flex-start;
+  }
 }
-
-/* iPhone safe area */
-.bottom-safe-area { height: calc(env(safe-area-inset-bottom) + 8px); }
