@@ -648,7 +648,7 @@
         //   this.activeRequests.delete(key);
         //   this.requestTimeouts.delete(key);
         // }, 30000);
-        const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT); 
+        const timeoutId = setTimeout(() => controller.abort(), 5000); 
         this.requestTimeouts.set(key, timeoutId);
         
         try {
@@ -795,6 +795,27 @@
         if (hour > 18) return 'dinner';
         if (hour < 11) return 'breakfast';
         return 'solo';
+      }
+
+      getOfflineSuggestion(mood) {
+        const suggestions = {
+          'tired': { emoji: '🍜', name: 'Hot Soup', reason: 'Warming comfort for tired vibes' },
+          'stressed': { emoji: '🍦', name: 'Ice Cream', reason: 'Sweet stress relief' },
+          'hungry': { emoji: '🍕', name: 'Pizza', reason: 'Quick satisfaction' },
+          'healthy': { emoji: '🥗', name: 'Fresh Salad', reason: 'Clean and energizing' },
+          'celebrating': { emoji: '🍰', name: 'Dessert', reason: 'Life is sweet!' }
+        };
+
+        const moodKey = Object.keys(suggestions).find(key => mood.toLowerCase().includes(key));
+        const suggestion = suggestions[moodKey] || suggestions['hungry'];
+        
+        return {
+          food: suggestion,
+          friendMessage: suggestion.reason,
+          emoji: suggestion.emoji,
+          name: suggestion.name,
+          reason: suggestion.reason
+        };
       }
 
       // Fast fallback suggestions for timeouts
@@ -952,26 +973,15 @@
           });
         });
       }
-      setupHaptics() {
-  if (window.Capacitor) {
-    import('@capacitor/haptics').then(({ Haptics, ImpactStyle }) => {
-      this.haptics = Haptics;
-      this.impactStyle = ImpactStyle;
-    });
-  }
-}
 
-async vibrate(style = 'Medium') {
-  if (this.haptics) {
-    try {
-      await this.haptics.impact({ style: this.impactStyle[style] });
-    } catch (e) {
-      if (navigator.vibrate) {
-        navigator.vibrate(style === 'Light' ? 50 : 75);
+      vibrate(style = 'Medium') {
+        // Simple web vibration - no Capacitor import needed
+        if (navigator.vibrate) {
+          const duration = style === 'Light' ? 50 : style === 'Heavy' ? 100 : 75;
+          navigator.vibrate(duration);
+        }
       }
-    }
-  }
-}
+
       // Modal methods
       openTravelModal() {
         const modal = document.getElementById('travel-modal');
@@ -1032,7 +1042,11 @@ async vibrate(style = 'Medium') {
 
       if (response.ok) {
         const data = await response.json();
-        this.showResult(data);
+        this.showResult({
+          emoji: data.food?.emoji || '🍽️',
+          name: data.food?.name || 'Good Choice',
+          reason: data.friendMessage || data.reasoning || 'Perfect for your mood!'
+        });
         this.vibrate('Light');
       } else {
         throw new Error(`API error: ${response.status}`);
