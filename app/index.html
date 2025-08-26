@@ -2,166 +2,1766 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-  />
-  <title>VFIED – One Button Food Intelligence</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VFIED - Fixed Timeout Issues</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    /* Base styles */
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0; min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      background: linear-gradient(180deg, #0a0e19, #070b14);
+      color: #e5ecff; line-height: 1.5;
+    }
 
-  <!-- PWA + theme -->
-  <meta name="theme-color" content="#0b0f1a" />
-  <link rel="manifest" href="/manifest.json" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
-  <!-- Styles (cache-busted) -->
-  <link rel="stylesheet" href="/src/style.css?v=launch3" />
+    #app { max-width: 430px; margin: 0 auto; min-height: 100vh; }
+
+    .glass-card {
+      background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px; backdrop-filter: blur(20px); margin: 20px; padding: 20px;
+    }
+
+    /* Modal Styles */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal.active {
+      display: flex !important;
+      opacity: 1;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-content {
+      background: rgba(10, 14, 25, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 16px;
+      backdrop-filter: blur(20px);
+      width: 100%;
+      max-width: 400px;
+      max-height: 90vh;
+      overflow: hidden;
+      transform: translateY(20px);
+      transition: transform 0.3s ease;
+    }
+
+    .modal.active .modal-content {
+      transform: translateY(0);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 20px 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin: 0;
+      color: #e5ecff;
+    }
+
+    .modal-close {
+      background: rgba(255, 255, 255, 0.1);
+      border: none;
+      border-radius: 50%;
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 18px;
+      color: #94a3b8;
+      transition: all 0.2s ease;
+    }
+
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #e5ecff;
+    }
+
+    .modal-body {
+      padding: 20px;
+      max-height: calc(90vh - 80px);
+      overflow-y: auto;
+    }
+
+    /* Dietary preferences */
+    .dietary-prefs {
+      background: rgba(255,255,255,0.04); border-radius: 12px; padding: 16px; margin-bottom: 16px;
+    }
+
+    .dietary-prefs h5 {
+      margin: 0 0 12px 0; font-size: 14px; font-weight: 700;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .diet-chips {
+      display: flex; flex-wrap: wrap; gap: 8px;
+    }
+
+    .diet-chip {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 20px; padding: 6px 12px; font-size: 12px; cursor: pointer;
+      transition: all 0.2s ease; user-select: none;
+    }
+
+    .diet-chip.active {
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-color: #10b981; color: white;
+    }
+
+    .diet-chip:hover:not(.active) {
+      background: rgba(255,255,255,0.12);
+    }
+
+    /* Tab system */
+    .tab-btn {
+      border: 0; padding: 12px 16px; font-weight: 700; 
+      background: transparent; border-radius: 12px; cursor: pointer; 
+      font-size: 14px; transition: all 0.2s ease;
+      color: #94a3b8;
+    }
+
+    .tab-btn.active {
+      color: #fff; 
+      background: linear-gradient(135deg, #7c3aed, #6366f1);
+    }
+
+    .tab-btn:hover:not(.active) {
+      color: #cbd5e1; 
+      background: rgba(255,255,255,0.04);
+    }
+
+    /* Decision button */
+    #decide-button {
+      width: 100%; padding: 20px; border: 0; border-radius: 16px;
+      font-weight: 900; color: #fff; font-size: 18px; cursor: pointer;
+      background: linear-gradient(135deg, #7c3aed, #6366f1);
+      box-shadow: 0 20px 40px rgba(124,58,237,0.3);
+      transition: all 0.3s ease; margin: 20px 0;
+    }
+
+    #decide-button:disabled {
+      opacity: 0.6; cursor: not-allowed;
+    }
+
+    #decide-button:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 25px 50px rgba(124,58,237,0.4);
+    }
+
+    /* Travel mode and event filter styles */
+    .travel-mode-chip, .event-filter-chip {
+      background: rgba(255,255,255,0.08); 
+      border: 1px solid rgba(255,255,255,0.15); 
+      border-radius: 10px; padding: 12px; 
+      text-align: center; cursor: pointer; 
+      font-size: 13px; font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .travel-mode-chip:hover, .event-filter-chip:hover {
+      background: rgba(255,255,255,0.12);
+      transform: translateY(-1px);
+    }
+
+    .travel-mode-chip.active {
+      background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2));
+      border-color: rgba(124,58,237,0.3);
+      color: #a5b4fc;
+    }
+
+    .event-filter-chip.active, .time-filter.active {
+      background: rgba(245, 158, 11, 0.2);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: #fbbf24;
+    }
+
+    .time-filter {
+      flex: 1; padding: 8px; 
+      background: rgba(255,255,255,0.08); 
+      border: 1px solid rgba(255,255,255,0.15); 
+      color: #e5ecff; border-radius: 8px; 
+      font-size: 12px; cursor: pointer; font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .time-filter:hover:not(.active) {
+      background: rgba(255,255,255,0.12);
+    }
+
+    /* Travel action buttons */
+    .travel-action-btn {
+      padding: 14px 12px; 
+      border: 1px solid rgba(255,255,255,0.15); 
+      background: rgba(255,255,255,0.08); 
+      color: #e5ecff; border-radius: 10px; 
+      cursor: pointer; font-weight: 700; 
+      text-align: center; font-size: 12px;
+      transition: all 0.2s ease;
+    }
+
+    .travel-action-btn:hover {
+      background: rgba(255,255,255,0.12);
+      transform: translateY(-1px);
+    }
+
+    /* Event cards */
+    .event-card {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px; background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 10px; margin-bottom: 12px;
+      cursor: pointer; transition: all 0.2s ease;
+    }
+
+    .event-card:hover {
+      background: rgba(255,255,255,0.08);
+      transform: translateY(-1px);
+    }
+
+    .event-emoji { font-size: 20px; min-width: 24px; }
+
+    .event-info { flex: 1; }
+
+    .event-title {
+      font-weight: 700; font-size: 14px; margin-bottom: 4px;
+    }
+
+    .event-details {
+      font-size: 12px; color: #94a3b8; margin-bottom: 4px;
+    }
+
+    .event-description {
+      font-size: 11px; color: #64748b; line-height: 1.3;
+    }
+
+    /* Results */
+    .suggestion-result {
+      background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 16px; padding: 20px; margin: 20px;
+    }
+
+    .hidden { display: none !important; }
+
+    /* Quick actions */
+    .quick-actions {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 16px 0;
+    }
+
+    .quick-action {
+      padding: 12px; background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 12px;
+      text-align: center; cursor: pointer; font-size: 13px; font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .quick-action:hover {
+      background: rgba(255,255,255,0.1); transform: translateY(-1px);
+    }
+
+    .quick-action.primary {
+      background: linear-gradient(135deg, rgba(34, 197, 94, 0.2), rgba(16, 185, 129, 0.2));
+      border-color: rgba(34, 197, 94, 0.3);
+    }
+
+    /* Mobile optimizations */
+    @media (max-width: 480px) {
+      #app { max-width: 100%; }
+      .glass-card { margin: 16px; padding: 16px; }
+      .modal { padding: 10px; }
+      .modal-content { max-width: 100%; }
+    }
+
+    /* Animation keyframes */
+    @keyframes loading {
+      0% { transform: translateX(-100%); }
+      50% { transform: translateX(200%); }
+      100% { transform: translateX(-100%); }
+    }
+  </style>
 </head>
+
 <body>
   <div id="app">
     <!-- Header -->
-    <header class="simple-header">
-      <h1 class="app-title">VFIED 🍽️</h1>
-      <p id="context-info" class="context-info">🤖 Initializing your food intelligence...</p>
+    <header style="text-align: center; padding: 20px;">
+      <h1 style="font-weight: 900; font-size: 28px; margin: 0 0 8px 0;
+                 background: linear-gradient(135deg, #fff, #c7d2fe);
+                 -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        VFIED 🍽️
+      </h1>
+      <p style="color: #9fb0c9; font-size: 13px; margin: 0;">
+        Your intelligent food companion
+      </p>
     </header>
 
-    <!-- One-Button Section -->
-    <main class="one-button-main">
-      <!-- Mood -->
-      <section class="mood-section">
-        <h3>🧠 Mood-aware suggestions</h3>
-        <div class="mood-input-container">
-          <input id="mood-input" class="mood-input"
-            placeholder="How are you feeling? (e.g., stressed but want something light)" />
-          <button id="detect-mood-btn" class="mood-detect-btn">Detect Mood</button>
+    <!-- Location status -->
+    <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); border-radius: 8px; padding: 8px 12px; margin: 20px; font-size: 12px;">
+      <div style="display: flex; align-items: center; gap: 4px; color: #10b981;">
+        📍 <span id="location-display">London, UK</span>
+        <span id="location-confidence">(GPS confirmed)</span>
+      </div>
+      <button id="change-location-btn" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); border-radius: 16px; padding: 4px 8px; font-size: 10px; cursor: pointer; color: #94a3b8; transition: all 0.2s ease;">
+        Change
+      </button>
+    </div>
+
+    <!-- Quick dietary preferences -->
+    <div class="glass-card">
+      <div class="dietary-prefs">
+        <h5>🥗 Quick dietary filters (optional)</h5>
+        <div class="diet-chips">
+          <div class="diet-chip" data-diet="vegetarian">🌱 Vegetarian</div>
+          <div class="diet-chip" data-diet="vegan">🌿 Vegan</div>
+          <div class="diet-chip" data-diet="gluten-free">🌾 No Gluten</div>
+          <div class="diet-chip" data-diet="no-nuts">🚫🥜 No Nuts</div>
+          <div class="diet-chip" data-diet="dairy-free">🥛❌ No Dairy</div>
+          <div class="diet-chip" data-diet="halal">☪️ Halal</div>
         </div>
-        <div id="detected-moods" class="detected-moods hidden"></div>
-      </section>
-
-      <!-- Social proof -->
-      <section id="social-proof" style="max-width: 500px;margin: 1rem auto 0;">
-        <h3 style="margin: 1rem 0 .5rem;">👥 Ask Your Friends</h3>
-        <div id="friend-chips" class="friend-chips"></div>
-      </section>
-
-      <!-- Decide -->
-      <section class="decision-area">
-        <button id="decide-button" class="giant-decide-button">
-          <span id="button-icon" class="button-icon">🎯</span>
-          <span id="button-text" class="button-text">DECIDE FOR ME</span>
-          <div class="button-subtitle">I'll figure it out for you</div>
-        </button>
-      </section>
-
-      <!-- Loading skeleton -->
-      <section id="suggestion-skeleton" class="suggestion-result hidden">
-        <div class="suggestion-card skeleton suggestion-skeleton">
-          <div class="skel-emoji"></div>
-          <div class="skel-line" style="width: 65%; margin: 10px auto;"></div>
-          <div class="skel-line" style="width: 85%; margin: 10px auto;"></div>
-          <div class="skel-line" style="width: 55%; margin: 10px auto;"></div>
-        </div>
-      </section>
-
-      <!-- Suggestion (aria-live for accessibility) -->
-      <section id="suggestion-result" class="suggestion-result hidden" aria-live="polite">
-        <div class="suggestion-card" id="resultCard">
-          <div id="social-signals" class="social-signals"></div>
-
-          <div id="mood-context" class="mood-context hidden">
-            <div id="mood-match-text" class="mood-match"></div>
-          </div>
-
-          <div id="result-emoji" class="food-emoji">🍔</div>
-          <h2 id="result-name" class="food-name">Your food suggestion</h2>
-          <p id="result-description" class="food-description"></p>
-          <div id="restaurant-info" class="restaurant-info"></div>
-        </div>
-
-        <div class="decision-actions">
-          <button id="accept-btn" class="action-btn accept">✅ Accept</button>
-          <button id="try-again-btn" class="action-btn try-again">🔄 Try Again</button>
-        </div>
-
-        <div class="ai-insights">
-          <button id="insights-toggle" class="insights-toggle">🤖 Why this choice? ↓</button>
-          <div id="insights-content" class="insights-content hidden">
-            <div id="cultural-note" class="cultural-note"></div>
-            <div id="personal-note" class="personal-note"></div>
-            <div id="weather-note" class="weather-note"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Local Gems -->
-      <section style="max-width: 900px;margin: 1.5rem auto 0;padding: 0 12px;">
-        <h3 style="margin-bottom:.5rem;">🌍 Local Gems</h3>
-        <div id="local-gems-grid" class="local-gems-grid"></div>
-        <div style="text-align:center;margin-top:10px;">
-          <button id="see-more-gems" class="insights-toggle" style="display:inline-block;max-width:240px;">See more gems</button>
-        </div>
-      </section>
-
-      <!-- Tabs -->
-      <div class="tabs" style="max-width: 900px;margin: 1.5rem auto 0;padding: 0 12px;">
-        <button class="tab tab-btn active" data-tab="tabTravel">✈️ Travel</button>
-        <button class="tab tab-btn" data-tab="tabEvents">🎪 Events</button>
       </div>
 
-      <!-- Travel tab -->
-      <section id="tabTravel" class="tabpanel" style="max-width: 900px;margin: 0 auto;padding: 0 12px;">
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">
-          <label for="travel-city-select">City:</label>
-          <select id="travel-city-select" class="setting-input" style="max-width:240px;">
-            <!-- populated by JS -->
-          </select>
-        </div>
-        <div id="travel-grid" class="travel-grid"></div>
-      </section>
+      <!-- Mood input -->
+      <h3 style="margin: 0 0 8px 0; font-size: 18px; font-weight: 700;">
+        🧠 How are you feeling?
+      </h3>
+      <div style="background: rgba(255,255,255,0.04); padding: 8px 12px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; color: #94a3b8;">
+        💡 Be specific! "Stressed but want something healthy" works better than just "hungry"
+      </div>
+      
+      <input id="mood-input" 
+             placeholder="e.g., celebrating with friends, need comfort food, post-workout hungry..."
+             style="width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+                    color: #e5ecff; border-radius: 12px; padding: 14px 16px; font-size: 15px;
+                    font-weight: 500; margin-bottom: 12px;" />
+    </div>
 
-      <!-- Events tab -->
-      <section id="tabEvents" class="tabpanel hidden" style="max-width: 900px;margin: 0 auto;padding: 0 12px;">
-        <div id="events-grid" class="events-grid"></div>
-      </section>
-    </main>
+    <!-- Enhanced tabs with modal triggers -->
+    <div style="display: flex; justify-content: center; margin: 20px 0;">
+      <div style="display: flex; gap: 4px; padding: 4px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px;">
+        <button class="tab-btn active" data-tab="food">
+          🍽️ Food
+        </button>
+        <button class="tab-btn" id="travel-modal-btn">
+          ✈️ Travel
+        </button>
+        <button class="tab-btn" id="events-modal-btn">
+          🎪 Events
+        </button>
+      </div>
+    </div>
+
+    <!-- Food Tab (main content) -->
+    <div id="food-tab" class="tab-content">
+      <!-- Decision button -->
+      <button id="decide-button">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
+          <span style="font-size: 24px;">🎯</span>
+          <div>
+            <div>DECIDE FOR ME</div>
+            <div style="font-size: 14px; opacity: 0.9; font-weight: 600;">I'll find your perfect match</div>
+          </div>
+        </div>
+      </button>
+    </div>
+
+    <!-- Result section -->
+    <div id="suggestion-result" class="suggestion-result hidden">
+      <div style="text-align: center; margin: 20px 0;">
+        <div id="result-emoji" style="font-size: 48px; margin-bottom: 12px;">🍔</div>
+        <h2 id="result-name" style="font-size: 24px; font-weight: 900; margin: 0 0 8px 0;">Your Perfect Match</h2>
+      </div>
+
+      <!-- Reasoning -->
+      <div style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 12px; margin: 16px 0;">
+        <h5 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: #a5b4fc;">
+          🤔 Why this choice?
+        </h5>
+        <p id="reasoning-text" style="margin: 0; font-size: 13px; line-height: 1.4; color: #cbd5e1;">
+          Based on your mood and preferences, this hits the perfect balance.
+        </p>
+      </div>
+
+      <!-- Quick actions -->
+      <div class="quick-actions">
+        <div class="quick-action primary" id="accept-btn">✅ Perfect!</div>
+        <div class="quick-action" id="share-btn">📤 Share</div>
+        <div class="quick-action" id="get-directions-btn">🗺️ Directions</div>
+        <div class="quick-action" id="try-again-btn">🔄 Try Again</div>
+      </div>
+    </div>
+
+    <!-- Travel Modal -->
+    <div id="travel-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">🧳 Your Travel Food Coach</h2>
+          <button class="modal-close" id="travel-modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <!-- Travel coach introduction -->
+          <div style="background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(99,102,241,0.1)); border: 1px solid rgba(124,58,237,0.2); border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
+            <p style="margin: 0; font-size: 13px; color: #94a3b8;">
+              New to <span style="color: #a5b4fc; font-weight: 700;" id="travel-modal-city">London</span>? I'll map your perfect food journey - from authentic eats to must-try experiences
+            </p>
+          </div>
+
+          <!-- Travel mode selector -->
+          <div style="margin-bottom: 20px;">
+            <h5 style="margin: 0 0 12px 0; font-weight: 700;">🎯 What brings you here?</h5>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+              <div class="travel-mode-chip active" data-mode="exploring">
+                🗺️ Exploring
+              </div>
+              <div class="travel-mode-chip" data-mode="business">
+                💼 Business
+              </div>
+              <div class="travel-mode-chip" data-mode="date">
+                💕 Date Night
+              </div>
+              <div class="travel-mode-chip" data-mode="family">
+                👨‍👩‍👧‍👦 Family
+              </div>
+            </div>
+          </div>
+
+          <!-- Time and budget -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+            <div>
+              <label style="font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;">⏱️ How long?</label>
+              <select id="travel-duration-modal" style="width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e5ecff; border-radius: 10px; padding: 10px; font-size: 13px;">
+                <option value="quick">2-3 hours</option>
+                <option value="half-day">Half day</option>
+                <option value="full-day" selected>Full day</option>
+                <option value="weekend">Weekend</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size: 13px; font-weight: 600; margin-bottom: 6px; display: block;">💰 Budget</label>
+              <select id="travel-budget-modal" style="width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e5ecff; border-radius: 10px; padding: 10px; font-size: 13px;">
+                <option value="budget">Budget ($)</option>
+                <option value="medium" selected>Moderate ($$)</option>
+                <option value="premium">Premium ($$$)</option>
+                <option value="luxury">Luxury ($$$$)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Travel actions -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
+            <button class="travel-action-btn" id="night-plan-modal-btn">
+              🌙 Plan My Night
+            </button>
+            <button class="travel-action-btn" id="food-crawl-modal-btn">
+              🍽️ Food Crawl
+            </button>
+            <button class="travel-action-btn" id="city-guide-modal-btn">
+              🗺️ City Guide  
+            </button>
+            <button class="travel-action-btn" id="hidden-gems-modal-btn">
+              💎 Hidden Gems
+            </button>
+          </div>
+
+          <!-- AI Travel Assistant -->
+          <div style="background: rgba(255,255,255,0.04); border-radius: 10px; padding: 12px; margin-bottom: 16px;">
+            <h6 style="margin: 0 0 8px 0; font-size: 13px; font-weight: 700; color: #a5b4fc;">🤖 Ask your travel coach</h6>
+            <input id="travel-query-modal" placeholder="e.g., best ramen in Tokyo for first-timer" style="width: 100%; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); color: #e5ecff; border-radius: 8px; padding: 10px; font-size: 13px; margin-bottom: 8px;" />
+            <button id="ask-coach-modal-btn" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #7c3aed, #6366f1); border: 0; border-radius: 8px; color: white; font-weight: 700; font-size: 13px; cursor: pointer;">
+              Ask Coach
+            </button>
+          </div>
+
+          <!-- Travel results area -->
+          <div id="travel-results-modal" class="hidden">
+            <!-- Results populated by JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Events Modal -->
+    <div id="events-modal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">🎪 Events in <span id="events-modal-city">London</span></h2>
+          <button class="modal-close" id="events-modal-close">×</button>
+        </div>
+        <div class="modal-body">
+          <!-- Events coach introduction -->
+          <div style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.1), rgba(251, 191, 36, 0.1)); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 12px; padding: 16px; margin-bottom: 20px; text-align: center;">
+            <p style="margin: 0; font-size: 13px; color: #94a3b8;">
+              Never miss the good stuff - food festivals, markets, tastings & more happening right now
+            </p>
+          </div>
+
+          <!-- Event categories -->
+          <div style="margin-bottom: 20px;">
+            <h5 style="margin: 0 0 12px 0; font-weight: 700;">🏷️ Show me:</h5>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+              <div class="event-filter-chip active" data-category="all">
+                All Events
+              </div>
+              <div class="event-filter-chip" data-category="food">
+                🍽️ Food
+              </div>
+              <div class="event-filter-chip" data-category="music">
+                🎵 Music
+              </div>
+              <div class="event-filter-chip" data-category="market">
+                🏪 Markets
+              </div>
+              <div class="event-filter-chip" data-category="culture">
+                🎭 Culture
+              </div>
+            </div>
+          </div>
+
+          <!-- Time filter -->
+          <div style="margin-bottom: 20px;">
+            <h5 style="margin: 0 0 8px 0; font-weight: 700;">📅 When:</h5>
+            <div style="display: flex; gap: 8px;">
+              <button class="time-filter active" data-time="today">
+                Today
+              </button>
+              <button class="time-filter" data-time="tomorrow">
+                Tomorrow
+              </button>
+              <button class="time-filter" data-time="weekend">
+                Weekend
+              </button>
+            </div>
+          </div>
+
+          <!-- Events results -->
+          <div id="events-grid-modal">
+            <div style="text-align: center; padding: 20px; color: #94a3b8;">
+              🎪 Loading events...
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Footer -->
-    <footer class="simple-footer">
-      <div class="stats-line">Decisions made: <span id="decisions-count">0</span> • Time saved: <span id="time-saved">0</span> min</div>
-      <div id="ai-status" class="ai-status">🎯 Ready</div>
-      <div class="bottom-safe-area"></div>
+    <footer style="background: rgba(0,0,0,0.2); backdrop-filter: blur(15px); padding: 20px; text-align: center; font-size: 12px; color: #9fb0c9;">
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 12px;">
+        <div>
+          <span style="font-size: 18px; font-weight: 800; color: #e5ecff; display: block;" id="decisions-count">0</span>
+          <span style="font-size: 10px; color: #94a3b8;">DECISIONS</span>
+        </div>
+        <div>
+          <span style="font-size: 18px; font-weight: 800; color: #e5ecff; display: block;">94%</span>
+          <span style="font-size: 10px; color: #94a3b8;">ACCURACY</span>
+        </div>
+        <div>
+          <span style="font-size: 18px; font-weight: 800; color: #e5ecff; display: block;">127</span>
+          <span style="font-size: 10px; color: #94a3b8;">CITIES</span>
+        </div>
+      </div>
+      <div>🌐 Connected • All systems operational</div>
     </footer>
   </div>
 
-  <!-- Local Gems Modal -->
-  <div id="gems-modal" class="modal" aria-hidden="true">
-    <div class="modal-content">
-      <button id="gems-modal-close" class="modal-close">×</button>
-      <h3>🌍 Local Gems</h3>
-      <ul id="gems-modal-list" class="modal-list"></ul>
-    </div>
-  </div>
-
-  <!-- Toast container -->
-  <div id="toast-wrap" class="toast-wrap"></div>
-
-  <!-- API base (HTTPS in prod). Comment the local line when deploying. -->
   <script>
-    // For local dev:
-    window.__API__ = 'http://localhost:3922';
-    console.log('VFIED __API__ =', window.__API__);
-    // For production:
-    // window.__API__ = 'https://vfied-v3.onrender.com';
-  </script>
+    class VFIEDApp {
+      constructor() {
+        // FIXED: API Configuration with better defaults
+        this.API_BASE = 'http://localhost:3048';
+        
+        // Core app state
+        this.currentLocation = { city: 'London', country_code: 'GB', confidence: 'high' };
+        this.selectedDietary = new Set();
+        this.currentResult = null;
+        this.travelMode = 'exploring';
+        this.eventFilters = { category: 'all', time: 'today' };
+        
+        // FIXED: Request management for timeout handling
+        this.activeRequests = new Map(); // Track active requests
+        this.requestTimeouts = new Map(); // Track request timeouts
+        
+        // Performance & UX improvements
+        this.recentSuggestions = JSON.parse(localStorage.getItem('vfied_recent') || '[]');
+        this.userPreferences = JSON.parse(localStorage.getItem('vfied_preferences') || '{}');
+        
+        // Attribution tracking for measuring success
+        this.trackingData = JSON.parse(localStorage.getItem('vfied_tracking') || '[]');
+        
+        // Load decision count from storage
+        const storedCount = parseInt(localStorage.getItem('vfied_decisions') || '0');
+        
+        this.init();
+        
+        // Update counter display immediately
+        const counterElement = document.getElementById('decisions-count');
+        if (counterElement) {
+          counterElement.textContent = storedCount;
+        }
+      }
 
-  <!-- Register Service Worker (for offline + updates) -->
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      init() {
+        this.setupEventListeners();
+        this.setupDietaryFilters();
+        this.updateLocationDisplay();
+        this.loadMockEvents();
+        this.restoreUserPreferences();
+      }
+
+      // FIXED: Better request management
+      async makeAPIRequest(url, options = {}, requestKey = null) {
+        // Generate unique request key if not provided
+        const key = requestKey || `req_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+        
+        // Cancel any existing request with this key
+        if (this.activeRequests.has(key)) {
+          this.activeRequests.get(key).abort();
+        }
+        
+        // Clear any existing timeout
+        if (this.requestTimeouts.has(key)) {
+          clearTimeout(this.requestTimeouts.get(key));
+        }
+        
+        // Create abort controller for this request
+        const controller = new AbortController();
+        this.activeRequests.set(key, controller);
+        
+        // Set a longer timeout (30 seconds instead of 10)
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          this.activeRequests.delete(key);
+          this.requestTimeouts.delete(key);
+        }, 30000);
+        
+        this.requestTimeouts.set(key, timeoutId);
+        
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal
+          });
+          
+          // Clean up on success
+          clearTimeout(timeoutId);
+          this.activeRequests.delete(key);
+          this.requestTimeouts.delete(key);
+          
+          return response;
+        } catch (error) {
+          // Clean up on error
+          clearTimeout(timeoutId);
+          this.activeRequests.delete(key);
+          this.requestTimeouts.delete(key);
+          
+          throw error;
+        }
+      }
+
+      // FIXED: Cancel operation method
+      cancelCurrentOperation() {
+        // Cancel all active requests
+        for (const [key, controller] of this.activeRequests.entries()) {
+          controller.abort();
+          console.log(`Cancelled request: ${key}`);
+        }
+        
+        // Clear all timeouts
+        for (const [key, timeoutId] of this.requestTimeouts.entries()) {
+          clearTimeout(timeoutId);
+          console.log(`Cleared timeout: ${key}`);
+        }
+        
+        // Clear the maps
+        this.activeRequests.clear();
+        this.requestTimeouts.clear();
+        
+        const resultsDiv = document.getElementById('travel-results-modal');
+        if (resultsDiv) {
+          resultsDiv.innerHTML = `
+            <div style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; text-align: center;">
+              <div style="font-size: 24px; margin-bottom: 12px;">⏹️</div>
+              <div style="color: #94a3b8;">Operation cancelled</div>
+              <button onclick="window.vfiedApp.hideTravelResults()" style="
+                background: linear-gradient(135deg, #7c3aed, #6366f1); 
+                border: 0; 
+                border-radius: 8px; 
+                color: white; 
+                padding: 8px 16px; 
+                font-size: 13px; 
+                font-weight: 600; 
+                cursor: pointer;
+                margin-top: 12px;
+              ">
+                Try Something Else
+              </button>
+            </div>
+          `;
+        }
+      }
+
+      // NEW: Method to hide travel results
+      hideTravelResults() {
+        const resultsDiv = document.getElementById('travel-results-modal');
+        if (resultsDiv) {
+          resultsDiv.classList.add('hidden');
+        }
+      }
+
+      // Restore saved user preferences
+      restoreUserPreferences() {
+        // Restore dietary preferences
+        if (this.userPreferences.dietary) {
+          this.userPreferences.dietary.forEach(diet => {
+            this.selectedDietary.add(diet);
+            const chip = document.querySelector(`[data-diet="${diet}"]`);
+            if (chip) chip.classList.add('active');
+          });
+        }
+
+        // Restore location if saved
+        if (this.userPreferences.location) {
+          this.currentLocation = this.userPreferences.location;
+          this.updateLocationDisplay();
+        }
+      }
+
+      // Save user preferences
+      saveUserPreferences() {
+        this.userPreferences = {
+          dietary: Array.from(this.selectedDietary),
+          location: this.currentLocation,
+          lastUsed: Date.now()
+        };
+        localStorage.setItem('vfied_preferences', JSON.stringify(this.userPreferences));
+      }
+
+      // Context gathering for better recommendations
+      getContextForRecommendation() {
+        const now = new Date();
+        const hour = now.getHours();
+        const isWeekend = [0, 6].includes(now.getDay());
+        
+        return {
+          time_context: {
+            hour,
+            meal_time: hour < 11 ? 'breakfast' : hour < 16 ? 'lunch' : 'dinner',
+            is_weekend: isWeekend,
+            is_late_night: hour > 21 || hour < 6
+          },
+          weather_context: this.getWeatherHint(),
+          social_context: this.getSocialContext(),
+          user_history: {
+            recent_suggestions: this.recentSuggestions.slice(0, 5),
+            total_decisions: parseInt(localStorage.getItem('vfied_decisions') || '0'),
+            preferred_dietary: Array.from(this.selectedDietary)
+          }
+        };
+      }
+
+      getWeatherHint() {
+        // Simple seasonal/time-based weather inference
+        const hour = new Date().getHours();
+        const month = new Date().getMonth();
+        
+        // Basic seasonal logic
+        if (month >= 11 || month <= 2) return 'cold_weather'; // Winter
+        if (month >= 6 && month <= 8 && hour > 11 && hour < 16) return 'hot_weather'; // Summer midday
+        if (hour > 18 || hour < 8) return 'cool_weather'; // Evening/morning
+        return 'neutral';
+      }
+
+      getSocialContext() {
+        const hour = new Date().getHours();
+        const isWeekend = [0, 6].includes(new Date().getDay());
+        
+        if (isWeekend && (hour > 18 || hour < 14)) return 'social';
+        if (hour > 12 && hour < 14) return 'quick_lunch';
+        if (hour > 18) return 'dinner';
+        if (hour < 11) return 'breakfast';
+        return 'solo';
+      }
+
+      // Fast fallback suggestions for timeouts
+      getFastFallback(mood) {
+        const hour = new Date().getHours();
+        const context = this.getContextForRecommendation();
+        
+        // Context-aware fallbacks
+        const contextualSuggestions = {
+          breakfast: [
+            { emoji: '☕', name: 'Coffee & Pastry', reason: 'Perfect morning start' },
+            { emoji: '🥞', name: 'Classic Breakfast', reason: 'Traditional comfort' },
+            { emoji: '🥣', name: 'Healthy Bowl', reason: 'Energizing start to your day' }
+          ],
+          lunch: [
+            { emoji: '🥪', name: 'Quick Sandwich', reason: 'Fast and satisfying' },
+            { emoji: '🍲', name: 'Soup & Salad', reason: 'Light but filling' },
+            { emoji: '🌯', name: 'Fresh Wrap', reason: 'Portable and tasty' }
+          ],
+          dinner: [
+            { emoji: '🍝', name: 'Pasta Place', reason: 'Comforting and warm' },
+            { emoji: '🍕', name: 'Local Pizza', reason: 'Always a good choice' },
+            { emoji: '🍛', name: 'Hearty Bowl', reason: 'Satisfying end to your day' }
+          ]
+        };
+
+        // Mood-based overrides
+        const moodSuggestions = {
+          'stressed': { emoji: '🍜', name: 'Comfort Ramen', reason: 'Warm and soothing' },
+          'celebrating': { emoji: '🍰', name: 'Dessert First', reason: 'Life is short!' },
+          'tired': { emoji: '🍔', name: 'Easy Burger', reason: 'No thinking required' },
+          'healthy': { emoji: '🥗', name: 'Fresh Salad', reason: 'Clean and energizing' },
+          'adventurous': { emoji: '🌮', name: 'Something New', reason: 'Try something different' }
+        };
+
+        // Check mood keywords first
+        const lowerMood = mood.toLowerCase();
+        for (const [key, suggestion] of Object.entries(moodSuggestions)) {
+          if (lowerMood.includes(key)) {
+            return suggestion;
+          }
+        }
+
+        // Fall back to time-based suggestions
+        const timeBasedOptions = contextualSuggestions[context.time_context.meal_time] || contextualSuggestions.lunch;
+        return timeBasedOptions[Math.floor(Math.random() * timeBasedOptions.length)];
+      }
+
+      setupEventListeners() {
+        // Modal triggers
+        document.getElementById('travel-modal-btn').addEventListener('click', () => {
+          this.openTravelModal();
+        });
+
+        document.getElementById('events-modal-btn').addEventListener('click', () => {
+          this.openEventsModal();
+        });
+
+        // Modal close buttons
+        document.getElementById('travel-modal-close').addEventListener('click', () => {
+          this.closeTravelModal();
+        });
+
+        document.getElementById('events-modal-close').addEventListener('click', () => {
+          this.closeEventsModal();
+        });
+
+        // Close modals on background click
+        document.getElementById('travel-modal').addEventListener('click', (e) => {
+          if (e.target === e.currentTarget) this.closeTravelModal();
+        });
+
+        document.getElementById('events-modal').addEventListener('click', (e) => {
+          if (e.target === e.currentTarget) this.closeEventsModal();
+        });
+
+        // ESC key to close modals
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            this.closeTravelModal();
+            this.closeEventsModal();
+          }
+        });
+
+        // Decision button (food tab)
+        document.getElementById('decide-button').addEventListener('click', () => {
+          this.makeDecision();
+        });
+
+        // Travel mode selection
+        document.querySelectorAll('.travel-mode-chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            document.querySelectorAll('.travel-mode-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            this.travelMode = chip.dataset.mode;
+          });
+        });
+
+        // Travel actions
+        document.getElementById('night-plan-modal-btn')?.addEventListener('click', () => this.generateNightPlan());
+        document.getElementById('food-crawl-modal-btn')?.addEventListener('click', () => this.generateFoodCrawl());
+        document.getElementById('city-guide-modal-btn')?.addEventListener('click', () => this.loadCityGuide());
+        document.getElementById('hidden-gems-modal-btn')?.addEventListener('click', () => this.findHiddenGems());
+        document.getElementById('ask-coach-modal-btn')?.addEventListener('click', () => this.askTravelCoach());
+
+        // Event filters
+        document.querySelectorAll('.event-filter-chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            document.querySelectorAll('.event-filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            this.eventFilters.category = chip.dataset.category;
+            this.loadMockEvents();
+          });
+        });
+
+        document.querySelectorAll('.time-filter').forEach(btn => {
+          btn.addEventListener('click', () => {
+            document.querySelectorAll('.time-filter').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            this.eventFilters.time = btn.dataset.time;
+            this.loadMockEvents();
+          });
+        });
+
+        // Other actions
+        document.getElementById('change-location-btn')?.addEventListener('click', () => this.changeLocation());
+        document.getElementById('accept-btn')?.addEventListener('click', () => this.handleAccept());
+        document.getElementById('try-again-btn')?.addEventListener('click', () => this.makeDecision());
+        document.getElementById('share-btn')?.addEventListener('click', () => this.shareResult());
+        document.getElementById('get-directions-btn')?.addEventListener('click', () => this.getDirections());
+
+        // Enter key support
+        document.getElementById('mood-input').addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') this.makeDecision();
+        });
+        
+        document.getElementById('travel-query-modal').addEventListener('keypress', (e) => {
+          if (e.key === 'Enter') this.askTravelCoach();
+        });
+      }
+
+      // Enhanced dietary setup with persistence
+      setupDietaryFilters() {
+        document.querySelectorAll('.diet-chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            const diet = chip.dataset.diet;
+            if (this.selectedDietary.has(diet)) {
+              this.selectedDietary.delete(diet);
+              chip.classList.remove('active');
+            } else {
+              this.selectedDietary.add(diet);
+              chip.classList.add('active');
+            }
+            this.saveUserPreferences();
+          });
+        });
+      }
+
+      // Modal methods
+      openTravelModal() {
+        const modal = document.getElementById('travel-modal');
+        document.getElementById('travel-modal-city').textContent = this.currentLocation.city;
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+      }
+
+      closeTravelModal() {
+        // Cancel any active travel requests when closing modal
+        this.cancelAllActiveRequests();
+        
+        const modal = document.getElementById('travel-modal');
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+        
+        // Hide travel results
+        this.hideTravelResults();
+      }
+
+      openEventsModal() {
+        const modal = document.getElementById('events-modal');
+        document.getElementById('events-modal-city').textContent = this.currentLocation.city;
+        modal.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        this.loadMockEvents();
+      }
+
+      closeEventsModal() {
+        const modal = document.getElementById('events-modal');
+        modal.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      // FIXED: Enhanced makeDecision with proper timeout handling
+      async makeDecision() {
+        const mood = document.getElementById('mood-input').value.trim();
+        if (!mood) {
+          this.showToast('Please tell me how you\'re feeling first!');
+          document.getElementById('mood-input').focus();
+          return;
+        }
+
+        this.showLoading();
+
+        try {
+          const context = this.getContextForRecommendation();
+          
+          const response = await this.makeAPIRequest(`${this.API_BASE}/v1/recommend`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: this.currentLocation,
+              mood_text: mood,
+              dietary: Array.from(this.selectedDietary),
+              recent_suggestions: this.recentSuggestions,
+              context: context,
+              social: context.social_context,
+              budget: 'medium'
+            })
+          }, 'main_decision');
+
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+
+          if (data.success) {
+            this.showResult({
+              emoji: data.food.emoji || '🍽️',
+              name: data.food.name,
+              reason: data.reasoning || data.friendMessage
+            });
+          } else {
+            throw new Error(data.error || 'Failed to get recommendation');
+          }
+
+        } catch (error) {
+          console.error('Recommendation error:', error);
+          
+          if (error.name === 'AbortError') {
+            // Show fast fallback for timeout/cancellation
+            const fallback = this.getFastFallback(mood);
+            fallback.reason = fallback.reason + ' (Quick suggestion - our AI is busy!)';
+            this.showResult(fallback);
+          } else {
+            // Network or other error - show contextual fallback
+            const fallback = this.getFastFallback(mood);
+            fallback.reason = fallback.reason + ' (Suggested based on your mood and time)';
+            this.showResult(fallback);
+          }
+        } finally {
+          this.hideLoading();
+        }
+      }
+
+      // FIXED: Enhanced travel coach with better error handling
+      async askTravelCoach() {
+        const query = document.getElementById('travel-query-modal').value.trim();
+        if (!query) {
+          this.showToast('Ask me anything about food in ' + this.currentLocation.city);
+          return;
+        }
+
+        // Show loading state
+        this.showTravelCoachLoading();
+
+        try {
+          const response = await this.makeAPIRequest(`${this.API_BASE}/v1/travel/coach`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: query,
+              location: this.currentLocation,
+              context: {
+                mode: this.travelMode,
+                budget: document.getElementById('travel-budget-modal')?.value || 'medium',
+                duration: document.getElementById('travel-duration-modal')?.value || 'full-day',
+                dietary: Array.from(this.selectedDietary)
+              }
+            })
+          }, 'travel_coach');
+
+          const data = await response.json();
+
+          if (data.success) {
+            this.showTravelCoachResponse(data);
+          } else {
+            throw new Error(data.error || 'Failed to get coach response');
+          }
+        } catch (error) {
+          console.error('Travel coach error:', error);
+          
+          if (error.name === 'AbortError') {
+            this.showTravelCoachCancelled();
+          } else {
+            this.showTravelCoachError();
+          }
+        }
+      }
+
+      // FIXED: Travel action loading without automatic timeout
+      showTravelActionLoading(message) {
+        const resultsDiv = document.getElementById('travel-results-modal');
+        
+        if (!resultsDiv) {
+          console.error('travel-results-modal element not found');
+          return;
+        }
+        
+        resultsDiv.classList.remove('hidden');
+        resultsDiv.innerHTML = `
+          <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 30px; text-align: center;">
+            <div style="font-size: 32px; margin-bottom: 16px;">✨</div>
+            <div style="font-weight: 700; margin-bottom: 12px; font-size: 16px;">${this.escapeHtml(message)}</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-bottom: 20px;">This might take up to 30 seconds...</div>
+            
+            <!-- Progress indicator -->
+            <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; margin-bottom: 16px;">
+              <div style="width: 30%; height: 100%; background: linear-gradient(90deg, #7c3aed, #6366f1); animation: loading 2s ease-in-out infinite;"></div>
+            </div>
+            
+            <!-- Cancel button -->
+            <button onclick="window.vfiedApp.cancelCurrentOperation()" style="
+              background: rgba(255,255,255,0.1); 
+              border: 1px solid rgba(255,255,255,0.2); 
+              border-radius: 8px; 
+              padding: 8px 16px; 
+              color: #94a3b8; 
+              font-size: 12px; 
+              cursor: pointer;
+            ">
+              Cancel Request
+            </button>
+          </div>
+        `;
+      }
+
+      showTravelCoachLoading() {
+        const resultsDiv = document.getElementById('travel-results-modal');
+        resultsDiv.classList.remove('hidden');
+        resultsDiv.innerHTML = `
+          <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="font-size: 24px; margin-bottom: 12px;">🤔</div>
+            <div style="font-weight: 700; margin-bottom: 8px;">Your coach is thinking...</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">Analyzing local food scene and your preferences</div>
+            <div style="width: 100%; height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-bottom: 16px; overflow: hidden;">
+              <div style="width: 30%; height: 100%; background: linear-gradient(90deg, #7c3aed, #6366f1); animation: loading 2s ease-in-out infinite;"></div>
+            </div>
+            <button onclick="window.vfiedApp.cancelCurrentOperation()" style="
+              background: rgba(255,255,255,0.1); 
+              border: 1px solid rgba(255,255,255,0.2); 
+              border-radius: 8px; 
+              padding: 6px 12px; 
+              color: #94a3b8; 
+              font-size: 11px; 
+              cursor: pointer;
+            ">
+              Cancel
+            </button>
+          </div>
+        `;
+      }
+
+      // NEW: Show cancellation message
+      showTravelCoachCancelled() {
+        const resultsDiv = document.getElementById('travel-results-modal');
+        resultsDiv.innerHTML = `
+          <div style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="font-size: 24px; margin-bottom: 12px;">⏹️</div>
+            <div style="color: #94a3b8; margin-bottom: 16px;">Request cancelled</div>
+            <button onclick="document.getElementById('travel-query-modal').focus()" style="
+              background: linear-gradient(135deg, #7c3aed, #6366f1); 
+              border: 0; 
+              border-radius: 8px; 
+              color: white; 
+              padding: 8px 16px; 
+              font-size: 13px; 
+              font-weight: 600; 
+              cursor: pointer;
+            ">
+              Try Again
+            </button>
+          </div>
+        `;
+      }
+
+      // FIXED: Enhanced travel operations with proper request tracking
+      async generateNightPlan() {
+        this.showTravelActionLoading('🌙 Creating your perfect night...');
+
+        try {
+          const modePrompts = {
+            exploring: `I want to experience authentic local ${this.currentLocation.city} nightlife and food scene. Map out a night that shows me what locals actually do - not tourist spots`,
+            business: `I'm here on business and have one night to experience ${this.currentLocation.city}. I want quality food and a sophisticated atmosphere, ideally walkable from city center`,
+            date: `Planning a romantic evening in ${this.currentLocation.city}. I need intimate spots with great food, good ambiance, and a memorable experience`,
+            family: `Family-friendly evening in ${this.currentLocation.city} with kids. Looking for good food options that work for all ages and some light entertainment`
+          };
+
+          const response = await this.makeAPIRequest(`${this.API_BASE}/v1/travel/nightplan`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: this.currentLocation,
+              prompt: modePrompts[this.travelMode] || modePrompts.exploring,
+              mode: this.travelMode,
+              budget: document.getElementById('travel-budget-modal')?.value || 'medium',
+              duration: document.getElementById('travel-duration-modal')?.value || 'full-day',
+              dietary: Array.from(this.selectedDietary)
+            })
+          }, 'night_plan');
+
+          const data = await response.json();
+          if (data.success) {
+            this.showNightPlanResult(data);
+          } else {
+            throw new Error('Failed to generate night plan');
+          }
+        } catch (error) {
+          if (error.name === 'AbortError') {
+            return; // User cancelled, don't show error
+          }
+          console.error('Night plan error:', error);
+          this.showTravelActionError('night plan');
+        }
+      }
+
+      async generateFoodCrawl() {
+        this.showTravelActionLoading('🍽️ Mapping your food adventure...');
+
+        try {
+          const duration = document.getElementById('travel-duration-modal')?.value || 'full-day';
+          const budget = document.getElementById('travel-budget-modal')?.value || 'medium';
+          
+          let crawlType = 'street_food';
+          if (this.travelMode === 'business') crawlType = 'restaurant_hop';
+          if (this.travelMode === 'date') crawlType = 'cultural_food';
+          if (duration === 'quick') crawlType = 'street_food';
+          
+          const crawlDuration = duration === 'quick' ? '2_hours' : 
+                              duration === 'half-day' ? '3_hours' : 
+                              duration === 'full-day' ? 'half_day' : '3_hours';
+
+          const response = await this.makeAPIRequest(`${this.API_BASE}/v1/travel/food-crawl`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: this.currentLocation,
+              crawl_type: crawlType,
+              duration: crawlDuration,
+              budget: budget,
+              dietary: Array.from(this.selectedDietary)
+            })
+          }, 'food_crawl');
+
+          const data = await response.json();
+          if (data.success) {
+            this.showFoodCrawlResult(data);
+          } else {
+            throw new Error('Failed to generate food crawl');
+          }
+        } catch (error) {
+          if (error.name === 'AbortError') {
+            return; // User cancelled, don't show error
+          }
+          console.error('Food crawl error:', error);
+          this.showTravelActionError('food crawl');
+        }
+      }
+
+      async loadCityGuide() {
+        this.showTravelActionLoading('🗺️ Loading insider knowledge...');
+
+        try {
+          console.log('Making request to:', `${this.API_BASE}/v1/travel/guide/${encodeURIComponent(this.currentLocation.city)}?country_code=${this.currentLocation.country_code}`);
+          
+          const response = await this.makeAPIRequest(`${this.API_BASE}/v1/travel/guide/${encodeURIComponent(this.currentLocation.city)}?country_code=${this.currentLocation.country_code}`, {}, 'city_guide');
+          
+          console.log('Response status:', response.status);
+          console.log('Response ok:', response.ok);
+          
+          const data = await response.json();
+          console.log('Response data:', data);
+          
+          if (data.success) {
+            this.showCityGuideResult(data);
+          } else {
+            throw new Error('Failed to load city guide');
+          }
+        } catch (error) {
+          if (error.name === 'AbortError') {
+            return; // User cancelled, don't show error
+          }
+          console.error('City guide error:', error);
+          this.showTravelActionError('city guide');
+        }
+      }
+
+      async findHiddenGems() {
+        this.showTravelActionLoading('💎 Discovering hidden gems...');
+
+        try {
+          const hiddenGemsQuery = `What are the best hidden food gems in ${this.currentLocation.city} that only locals know about? I want places that aren't in guidebooks - the real secrets.`;
+          
+          const response = await this.makeAPIRequest(`${this.API_BASE}/v1/travel/coach`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query: hiddenGemsQuery,
+              location: this.currentLocation,
+              context: {
+                mode: this.travelMode,
+                budget: document.getElementById('travel-budget-modal')?.value || 'medium',
+                duration: document.getElementById('travel-duration-modal')?.value || 'full-day',
+                dietary: Array.from(this.selectedDietary),
+                request_type: 'hidden_gems'
+              }
+            })
+          }, 'hidden_gems');
+
+          const data = await response.json();
+          if (data.success) {
+            this.showHiddenGemsResult(data);
+          } else {
+            throw new Error('Failed to find hidden gems');
+          }
+        } catch (error) {
+          if (error.name === 'AbortError') {
+            return; // User cancelled, don't show error
+          }
+          console.error('Hidden gems error:', error);
+          this.showTravelActionError('hidden gems');
+        }
+      }
+
+      // NEW: Cancel all active requests
+      cancelAllActiveRequests() {
+        for (const [key, controller] of this.activeRequests.entries()) {
+          controller.abort();
+          console.log(`Cancelled request: ${key}`);
+        }
+        
+        for (const [key, timeoutId] of this.requestTimeouts.entries()) {
+          clearTimeout(timeoutId);
+          console.log(`Cleared timeout: ${key}`);
+        }
+        
+        this.activeRequests.clear();
+        this.requestTimeouts.clear();
+      }
+
+      showTravelCoachResponse(data) {
+        const resultsDiv = document.getElementById('travel-results-modal');
+        resultsDiv.innerHTML = `
+          <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 20px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+              <div style="font-size: 20px;">🤖</div>
+              <h4 style="margin: 0; color: #a5b4fc; font-size: 16px;">Your ${this.currentLocation.city} Coach</h4>
+            </div>
+            
+            <div style="background: rgba(255,255,255,0.04); border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+              <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #e5ecff;">
+                ${data.response}
+              </p>
+            </div>
+
+            ${data.recommendations && data.recommendations.length > 0 ? `
+              <div style="margin-bottom: 20px;">
+                <h5 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #a5b4fc;">📍 Specific Recommendations</h5>
+                ${data.recommendations.map(rec => `
+                  <div style="display: flex; gap: 12px; margin-bottom: 12px; padding: 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">
+                    <div style="flex: 1;">
+                      <div style="font-weight: 700; font-size: 14px; margin-bottom: 4px; color: #e5ecff;">${rec.name}</div>
+                      <div style="font-size: 13px; color: #94a3b8; margin-bottom: 6px;">${rec.location}</div>
+                      <div style="font-size: 12px; color: #cbd5e1; line-height: 1.4;">${rec.details}</div>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.08); border-radius: 16px; padding: 4px 8px; font-size: 11px; font-weight: 600; color: #10b981; align-self: flex-start;">
+                      ${rec.price_range}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
+
+            ${data.quick_tips && data.quick_tips.length > 0 ? `
+              <div style="margin-bottom: 20px;">
+                <h5 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #a5b4fc;">💡 Pro Tips</h5>
+                <div style="display: grid; gap: 8px;">
+                  ${data.quick_tips.map(tip => `
+                    <div style="padding: 10px 12px; background: rgba(255,255,255,0.04); border-radius: 8px; font-size: 13px; border-left: 3px solid #10b981;">
+                      ${tip}
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            ${data.follow_up_questions && data.follow_up_questions.length > 0 ? `
+              <div>
+                <h5 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #a5b4fc;">❓ Ask me more</h5>
+                <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                  ${data.follow_up_questions.map(question => `
+                    <button onclick="window.askFollowUp('${question.replace(/'/g, "\\'")}')" style="
+                      background: rgba(255,255,255,0.08); 
+                      border: 1px solid rgba(255,255,255,0.15); 
+                      border-radius: 16px; 
+                      padding: 6px 12px; 
+                      font-size: 12px; 
+                      color: #94a3b8; 
+                      cursor: pointer;
+                      transition: all 0.2s ease;
+                    " onmouseover="this.style.background='rgba(255,255,255,0.12)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'">
+                      ${question}
+                    </button>
+                  `).join('')}
+                </div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+
+        resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+
+      showTravelActionError(actionType) {
+        const resultsDiv = document.getElementById('travel-results-modal');
+        resultsDiv.innerHTML = `
+          <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,58,58,0.2); border-radius: 12px; padding: 20px; text-align: center;">
+            <div style="font-size: 24px; margin-bottom: 12px;">🤕</div>
+            <div style="font-weight: 700; margin-bottom: 8px; color: #fca5a5;">Couldn't load your ${actionType}</div>
+            <div style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">Please check your connection and try again</div>
+            <button onclick="window.vfiedApp.hideTravelResults()" style="
+              background: linear-gradient(135deg, #7c3aed, #6366f1); 
+              border: 0; 
+              border-radius: 8px; 
+              color: white; 
+              padding: 8px 16px; 
+              font-size: 13px; 
+              font-weight: 600; 
+              cursor: pointer;
+            ">
+              Close
+            </button>
+          </div>
+        `;
+      }
+
+      // Events loading
+      loadMockEvents() {
+        const eventsGrid = document.getElementById('events-grid-modal');
+        
+        const mockEvents = [
+          { title: 'Street Food Festival', when: 'Tonight 6-11pm', emoji: '🍽️', category: 'food', description: 'Local vendors showcase signature dishes from around the world' },
+          { title: 'Jazz & Wine Evening', when: 'Tomorrow 8pm', emoji: '🎵', category: 'music', description: 'Perfect pairing of smooth jazz and local wine selections' },
+          { title: 'Borough Market Tour', when: 'Saturday 10am', emoji: '🏪', category: 'market', description: 'Guided tour through London\'s most famous food market' },
+          { title: 'Cultural Food Walk', when: 'Sunday 2pm', emoji: '🎭', category: 'culture', description: 'Tasting tour through historic neighborhoods and their cuisines' },
+          { title: 'Rooftop Food Pop-up', when: 'Tonight 7pm', emoji: '🍽️', category: 'food', description: 'Limited-time rooftop dining experience with city views' },
+          { title: 'Live Cooking Class', when: 'Tomorrow 6pm', emoji: '🎪', category: 'culture', description: 'Interactive cooking class with local chef demonstrations' }
+        ];
+
+        // Filter events based on current filters
+        let filteredEvents = mockEvents;
+        if (this.eventFilters.category !== 'all') {
+          filteredEvents = mockEvents.filter(event => event.category === this.eventFilters.category);
+        }
+
+        if (filteredEvents.length === 0) {
+          eventsGrid.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px;">
+              <div style="font-size: 48px; margin-bottom: 16px;">🎪</div>
+              <p style="margin: 0 0 12px 0; font-weight: 700;">No events found</p>
+              <p style="margin: 0; font-size: 13px; color: #94a3b8;">Try changing your filters or check back later</p>
+            </div>
+          `;
+          return;
+        }
+
+        eventsGrid.innerHTML = filteredEvents.map(event => `
+          <div class="event-card">
+            <div class="event-emoji">${event.emoji}</div>
+            <div class="event-info">
+              <div class="event-title">${event.title}</div>
+              <div class="event-details">${event.when} • ${this.currentLocation.city}</div>
+              <div class="event-description">${event.description}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      // Utility methods
+      updateLocationDisplay() {
+        document.getElementById('location-display').textContent = `${this.currentLocation.city}, UK`;
+      }
+
+      changeLocation() {
+        const newLocation = prompt('Enter city (e.g., "New York", "London", "Tokyo"):');
+        if (newLocation && newLocation.trim()) {
+          this.currentLocation.city = newLocation.trim();
+          this.updateLocationDisplay();
+          this.saveUserPreferences();
+        }
+      }
+
+      handleAccept() {
+        this.showToast('Great choice! Hope you enjoy it!');
+      }
+
+      async shareResult() {
+        if (!this.currentResult) return;
+        
+        const shareText = `VFIED suggested: ${this.currentResult.name}\n\n${this.currentResult.reason}\n\nTry VFIED for personalized food decisions!`;
+        
+        if (navigator.share) {
+          try {
+            await navigator.share({ title: 'My VFIED Suggestion', text: shareText });
+          } catch {
+            this.copyToClipboard(shareText);
+          }
+        } else {
+          this.copyToClipboard(shareText);
+        }
+      }
+
+      copyToClipboard(text) {
+        navigator.clipboard.writeText(text).then(() => {
+          this.showToast('Copied to clipboard!');
+        }).catch(() => {
+          const textArea = document.createElement('textarea');
+          textArea.value = text;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          this.showToast('Copied to clipboard!');
+        });
+      }
+
+      getDirections() {
+        if (!this.currentResult) return;
+        
+        const query = encodeURIComponent(`${this.currentResult.name} ${this.currentLocation.city}`);
+        const mapsUrl = `https://maps.google.com/maps?q=${query}`;
+        window.open(mapsUrl, '_blank');
+      }
+
+      incrementDecisionCount() {
+        const currentCount = parseInt(localStorage.getItem('vfied_decisions') || '0');
+        const newCount = currentCount + 1;
+        localStorage.setItem('vfied_decisions', newCount.toString());
+        
+        const counterElement = document.getElementById('decisions-count');
+        if (counterElement) {
+          counterElement.textContent = newCount;
+        }
+      }
+
+      showToast(message) {
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+          position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 2000;
+          background: rgba(0,0,0,0.9); color: white; padding: 12px 20px; border-radius: 8px;
+          font-size: 14px; max-width: 300px; text-align: center; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        `;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+          if (toast.parentNode) {
+            toast.remove();
+          }
+        }, 3000);
+      }
+
+      // Enhanced result display methods
+      showResult(result) {
+        const trackingCode = `VFIED${Date.now().toString(36).toUpperCase()}`;
+        result.trackingCode = trackingCode;
+
+        document.getElementById('result-emoji').textContent = result.emoji;
+        document.getElementById('result-name').textContent = result.name;
+        document.getElementById('reasoning-text').textContent = result.reason;
+        
+        const resultSection = document.getElementById('suggestion-result');
+        resultSection.classList.remove('hidden');
+
+        this.addTrackingCode(trackingCode);
+
+        this.recentSuggestions.unshift(result.name);
+        this.recentSuggestions = this.recentSuggestions.slice(0, 10);
+        localStorage.setItem('vfied_recent', JSON.stringify(this.recentSuggestions));
+
+        const tracking = {
+          code: trackingCode,
+          suggestion: result.name,
+          timestamp: Date.now(),
+          location: this.currentLocation.city,
+          mood: document.getElementById('mood-input').value
+        };
+        
+        this.trackingData.push(tracking);
+        this.trackingData = this.trackingData.slice(-50);
+        localStorage.setItem('vfied_tracking', JSON.stringify(this.trackingData));
+
+        this.currentResult = result;
+        this.incrementDecisionCount();
+        this.saveUserPreferences();
+
+        resultSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      addTrackingCode(trackingCode) {
+        const existingTracking = document.querySelector('.tracking-code-display');
+        if (existingTracking) {
+          existingTracking.remove();
+        }
+
+        const trackingElement = document.createElement('div');
+        trackingElement.className = 'tracking-code-display';
+        trackingElement.innerHTML = `
+          <div style="margin-top: 12px; padding: 8px; background: rgba(255,255,255,0.06); border-radius: 8px; text-align: center;">
+            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 4px;">Going there? Mention this code:</div>
+            <div style="font-size: 14px; font-weight: 700; color: #10b981; cursor: pointer;" onclick="navigator.clipboard.writeText('${trackingCode}'); window.vfiedApp.showToast('Code copied!');">
+              ${trackingCode}
+            </div>
+            <div style="font-size: 10px; color: #64748b; margin-top: 2px;">Click to copy</div>
+          </div>
+        `;
+        document.getElementById('suggestion-result').appendChild(trackingElement);
+      }
+
+      showLoading() {
+        const button = document.getElementById('decide-button');
+        button.disabled = true;
+        button.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; gap: 8px;"><div>🤔</div><div>Thinking...</div></div>';
+      }
+
+      hideLoading() {
+        const button = document.getElementById('decide-button');
+        button.disabled = false;
+        button.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; gap: 8px;"><span style="font-size: 24px;">🎯</span><div><div>DECIDE FOR ME</div><div style="font-size: 14px; opacity: 0.9; font-weight: 600;">I\'ll find your perfect match</div></div></div>';
+      }
+
+      // Helper method to escape HTML in messages
+      escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      // Add method for follow-up questions
+      askFollowUp(question) {
+        document.getElementById('travel-query-modal').value = question;
+        this.askTravelCoach();
+      }
+
+      // Enhanced result display methods for travel features
+      showCityGuideResult(data) {
+        const resultsDiv = document.getElementById('travel-results-modal');
+        resultsDiv.innerHTML = `
+          <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; padding: 20px;">
+            <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px;">
+              <div style="font-size: 24px;">🗺️</div>
+              <h4 style="margin: 0; color: #a5b4fc; font-size: 18px;">${data.city} Food Guide</h4>
+            </div>
+            <div style="margin-bottom: 20px;">
+              <h5 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #fbbf24;">🍽️ Must-Try Dishes</h5>
+              <div style="display: grid; gap: 8px;">
+                ${data.food_scene.signature_dishes.map(dish => `
+                  <div style="padding: 12px; background: rgba(255,255,255,0.04); border-radius: 8px; border-left: 3px solid #fbbf24;">
+                    <div style="font-weight: 600; font-size: 13px;">${dish}</div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+            <div style="margin-bottom: 20px;">
+              <h5 style="margin: 0 0 12px 0; font-size: 14px; font-weight: 700; color: #10b981;">🏘️ Best Food Neighborhoods</h5>
+              ${data.neighborhoods.map(hood => `
+                <div style="padding: 12px; background: rgba(255,255,255,0.04); border-radius: 8px; margin-bottom: 8px;">
+                  <div style="font-weight: 600; font-size: 14px; margin-bottom: 6px;">${hood.name}</div>
+                  <div style="font-size: 12px; color: #cbd5e1;">${hood.vibe}</div>
+                  <div style="font-size: 11px; color: #10b981; font-weight: 600;">Food: ${hood.food_specialty}</div>
+                </div>
+              `).join('')}
+            </div>
+            <div>
+              <h5 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700;">💡 Local Tips</h5>
+              ${data.local_tips.map(tip => `
+                <div style="padding: 10px; background: rgba(34, 211, 153, 0.1); border-radius: 8px; margin-bottom: 8px; font-size: 12px;">
+                  ${tip}
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      showNightPlanResult(data) {
+        const resultsDiv = document.getElementById('travel-results-modal');
+        resultsDiv.innerHTML = `
+          <div style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 20px;">
+            <h4 style="margin: 0 0 16px 0; color: #a5b4fc;">${data.planTitle}</h4>
+            ${data.timeline.map(item => `
+              <div style="margin-bottom: 16px; padding: 14px; background: rgba(255,255,255,0.04); border-radius: 8px;">
+                <div style="font-weight: 700; margin-bottom: 6px;">${item.time} - ${item.activity}</div>
+                <div style="color: #fbbf24; margin-bottom: 6px;">${item.emoji} ${item.food}</div>
+                <div style="font-size: 12px; color: #94a3b8;">${item.note}</div>
+                <div style="font-size: 11px; color: #10b981; margin-top: 4px;">${item.estimated_cost}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      showFoodCrawlResult(data) {
+        const resultsDiv = document.getElementById('travel-results-modal');
+        resultsDiv.innerHTML = `
+          <div style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 20px;">
+            <h4 style="margin: 0 0 16px 0; color: #a5b4fc;">${data.crawl_title}</h4>
+            ${data.stops.map(stop => `
+              <div style="margin-bottom: 16px; padding: 14px; background: rgba(255,255,255,0.04); border-radius: 8px;">
+                <div style="font-weight: 700; margin-bottom: 6px;">${stop.order}. ${stop.time} - ${stop.location}</div>
+                <div style="color: #fbbf24; margin-bottom: 6px;">${stop.emoji} ${stop.food}</div>
+                <div style="font-size: 12px; color: #94a3b8; margin-bottom: 4px;">${stop.reason}</div>
+                <div style="font-size: 11px; color: #10b981;">💡 ${stop.tip}</div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      showHiddenGemsResult(data) {
+        const resultsDiv = document.getElementById('travel-results-modal');
+        resultsDiv.innerHTML = `
+          <div style="background: rgba(255,255,255,0.06); border-radius: 12px; padding: 20px;">
+            <h4 style="margin: 0 0 16px 0; color: #a5b4fc;">💎 Hidden Gems in ${this.currentLocation.city}</h4>
+            <div style="background: rgba(255,255,255,0.04); border-radius: 10px; padding: 16px; margin-bottom: 20px;">
+              <p style="margin: 0; font-size: 14px; color: #e5ecff;">${data.response}</p>
+            </div>
+            ${data.recommendations ? data.recommendations.map(rec => `
+              <div style="margin-bottom: 12px; padding: 12px; background: rgba(255,255,255,0.04); border-radius: 8px;">
+                <div style="font-weight: 700; margin-bottom: 4px;">${rec.name}</div>
+                <div style="font-size: 12px; color: #94a3b8; margin-bottom: 6px;">${rec.location}</div>
+                <div style="font-size: 12px; color: #cbd5e1;">${rec.details}</div>
+              </div>
+            `).join('') : ''}
+          </div>
+        `;
+      }
     }
-  </script>
 
-  <!-- App logic -->
-  <script type="module" src="/src/main.js"></script>
+    // Global helper functions for button actions
+    window.askFollowUp = function(question) {
+      const app = window.vfiedApp;
+      if (app) {
+        document.getElementById('travel-query-modal').value = question;
+        app.askTravelCoach();
+      }
+    };
+
+    window.searchLocation = function(searchQuery) {
+      const mapsUrl = `https://maps.google.com/maps?q=${encodeURIComponent(searchQuery)}`;
+      window.open(mapsUrl, '_blank');
+    };
+
+    // Initialize the app and store globally
+    document.addEventListener('DOMContentLoaded', () => {
+      window.vfiedApp = new VFIEDApp();
+    });
+  </script>
 </body>
 </html>

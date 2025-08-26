@@ -1,12 +1,15 @@
+import { CONFIG } from './config.js';
+
+export const API_BASE = CONFIG.API_BASE;
 // VFIED Unified Main (Food + Social + Travel + Events) — with Toasts, Skeletons, Fallback & Stats
 
 // ---- Robust API base resolution ----
-const qpApi = new URLSearchParams(location.search).get('api');
-if (qpApi) localStorage.setItem('vfied_api', qpApi);
+// const qpApi = new URLSearchParams(location.search).get('api');
+// if (qpApi) localStorage.setItem('vfied_api', qpApi);
 
-const storedApi = localStorage.getItem('vfied_api');
-const runtimeApi = (typeof window !== 'undefined' && window.__API__) || ''; // '' = same-origin
-export const API_BASE = (qpApi || storedApi || runtimeApi || '').replace(/\/$/, '');
+// const storedApi = localStorage.getItem('vfied_api');
+// const runtimeApi = (typeof window !== 'undefined' && window.__API__) || ''; // '' = same-origin
+// export const API_BASE = (qpApi || storedApi || runtimeApi || '').replace(/\/$/, '');
 
 console.log('API_BASE ->', API_BASE || '(same-origin)');
 
@@ -138,46 +141,59 @@ function setThinking(btn, on = true) {
 }
 
 async function handleDecision() {
-  const decideBtn = byId('decide-button');
+  const decideBtn = document.getElementById('decide-button');
   setThinking(decideBtn, true);
   showSuggestionSkeleton();
-  updateContext('🧠 Analyzing your mood, weather, and local options...');
+  updateContext('Analyzing your mood, weather, and local options...');
 
   try {
-    const mood = (byId('mood-input')?.value || '').trim() || 'hungry';
-    const prefs = getUserPrefs();
+    const mood = document.getElementById('mood-input')?.value?.trim() || 'hungry';
+    const selectedDietary = Array.from(document.querySelectorAll('.diet-chip.active'))
+      .map(chip => chip.dataset.diet);
 
-    const payload = {
-      location: { city: 'London', country: 'United Kingdom', country_code: 'GB' },
-      mood_text: mood,
-      dietary: prefs.dietary || [],
-      budget: prefs.budget || 'medium',
-      menu_source: 'global_database',
-    };
-
-    // Updated URL construction to avoid double slashes
-    const url = API_BASE ? `${API_BASE}/v1/recommend` : `/v1/recommend`;
-    const res = await fetch(url, {
+    // Use the fixed API call
+    const response = await fetch(`${API_BASE}/v1/recommend`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        location: { 
+          city: 'London', 
+          country: 'United Kingdom', 
+          country_code: 'GB' 
+        },
+        mood_text: mood,
+        dietary: selectedDietary,
+        budget: 'medium',
+        menu_source: 'global_database'
+      })
     });
 
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    const s = await res.json();
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
 
-    // Enrich with social signals
-    const enriched = addSocialSignals(s);
-    showSuggestion(enriched);
+    const data = await response.json();
+    
+    if (data.success) {
+      const enriched = addSocialSignals(data);
+      showSuggestion(enriched);
+      incrementStats({ timeSavedMin: 3 });
+    } else {
+      throw new Error(data.error || 'Recommendation failed');
+    }
 
-    // track stats (success)
-    incrementStats({ timeSavedMin: 3 }); // optimistic: ~3 min saved per quick decision
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error('Decision error:', error);
+    
+    // Show user-friendly error
+    toast(`Server unavailable: ${error.message}`, 'warn');
+    
+    // Use fallback
     const fallback = addSocialSignals(sample(fallbackSuggestions));
     showSuggestion(fallback);
-    updateContext('⚠️ Server unavailable — using a local fallback.');
-    toast('⚠️ Using offline suggestion (server unavailable).', 'warn');
+    updateContext('Using offline suggestion (server unavailable)');
+    
   } finally {
     hideSuggestionSkeleton();
     setThinking(decideBtn, false);

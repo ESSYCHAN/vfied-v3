@@ -935,49 +935,36 @@ export const aiFoodService = new AIFoodService();
 // UPDATED EXPORT FUNCTIONS - NOW WITH PROPER SETTINGS INTEGRATION
 
 export const getAIFoodSuggestion = async (mood, context = {}) => {
-  console.log(`🤖 Getting AI suggestion for mood: ${mood} with settings awareness`);
+  console.log(`Getting AI suggestion for mood: ${mood}`);
   
   try {
-    // Get effective location (settings override or detected)
-    const effectiveLocation = aiFoodService.getEffectiveLocation();
-    const userSettings = aiFoodService.getUserSettings();
-    
-    console.log('📍 Using effective location:', effectiveLocation);
-    console.log('⚙️ Using user settings:', userSettings);
-    
-    const response = await fetch('https://vfied-mcp-server.onrender.com/mcp/get_food_suggestion', {
+    // Try your MCP server first
+    const response = await fetch(`${CONFIG.API_BASE}/v1/recommend`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        mood,
-        location: effectiveLocation, // USE EFFECTIVE LOCATION
-        dietary: userSettings?.dietary || [], // INCLUDE DIETARY RESTRICTIONS
-        context: {
-          budget: context.budget || 'medium',
-          socialSituation: context.socialSituation || 'solo',
-          timeConstraint: context.quick ? 'quick' : 'normal'
-        },
-        userId: context.userId || 'anonymous'
+        mood_text: mood,
+        location: context.location || CONFIG.DEFAULT_LOCATION,
+        dietary: context.dietary || [],
+        budget: context.budget || 'medium'
       })
     });
 
     if (!response.ok) {
-      throw new Error(`MCP server error: ${response.status}`);
+      throw new Error(`Server error: ${response.status}`);
     }
 
     const data = await response.json();
-    console.log('✅ MCP mood suggestion received for', effectiveLocation.city, ':', data);
-    
     return {
       ...data,
-      source: 'mcp',
-      location: effectiveLocation.city
+      source: 'server',
+      location: context.location?.city || 'London'
     };
 
   } catch (error) {
-    console.error('❌ MCP mood call failed, using local AI:', error);
+    console.error('Server call failed, using local fallback:', error);
+    
+    // Fallback to local AI service
     return await aiFoodService.getPersonalizedFoodSuggestion(mood, context);
   }
 };

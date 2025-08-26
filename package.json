@@ -9,7 +9,8 @@
   "dev:app": "vite",
   "dev": "npm-run-all -p dev:server dev:app",
   "build": "vite build",
-  "preview": "vite preview"
+  "preview": "vite preview", 
+  "server": "node server/mcp-server.js"
 },
   "dependencies": {
     "@capacitor/app": "^5.0.8",
