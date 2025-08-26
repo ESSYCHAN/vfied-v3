@@ -475,38 +475,49 @@ Be specific to ${context.location?.city}, ${context.location?.country} and curre
     if (!this.openaiApiKey) {
       throw new Error('OpenAI API key not configured');
     }
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.openaiApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are VFIED, a culturally-aware personal food friend who gives specific, practical food suggestions based on location, culture, and personal patterns. Always respond with valid JSON.'
-          },
-          {
-            role: 'user', 
-            content: prompt
-          }
-        ],
-        max_tokens: options.maxTokens || 1000,
-        temperature: 0.7,
-        response_format: options.responseFormat === 'json' ? { type: 'json_object' } : undefined
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+  
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+  
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        signal: controller.signal, // Add this line
+        headers: {
+          'Authorization': `Bearer ${this.openaiApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', // Change to faster model
+          messages: [
+            {
+              role: 'system',
+              content: 'You are VFIED, a culturally-aware personal food friend who gives specific, practical food suggestions based on location, culture, and personal patterns. Always respond with valid JSON.'
+            },
+            {
+              role: 'user', 
+              content: prompt
+            }
+          ],
+          max_tokens: options.maxTokens || 500, // Reduce tokens for speed
+          temperature: 0.7,
+          response_format: options.responseFormat === 'json' ? { type: 'json_object' } : undefined
+        })
+      });
+  
+      clearTimeout(timeoutId);
+  
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`OpenAI API error: ${response.status} - ${error}`);
+      }
+  
+      const data = await response.json();
+      return data.choices[0].message.content;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
     }
-
-    const data = await response.json();
-    return data.choices[0].message.content;
   }
 
   parseAIResponse(aiResponse, mood, context) {

@@ -238,12 +238,14 @@ app.use(cors({
   credentials: true
 }));
 app.use((req, res, next) => {
-  if (req.path.startsWith('/v1/')) {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`, {
-      userAgent: req.headers['user-agent']?.substring(0, 50),
-      ip: req.ip
-    });
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
+  
   next();
 });
 

@@ -643,12 +643,12 @@
         this.activeRequests.set(key, controller);
         
         // Set a longer timeout (30 seconds instead of 10)
-        const timeoutId = setTimeout(() => {
-          controller.abort();
-          this.activeRequests.delete(key);
-          this.requestTimeouts.delete(key);
-        }, 30000);
-        
+        // const timeoutId = setTimeout(() => {
+        //   controller.abort();
+        //   this.activeRequests.delete(key);
+        //   this.requestTimeouts.delete(key);
+        // }, 30000);
+        const timeoutId = setTimeout(() => controller.abort(), CONFIG.TIMEOUT); 
         this.requestTimeouts.set(key, timeoutId);
         
         try {
@@ -952,7 +952,26 @@
           });
         });
       }
+      setupHaptics() {
+  if (window.Capacitor) {
+    import('@capacitor/haptics').then(({ Haptics, ImpactStyle }) => {
+      this.haptics = Haptics;
+      this.impactStyle = ImpactStyle;
+    });
+  }
+}
 
+async vibrate(style = 'Medium') {
+  if (this.haptics) {
+    try {
+      await this.haptics.impact({ style: this.impactStyle[style] });
+    } catch (e) {
+      if (navigator.vibrate) {
+        navigator.vibrate(style === 'Light' ? 50 : 75);
+      }
+    }
+  }
+}
       // Modal methods
       openTravelModal() {
         const modal = document.getElementById('travel-modal');
@@ -989,66 +1008,46 @@
 
       // FIXED: Enhanced makeDecision with proper timeout handling
       async makeDecision() {
-        const mood = document.getElementById('mood-input').value.trim();
-        if (!mood) {
-          this.showToast('Please tell me how you\'re feeling first!');
-          document.getElementById('mood-input').focus();
-          return;
-        }
+    const mood = document.getElementById('mood-input')?.value?.trim();
+    if (!mood) {
+      this.showToast('Tell me how you\'re feeling first!');
+      this.vibrate('Light');
+      return;
+    }
 
-        this.showLoading();
+    this.vibrate('Medium');
+    this.showLoading();
 
-        try {
-          const context = this.getContextForRecommendation();
-          
-          const response = await this.makeAPIRequest(`${this.API_BASE}/v1/recommend`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              location: this.currentLocation,
-              mood_text: mood,
-              dietary: Array.from(this.selectedDietary),
-              recent_suggestions: this.recentSuggestions,
-              context: context,
-              social: context.social_context,
-              budget: 'medium'
-            })
-          }, 'main_decision');
+    try {
+      // Try fast API first
+      const response = await this.makeAPIRequest('/v1/recommend', {
+        method: 'POST',
+        body: JSON.stringify({
+          location: this.currentLocation,
+          mood_text: mood,
+          dietary: Array.from(this.selectedDietary),
+          quick: true // Signal for faster response
+        })
+      });
 
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-
-          const data = await response.json();
-
-          if (data.success) {
-            this.showResult({
-              emoji: data.food.emoji || '🍽️',
-              name: data.food.name,
-              reason: data.reasoning || data.friendMessage
-            });
-          } else {
-            throw new Error(data.error || 'Failed to get recommendation');
-          }
-
-        } catch (error) {
-          console.error('Recommendation error:', error);
-          
-          if (error.name === 'AbortError') {
-            // Show fast fallback for timeout/cancellation
-            const fallback = this.getFastFallback(mood);
-            fallback.reason = fallback.reason + ' (Quick suggestion - our AI is busy!)';
-            this.showResult(fallback);
-          } else {
-            // Network or other error - show contextual fallback
-            const fallback = this.getFastFallback(mood);
-            fallback.reason = fallback.reason + ' (Suggested based on your mood and time)';
-            this.showResult(fallback);
-          }
-        } finally {
-          this.hideLoading();
-        }
+      if (response.ok) {
+        const data = await response.json();
+        this.showResult(data);
+        this.vibrate('Light');
+      } else {
+        throw new Error(`API error: ${response.status}`);
       }
+    } catch (error) {
+      console.warn('API failed, using offline suggestion:', error);
+      
+      // Fast offline fallback
+      const fallback = this.getOfflineSuggestion(mood);
+      this.showResult(fallback);
+      this.vibrate('Heavy');
+    } finally {
+      this.hideLoading();
+    }
+  }
 
       // FIXED: Enhanced travel coach with better error handling
       async askTravelCoach() {

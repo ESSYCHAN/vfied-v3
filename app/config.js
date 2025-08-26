@@ -5,12 +5,10 @@ const API_PORT = 3048; // Your server port
 export const CONFIG = {
   API_BASE: isDevelopment 
     ? `http://localhost:${API_PORT}` 
-    : 'https://your-production-domain.com', // Update this for production
+    : 'https://vfied-v3.onrender.com', // Change this line only
   
-  // Feature flags
+  TIMEOUT: 5000, // Add this line for mobile
   ENABLE_AI: true,
   ENABLE_WEATHER: true,
-  
-  // Fallback values
   DEFAULT_LOCATION: { city: 'London', country_code: 'GB' }
 };
