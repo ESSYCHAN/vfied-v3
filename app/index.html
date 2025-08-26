@@ -267,7 +267,7 @@
   <script>
     class VFIEDApp {
       constructor() {
-        this.API_BASE = location.hostname === 'localhost' ? 'http://localhost:3048' : 'https://vfied-v3.onrender.com';
+        this.API_BASE = location.hostname === 'localhost' ? 'http://localhost:3049' : 'https://vfied-v3.onrender.com';
 
         this.currentLocation = { city: 'London', country: 'United Kingdom', country_code: 'GB', confidence: 'high' };
         this.selectedDietary = new Set();
@@ -287,7 +287,23 @@
         const counterElement = document.getElementById('decisions-count');
         if (counterElement) counterElement.textContent = storedCount;
       }
+      CITY_TO_CC = {
+        // quick, common cities; extend as needed
+        london: 'GB', manchester: 'GB', edinburgh: 'GB',
+        paris: 'FR', lyon: 'FR',
+        tokyo: 'JP', osaka: 'JP',
+        nairobi: 'KE', mombasa: 'KE',
+        newyork: 'US', "new york": 'US', losangeles: 'US', "los angeles": 'US', chicago: 'US',
+        sydney: 'AU', melbourne: 'AU',
+        berlin: 'DE', munich: 'DE',
+        madrid: 'ES', barcelona: 'ES',
+        rome: 'IT', milan: 'IT'
+      };
 
+      guessCountryCode(city) {
+        const key = String(city || '').trim().toLowerCase();
+        return this.CITY_TO_CC[key] || null;
+      }
       // Unified API with AbortController + timeout
       async makeAPIRequest(path, options = {}, key = null, timeoutMs = 30000) {
         const url = `${this.API_BASE}${path}`;
@@ -436,12 +452,38 @@
         document.getElementById('location-display').textContent = `${this.currentLocation.city}, ${cc}`;
       }
       changeLocation() {
-        const newLocation = prompt('Enter city (e.g., "New York", "London", "Tokyo"):');
-        if (newLocation && newLocation.trim()) {
-          this.currentLocation.city = newLocation.trim();
-          this.updateLocationDisplay();
-          this.saveUserPreferences();
+        const input = prompt('Enter location (e.g., "Tokyo, JP" or just "Tokyo"):');
+        if (!input || !input.trim()) return;
+
+        const raw = input.trim();
+        let city = raw;
+        let cc = null;
+
+        // Accept "City, CC" or "City - CC"
+        const m = raw.match(/^(.+?)[,\-]\s*([A-Za-z]{2})$/);
+        if (m) {
+          city = m[1].trim();
+          cc = m[2].trim().toUpperCase();
+        } else {
+          // Try to guess common cities → country code
+          cc = this.guessCountryCode(raw) || this.currentLocation.country_code || 'GB';
         }
+
+        this.currentLocation = {
+          ...this.currentLocation,
+          city,
+          country_code: cc
+        };
+
+        this.updateLocationDisplay();
+
+        // Also refresh modal headers if open
+        const tCity = document.getElementById('travel-modal-city');
+        if (tCity) tCity.textContent = city;
+        const eCity = document.getElementById('events-modal-city');
+        if (eCity) eCity.textContent = city;
+
+        this.saveUserPreferences();
       }
 
       // Cancel helpers

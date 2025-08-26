@@ -22,7 +22,7 @@ import { SUPPORTED_COUNTRIES } from './data/countries.js'; // adjust path as nee
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY || '';
 const USE_GPT = String(process.env.USE_GPT || process.env.VITE_USE_GPT || '').toLowerCase() === 'true';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-const PORT = process.env.MCP_PORT || process.env.PORT || 3048; // ✅ FIXED: Match OpenAPI schema
+const PORT = process.env.MCP_PORT || process.env.PORT || 3049; // ✅ FIXED: Match OpenAPI schema
 
 const moods = moodsModule.MOOD_TAXONOMY?.moods || moodsModule.default?.moods || [];
 const countries = countriesModule.SUPPORTED_COUNTRIES?.countries || countriesModule.default?.countries || [];

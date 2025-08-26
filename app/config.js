@@ -1,6 +1,6 @@
 // Determine API base URL
 const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-const API_PORT = 3048; // Your server port
+const API_PORT = 3049; // Your server port
 
 export const CONFIG = {
   API_BASE: isDevelopment 
