@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VFIED – One Tap Food Intelligence</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      margin: 0; font-family: Inter, sans-serif;
+      background: linear-gradient(180deg, #0a0e19, #070b14);
+      color: #e5ecff; min-height: 100vh; display: flex; justify-content: center;
+    }
+    #app { max-width: 480px; width: 100%; padding: 24px; }
+    h1 {
+      font-weight: 900; font-size: 28px; text-align: center; margin: 0;
+      background: linear-gradient(135deg, #fff, #c7d2fe);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .tagline { text-align: center; color: #9fb0c9; font-size: 14px; margin-bottom: 24px; }
+    .tabs { display: flex; gap: 8px; justify-content: center; margin-bottom: 20px; }
+    .tab { padding: 10px 14px; border-radius: 12px; font-weight: 700; font-size: 14px; cursor: pointer;
+      border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.06); color: #94a3b8; }
+    .tab.active { background: linear-gradient(135deg, #7c3aed, #6366f1); color: #fff; }
+    .glass-card {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px; padding: 20px; margin-bottom: 20px;
+    }
+    button.main-btn {
+      width: 100%; padding: 20px; border: none;
+      border-radius: 16px; font-weight: 900; font-size: 20px;
+      background: linear-gradient(135deg, #7c3aed, #6366f1);
+      color: #fff; cursor: pointer;
+      box-shadow: 0 20px 40px rgba(124,58,237,0.3);
+    }
+    .suggestions { margin-top: 20px; }
+    .card {
+      background: rgba(255,255,255,0.08);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 16px; padding: 16px; margin-bottom: 12px;
+      text-align: center;
+    }
+    .emoji { font-size: 40px; margin-bottom: 8px; }
+    .reason { font-size: 13px; color: #a5b4fc; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>VFIED 🍽️</h1>
+    <p class="tagline">One-tap, smart shortlist for your next meal, trip, or night out</p>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <div class="tab active">🍽️ Food</div>
+      <div class="tab">✈️ Travel</div>
+      <div class="tab">🎪 Events</div>
+    </div>
+
+    <!-- Food Tab -->
+    <section>
+      <div class="glass-card">
+        <strong>🥗 Dietary filters (optional)</strong>
+        <div class="chips">
+          <div class="chip">Vegetarian</div>
+          <div class="chip">Vegan</div>
+          <div class="chip">No Gluten</div>
+          <div class="chip">Dairy-Free</div>
+          <div class="chip">Halal</div>
+        </div>
+      </div>
+      <button class="main-btn">DECIDE FOR ME</button>
+      <div class="suggestions">
+        <div class="card"><div class="emoji">🍕</div><h3>Margherita Pizza</h3><p class="reason">Comfort carb + cheese, easy crowd pleaser</p></div>
+        <div class="card"><div class="emoji">🥦</div><h3>Veggie Stir Fry</h3><p class="reason">Light, healthy, plant-based option</p></div>
+        <div class="card"><div class="emoji">🌯</div><h3>Grilled Chicken Wrap</h3><p class="reason">Quick protein, balanced, travel-friendly</p></div>
+      </div>
+    </section>
+
+    <!-- Travel Tab -->
+    <section>
+      <button class="main-btn">PLAN MY DAY</button>
+      <div class="suggestions">
+        <div class="card"><div class="emoji">🥐</div><h3>Paris Breakfast Café</h3><p class="reason">Cozy croissant + coffee to start your trip</p></div>
+        <div class="card"><div class="emoji">🍲</div><h3>Local Bistro Lunch</h3><p class="reason">Authentic comfort food in the city center</p></div>
+        <div class="card"><div class="emoji">🍷</div><h3>Wine & Tapas Bar</h3><p class="reason">Perfect evening stop for travelers</p></div>
+      </div>
+    </section>
+
+    <!-- Events Tab -->
+    <section>
+      <button class="main-btn">FIND EVENTS</button>
+      <div class="suggestions">
+        <div class="card"><div class="emoji">🎶</div><h3>Jazz & Dinner Night</h3><p class="reason">Smooth live music with soul food pairings</p></div>
+        <div class="card"><div class="emoji">🎡</div><h3>Street Food Festival</h3><p class="reason">Sample global dishes from local vendors</p></div>
+        <div class="card"><div class="emoji">🍻</div><h3>Beer & BBQ Fest</h3><p class="reason">Casual evening, hearty food, fun crowds</p></div>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

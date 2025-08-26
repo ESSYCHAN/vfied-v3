@@ -1,67 +1,160 @@
 // data/countries.js - Supported Countries with Cultural Context
 export const SUPPORTED_COUNTRIES = {
-    countries: [
-      // Africa
-      { name: 'Kenya', country_code: 'KE', region: 'East Africa', cuisine: 'East African' },
-      { name: 'Nigeria', country_code: 'NG', region: 'West Africa', cuisine: 'West African' },
-      { name: 'Ghana', country_code: 'GH', region: 'West Africa', cuisine: 'West African' },
-      { name: 'South Africa', country_code: 'ZA', region: 'Southern Africa', cuisine: 'South African' },
-      { name: 'Ethiopia', country_code: 'ET', region: 'East Africa', cuisine: 'Ethiopian' },
-      { name: 'Uganda', country_code: 'UG', region: 'East Africa', cuisine: 'East African' },
-      { name: 'Tanzania', country_code: 'TZ', region: 'East Africa', cuisine: 'East African' },
-      { name: 'Morocco', country_code: 'MA', region: 'North Africa', cuisine: 'Moroccan' },
-      { name: 'Egypt', country_code: 'EG', region: 'North Africa', cuisine: 'Middle Eastern' },
-  
-      // Europe
-      { name: 'United Kingdom', country_code: 'GB', region: 'Western Europe', cuisine: 'British' },
-      { name: 'Germany', country_code: 'DE', region: 'Central Europe', cuisine: 'German' },
-      { name: 'France', country_code: 'FR', region: 'Western Europe', cuisine: 'French' },
-      { name: 'Italy', country_code: 'IT', region: 'Southern Europe', cuisine: 'Italian' },
-      { name: 'Spain', country_code: 'ES', region: 'Southern Europe', cuisine: 'Spanish' },
-      { name: 'Netherlands', country_code: 'NL', region: 'Western Europe', cuisine: 'Dutch' },
-      { name: 'Sweden', country_code: 'SE', region: 'Northern Europe', cuisine: 'Scandinavian' },
-      { name: 'Poland', country_code: 'PL', region: 'Central Europe', cuisine: 'Polish' },
-  
-      // Americas
-      { name: 'United States', country_code: 'US', region: 'North America', cuisine: 'American' },
-      { name: 'Canada', country_code: 'CA', region: 'North America', cuisine: 'Canadian' },
-      { name: 'Mexico', country_code: 'MX', region: 'North America', cuisine: 'Mexican' },
-      { name: 'Brazil', country_code: 'BR', region: 'South America', cuisine: 'Brazilian' },
-      { name: 'Argentina', country_code: 'AR', region: 'South America', cuisine: 'Argentinian' },
-      { name: 'Colombia', country_code: 'CO', region: 'South America', cuisine: 'Colombian' },
-      { name: 'Peru', country_code: 'PE', region: 'South America', cuisine: 'Peruvian' },
-  
-      // Asia
-      { name: 'India', country_code: 'IN', region: 'South Asia', cuisine: 'Indian' },
-      { name: 'Japan', country_code: 'JP', region: 'East Asia', cuisine: 'Japanese' },
-      { name: 'China', country_code: 'CN', region: 'East Asia', cuisine: 'Chinese' },
-      { name: 'Thailand', country_code: 'TH', region: 'Southeast Asia', cuisine: 'Thai' },
-      { name: 'Vietnam', country_code: 'VN', region: 'Southeast Asia', cuisine: 'Vietnamese' },
-      { name: 'South Korea', country_code: 'KR', region: 'East Asia', cuisine: 'Korean' },
-      { name: 'Singapore', country_code: 'SG', region: 'Southeast Asia', cuisine: 'Singaporean' },
-      { name: 'Malaysia', country_code: 'MY', region: 'Southeast Asia', cuisine: 'Malaysian' },
-      { name: 'Indonesia', country_code: 'ID', region: 'Southeast Asia', cuisine: 'Indonesian' },
-      { name: 'Philippines', country_code: 'PH', region: 'Southeast Asia', cuisine: 'Filipino' },
-  
-      // Oceania
-      { name: 'Australia', country_code: 'AU', region: 'Oceania', cuisine: 'Australian' },
-      { name: 'New Zealand', country_code: 'NZ', region: 'Oceania', cuisine: 'New Zealand' },
-  
-      // Middle East
-      { name: 'Turkey', country_code: 'TR', region: 'Middle East', cuisine: 'Turkish' },
-      { name: 'Lebanon', country_code: 'LB', region: 'Middle East', cuisine: 'Lebanese' },
-      { name: 'Israel', country_code: 'IL', region: 'Middle East', cuisine: 'Israeli' },
-      { name: 'United Arab Emirates', country_code: 'AE', region: 'Middle East', cuisine: 'Emirati' }
-    ]
-  };
+  countries: [
+    {
+      name: 'Kenya',
+      country_code: 'KE',
+      region: 'East Africa',
+      cuisine: 'East African',
+      dishes: [
+        { name: "Ugali + Sukuma", emoji: "🍽️", explanation: "Staple comfort: maize meal with greens" },
+        { name: "Nyama Choma", emoji: "🥩", explanation: "Char-grilled goat/beef, weekend favorite" },
+        { name: "Pilau", emoji: "🍚", explanation: "Spiced rice, aromatic and satisfying" },
+        { name: "Chapati & Beans", emoji: "🫓", explanation: "Flatbread with seasoned beans" },
+        { name: "Samosas", emoji: "🥟", explanation: "Crispy pastries with spiced filling" }
+      ],
+      travel_spots: [
+        { name: "Kenyatta Market", emoji: "🥙", reason: "Street food stalls with nyama choma" },
+        { name: "Giraffe Centre Café", emoji: "🦒", reason: "Unique breakfast with giraffes" },
+        { name: "Karen Blixen Coffee Garden", emoji: "☕", reason: "Cozy lunch with history" }
+      ],
+      events: [
+        { title: "Nairobi Street Food Festival", emoji: "🎉", description: "Sample bold local flavors" },
+        { title: "Kenya Food & Drink Expo", emoji: "🍻", description: "Showcase of East African cuisine" }
+      ]
+    },
+    {
+      name: 'United Kingdom',
+      country_code: 'GB',
+      region: 'Western Europe',
+      cuisine: 'British',
+      dishes: [
+        { name: "Fish & Chips", emoji: "🍟", explanation: "Classic British comfort, crispy & filling" },
+        { name: "Chicken Tikka Masala", emoji: "🍛", explanation: "UK curry-house favorite, bold spices" },
+        { name: "Sunday Roast", emoji: "🥩", explanation: "Traditional hearty family meal" },
+        { name: "Full English Breakfast", emoji: "🍳", explanation: "Complete morning fuel with all the fixings" },
+        { name: "Bangers & Mash", emoji: "🌭", explanation: "Sausages with creamy mashed potatoes" }
+      ],
+      travel_spots: [
+        { name: "Borough Market", emoji: "🥪", reason: "Historic market with artisanal food" },
+        { name: "Brick Lane", emoji: "🍛", reason: "Curry capital with vibrant energy" },
+        { name: "Camden Market", emoji: "🌮", reason: "Street food from all over the world" }
+      ],
+      events: [
+        { title: "London Coffee Festival", emoji: "☕", description: "Specialty brews & tastings" },
+        { title: "Taste of London", emoji: "🍴", description: "Flagship UK food festival" }
+      ]
+    },
+    {
+      name: 'United States',
+      country_code: 'US',
+      region: 'North America',
+      cuisine: 'American',
+      dishes: [
+        { name: "Smash Burger", emoji: "🍔", explanation: "Hearty, fast, crowd-pleasing classic" },
+        { name: "Burrito Bowl", emoji: "🌯", explanation: "Protein + grains, easy to customize" },
+        { name: "Chicken Caesar Salad", emoji: "🥗", explanation: "Crunchy greens with savory bite" },
+        { name: "BBQ Ribs", emoji: "🍖", explanation: "Smoky comfort food, weekend worthy" },
+        { name: "Mac & Cheese", emoji: "🧀", explanation: "Creamy comfort food classic" }
+      ],
+      travel_spots: [
+        { name: "Chelsea Market (NYC)", emoji: "🥯", reason: "Iconic indoor food hall" },
+        { name: "Fisherman's Wharf (SF)", emoji: "🦀", reason: "Seafood stalls and chowder bowls" },
+        { name: "Austin Food Trucks", emoji: "🌮", reason: "Street food and BBQ hotspot" }
+      ],
+      events: [
+        { title: "BBQ Festival", emoji: "🍖", description: "Smoked meats, live music, community vibes" },
+        { title: "Food & Wine Classic", emoji: "🍷", description: "Luxury tasting with chefs & sommeliers" }
+      ]
+    },
+    {
+      name: 'Japan',
+      country_code: 'JP',
+      region: 'East Asia',
+      cuisine: 'Japanese',
+      dishes: [
+        { name: "Tonkotsu Ramen", emoji: "🍜", explanation: "Rich broth, cozy noodle comfort" },
+        { name: "Chicken Katsu", emoji: "🍱", explanation: "Crispy cutlet, simple and satisfying" },
+        { name: "Salmon Nigiri", emoji: "🍣", explanation: "Clean flavors, light but filling" },
+        { name: "Tempura", emoji: "🍤", explanation: "Light, crispy battered vegetables and seafood" },
+        { name: "Miso Soup", emoji: "🥣", explanation: "Savory soybean soup with tofu and seaweed" }
+      ],
+      travel_spots: [
+        { name: "Tsukiji Outer Market (Tokyo)", emoji: "🐟", reason: "Fresh sushi & seafood street stalls" },
+        { name: "Dotonbori (Osaka)", emoji: "🍢", reason: "Street food heaven: takoyaki & okonomiyaki" },
+        { name: "Kyoto Nishiki Market", emoji: "🍡", reason: "Traditional snacks & sweets" }
+      ],
+      events: [
+        { title: "Cherry Blossom Food Stalls", emoji: "🌸", description: "Seasonal hanami snacks & drinks" },
+        { title: "Tokyo Ramen Show", emoji: "🍜", description: "Regional ramen pop-ups in one place" }
+      ]
+    },
+    {
+      name: 'India',
+      country_code: 'IN',
+      region: 'South Asia',
+      cuisine: 'Indian',
+      dishes: [
+        { name: "Butter Chicken", emoji: "🍛", explanation: "Creamy tomato curry with tender chicken" },
+        { name: "Biryani", emoji: "🍚", explanation: "Fragrant rice with spices and meat" },
+        { name: "Masala Dosa", emoji: "🥞", explanation: "Crispy crepe with spiced potato filling" },
+        { name: "Dal Tadka", emoji: "🍲", explanation: "Spiced lentil curry, comfort in a bowl" },
+        { name: "Naan & Curry", emoji: "🫓", explanation: "Fluffy bread perfect for scooping curry" }
+      ],
+      travel_spots: [
+        { name: "Chandni Chowk (Delhi)", emoji: "🌶️", reason: "Spicy street food paradise" },
+        { name: "Crawford Market (Mumbai)", emoji: "🧄", reason: "Aromatic spices and traditional snacks" },
+        { name: "Local Dhaba", emoji: "🚛", reason: "Roadside eatery with authentic flavors" }
+      ],
+      events: [
+        { title: "Diwali Food Festival", emoji: "🪔", description: "Sweet treats and festival foods" },
+        { title: "Street Food Walk", emoji: "🌶️", description: "Guided tour through spicy local favorites" }
+      ]
+    },
+    {
+      name: 'France',
+      country_code: 'FR',
+      region: 'Western Europe',
+      cuisine: 'French',
+      dishes: [
+        { name: "Coq au Vin", emoji: "🍗", explanation: "Wine-braised chicken, classic bistro dish" },
+        { name: "Croque Monsieur", emoji: "🥪", explanation: "Grilled ham and cheese with béchamel" },
+        { name: "French Onion Soup", emoji: "🧅", explanation: "Rich broth with caramelized onions and cheese" },
+        { name: "Ratatouille", emoji: "🍆", explanation: "Rustic vegetable stew from Provence" },
+        { name: "Croissant", emoji: "🥐", explanation: "Buttery, flaky pastry perfect for breakfast" }
+      ],
+      travel_spots: [
+        { name: "Local Boulangerie", emoji: "🥖", reason: "Fresh bread and pastries daily" },
+        { name: "Wine Bar", emoji: "🍷", reason: "Regional wines with cheese and charcuterie" },
+        { name: "Bistro", emoji: "🍽️", reason: "Casual French dining with seasonal menus" }
+      ],
+      events: [
+        { title: "Wine Harvest Festival", emoji: "🍇", description: "Celebrate new vintages with tastings" },
+        { title: "Marché aux Puces", emoji: "🧀", description: "Flea market with artisanal cheese stalls" }
+      ]
+    }
+  ]
+};
   
   // Helper functions
   export function getCountryByCode(countryCode) {
     return SUPPORTED_COUNTRIES.countries.find(
-      country => country.country_code === countryCode?.toUpperCase()
+      country => country.country_code=== countryCode?.toUpperCase()
     );
   }
+  export function getCountryDishes(countryCode) {
+    const country = getCountryByCode(countryCode);
+    return country?.dishes || [];
+  }
   
+  export function getCountryTravelSpots(countryCode) {
+    const country = getCountryByCode(countryCode);
+    return country?.travel_spots || [];
+  }
+  export function getCountryEvents(countryCode) {
+    const country = getCountryByCode(countryCode);
+    return country?.events || [];
+  }
   export function getCountriesByRegion(region) {
     return SUPPORTED_COUNTRIES.countries.filter(
       country => country.region === region
@@ -126,3 +219,12 @@ export const SUPPORTED_COUNTRIES = {
     const matches = searchCountries(countryInput);
     return matches.length > 0 ? matches[0] : null;
   }
+  // New helper for quick decision fallbacks
+export function getQuickFallbackDishes(countryCode) {
+  const dishes = getCountryDishes(countryCode);
+  return dishes.length >= 3 ? dishes.slice(0, 3) : [
+    { name: "Local Special", emoji: "🍽️", explanation: "Regional favorite dish" },
+    { name: "Comfort Food", emoji: "🥘", explanation: "Traditional comfort meal" },
+    { name: "Street Food", emoji: "🥙", explanation: "Popular quick bite" }
+  ];
+}

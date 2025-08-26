@@ -1,4 +1,4 @@
-// server/mcp-server.js - COMPLETE INTEGRATION
+// server/mcp-server.js - COMPLETE INTEGRATION (patched)
 
 import express from 'express';
 import cors from 'cors';
@@ -11,6 +11,12 @@ import fs from 'fs';
 import Joi from 'joi';
 import * as moodsModule from './data/moods.js';
 import * as countriesModule from './data/countries.js';
+import { randomUUID } from 'crypto';
+import { SUPPORTED_COUNTRIES } from './data/countries.js'; // adjust path as needed
+
+// Optional polyfill if your Node is <18
+// import fetch from 'node-fetch';
+// globalThis.fetch = globalThis.fetch || fetch;
 
 // Environment variables
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY || '';
@@ -21,6 +27,100 @@ const PORT = process.env.MCP_PORT || process.env.PORT || 3048; // ✅ FIXED: Mat
 const moods = moodsModule.MOOD_TAXONOMY?.moods || moodsModule.default?.moods || [];
 const countries = countriesModule.SUPPORTED_COUNTRIES?.countries || countriesModule.default?.countries || [];
 
+// --- define mood fallbacks FIRST (prevents use-before-define) ---
+const MOODS_FALLBACK = [
+  { id: 'TIRED', group: 'Energy', synonyms: ['exhausted','sleepy','low energy','fatigued'] },
+  { id: 'STRESSED', group: 'Emotion', synonyms: ['anxious','tense','overwhelmed','deadline'] },
+  { id: 'CELEBRATING', group: 'Social', synonyms: ['party','treat','reward','birthday','win'] },
+  { id: 'HUNGRY', group: 'Body', synonyms: ['starving','very hungry','need food fast'] },
+  { id: 'POST_WORKOUT', group: 'Body', synonyms: ['gym','post workout','protein','recovery'] },
+  { id: 'SICK', group: 'Body', synonyms: ['flu','cold','under the weather','sore throat'] },
+  { id: 'FOCUSED', group: 'Intent', synonyms: ['work mode','deep work','productive'] },
+  { id: 'RELAX', group: 'Emotion', synonyms: ['cozy','chill','comforting','calm'] },
+  { id: 'ADVENTUROUS', group: 'Intent', synonyms: ['spicy','new cuisine','explore','try something new'] },
+];
+
+// Countries processing
+function extractCountriesFromModule(mod) {
+  const candidates = [];
+  const tryPush = (val) => {
+    if (!val) return;
+    if (Array.isArray(val)) {
+      candidates.push(val);
+    } else if (typeof val === 'object') {
+      const vals = Object.values(val);
+      if (vals.length && typeof vals[0] === 'object') candidates.push(vals);
+    }
+  };
+
+  tryPush(mod?.default);
+  tryPush(mod?.countries);
+  tryPush(mod?.COUNTRIES);
+  tryPush(mod);
+  Object.values(mod || {}).forEach(tryPush);
+
+  const arr = candidates.sort((a, b) => b.length - a.length)[0] || [];
+  return Array.isArray(arr) ? arr : [];
+}
+
+function buildIsoFallbackList() {
+  let regionNames = null;
+  try {
+    if (typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function') {
+      regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+    }
+  } catch {
+    regionNames = null;
+  }
+
+  const CODES = [
+    'AF','AL','DZ','AD','AO','AG','AR','AM','AU','AT','AZ','BS','BH','BD','BB','BY','BE','BZ','BJ','BT','BO','BA','BW','BR','BN','BG','BF','BI',
+    'KH','CM','CA','CV','CF','TD','CL','CN','CO','KM','CG','CD','CK','CR','CI','HR','CU','CY','CZ','DK','DJ','DM','DO','EC','EG','SV','GQ','ER','EE','ET',
+    'FJ','FI','FR','GA','GM','GE','DE','GH','GR','GD','GT','GN','GW','GY','HT','HN','HU','IS','IN','ID','IR','IQ','IE','IL','IT','JM','JP','JO','KZ',
+    'KE','KI','KP','KR','KW','KG','LA','LV','LB','LS','LR','LY','LI','LT','LU','MG','MW','MY','MV','ML','MT','MH','MR','MU','MX','FM','MD','MC','MN',
+    'ME','MA','MZ','MM','NA','NR','NP','NL','NZ','NI','NE','NG','NO','OM','PK','PW','PS','PA','PG','PY','PE','PH','PL','PT','QA','RO','RU','RW',
+    'KN','LC','VC','WS','SM','ST','SA','SN','RS','SC','SL','SG','SK','SI','SB','SO','ZA','SS','ES','LK','SD','SR','SE','CH','SY','TW','TJ','TZ',
+    'TH','TL','TG','TK','TO','TT','TN','TR','TM','TV','UG','UA','AE','GB','US','UY','UZ','VU','VE','VN','YE','ZM','ZW'
+  ];
+
+  return CODES.map(code => ({
+    name: regionNames ? (regionNames.of(code) || code) : code,
+    code
+  }));
+}
+
+function normalizeCountry(c) {
+  const name = c?.name?.common ?? c?.name?.official ?? c?.name ?? c?.commonName ?? c?.official ?? c?.country ?? c?.Country ?? c?.name_en ?? '';
+  const code = (c?.alpha2 ?? c?.alpha_2 ?? c?.code ?? c?.iso2 ?? c?.['alpha-2'] ?? c?.iso ?? c?.cca2 ?? '').toString().toUpperCase();
+  return { name, code };
+}
+
+// Moods processing
+function extractMoodsFromModule(mod) {
+  const candidates = [];
+  const tryPush = (val) => {
+    if (!val) return;
+    if (Array.isArray(val)) candidates.push(val);
+    else if (typeof val === 'object') {
+      const vals = Object.values(val);
+      if (vals.length && typeof vals[0] === 'object') candidates.push(vals);
+    }
+  };
+  tryPush(mod?.default);
+  tryPush(mod?.moods);
+  tryPush(mod);
+  Object.values(mod || {}).forEach(tryPush);
+  const arr = candidates.sort((a,b)=>b.length-a.length)[0] || [];
+  return Array.isArray(arr) ? arr : [];
+}
+
+function normalizeMood(m) {
+  const id = (m?.id || m?.ID || m?.name || '').toString().trim().toUpperCase();
+  const group = (m?.group || m?.category || 'Emotion').toString();
+  const synonyms = Array.isArray(m?.synonyms) ? m.synonyms : [];
+  return id ? { id, group, synonyms } : null;
+}
+
 // Then process the extracted data
 const rawCountries = extractCountriesFromModule(countriesModule);
 const normalized = rawCountries.map(normalizeCountry).filter(x => x.name && /^[A-Z]{2}$/.test(x.code));
@@ -28,6 +128,100 @@ const COUNTRIES_LIST = countries.length ? countries : (normalized.length ? norma
 
 const rawMoods = extractMoodsFromModule(moodsModule).map(normalizeMood).filter(Boolean);
 const MOODS_TAXONOMY = moods.length ? moods : MOODS_FALLBACK;
+
+const QUICK_SCHEMA = Joi.object({
+  location: Joi.object({
+    city: Joi.string().allow('', null),
+    country: Joi.string().allow('', null),
+    country_code: Joi.string().length(2).uppercase().allow('', null),
+    latitude: Joi.number().optional(),
+    longitude: Joi.number().optional()
+  }).default({}),
+  dietary: Joi.array().items(Joi.string().lowercase()).default([])
+});
+
+const GLOBAL_POOL = [
+  { name: "Grilled Chicken Wrap", emoji: "🌯", explanation: "Quick protein, balanced, travel-friendly" },
+  { name: "Veggie Stir Fry", emoji: "🥦", explanation: "Light, healthy, plant-forward" },
+  { name: "Margherita Pizza", emoji: "🍕", explanation: "Comfort carb + cheese, easy crowd pleaser" },
+  { name: "Falafel Bowl", emoji: "🥗", explanation: "Crispy, filling, vegetarian protein" },
+  { name: "Chicken Biryani", emoji: "🍛", explanation: "Aromatic rice + protein, satisfying" },
+  { name: "Sushi Bento", emoji: "🍣", explanation: "Clean flavors, balanced macros" }
+];
+
+const COUNTRY_POOLS = {
+  GB: [
+    { name: "Fish & Chips", emoji: "🍟", explanation: "Classic British comfort, crispy & filling" },
+    { name: "Chicken Tikka", emoji: "🍛", explanation: "UK favourite curry, bold and warming" },
+    { name: "Jacket Potato", emoji: "🥔", explanation: "Cozy carb base with flexible toppings" }
+  ],
+  US: [
+    { name: "Smash Burger", emoji: "🍔", explanation: "Hearty, fast, crowd-pleasing classic" },
+    { name: "Burrito Bowl", emoji: "🥙", explanation: "Protein + grains, easy to customize" },
+    { name: "Chicken Caesar", emoji: "🥗", explanation: "Crunchy greens with savory bite" }
+  ],
+  KE: [
+    { name: "Ugali + Sukuma", emoji: "🍽️", explanation: "Staple comfort: maize meal with greens" },
+    { name: "Nyama Choma", emoji: "🥩", explanation: "Char-grilled meat, weekend favorite" },
+    { name: "Pilau", emoji: "🍚", explanation: "Spiced rice, aromatic and satisfying" }
+  ],
+  JP: [
+    { name: "Tonkotsu Ramen", emoji: "🍜", explanation: "Rich broth, cozy noodle comfort" },
+    { name: "Chicken Katsu", emoji: "🍱", explanation: "Crispy cutlet, simple and satisfying" },
+    { name: "Salmon Nigiri", emoji: "🍣", explanation: "Clean flavors, light but filling" }
+  ],
+  IN: [
+    { name: "Butter Chicken", emoji: "🍛", explanation: "Creamy curry, rich and comforting" },
+    { name: "Masala Dosa", emoji: "🥞", explanation: "Crispy crepe with spiced potato filling" },
+    { name: "Biryani", emoji: "🍚", explanation: "Fragrant rice with tender meat/vegetables" }
+  ],
+  FR: [
+    { name: "Croque Monsieur", emoji: "🥪", explanation: "Grilled ham & cheese, French comfort" },
+    { name: "Ratatouille", emoji: "🍆", explanation: "Rustic vegetable stew, wholesome" },
+    { name: "Coq au Vin", emoji: "🍗", explanation: "Wine-braised chicken, classic bistro" }
+  ]
+};
+
+const EVENTS_SCHEMA = Joi.object({
+  city: Joi.string().default('London'),
+  country_code: Joi.string().length(2).uppercase().default('GB'),
+  category: Joi.string().valid('all','food','music','market','culture','nightlife').default('all'),
+  time: Joi.string().valid('today','tomorrow','weekend','this_week').default('today')
+});
+
+const ITIN_SCHEMA = Joi.object({
+  location: Joi.object({
+    city: Joi.string().default('London'),
+    country_code: Joi.string().length(2).uppercase().required()
+  }).required(),
+  duration: Joi.string().valid('one_day','two_days','weekend','quick','half-day','full-day').default('one_day'),
+  interests: Joi.array().items(Joi.string()).default(['food','culture']),
+  budget: Joi.string().valid('budget','medium','premium','luxury').default('medium')
+});
+
+function pickCountryPool(cc) {
+  const code = (cc || '').toUpperCase();
+  return COUNTRY_POOLS[code] && COUNTRY_POOLS[code].length ? COUNTRY_POOLS[code] : GLOBAL_POOL;
+}
+
+// ✅ robust country finder (uses export if available else normalized list)
+function findCountryByCode(cc) {
+  if (!cc) return null;
+  const code = cc.toUpperCase();
+  const fromExport = SUPPORTED_COUNTRIES?.countries?.find?.(c => c.country_code === code);
+  if (fromExport) return fromExport;
+  return COUNTRIES_LIST.find(c => (c.country_code || c.code) === code) || null;
+}
+
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 // Add this function after your existing helper functions, before app.post routes
 function validateDietaryCompliance(foodName, dietaryRestrictions) {
   const restrictions = {
@@ -35,7 +229,8 @@ function validateDietaryCompliance(foodName, dietaryRestrictions) {
     'vegetarian': ['meat', 'fish', 'chicken', 'beef', 'pork', 'bacon'],
     'gluten-free': ['bread', 'pasta', 'wheat', 'flour', 'gluten'],
     'halal': ['pork', 'bacon', 'ham', 'alcohol'],
-    'dairy-free': ['milk', 'cheese', 'cream', 'butter', 'yogurt']
+    'dairy-free': ['milk', 'cheese', 'cream', 'butter', 'yogurt'],
+    'nut-free': ['nut','nuts','peanut','peanuts','almond','almonds','cashew','cashews','walnut','walnuts','hazelnut','hazelnuts','pistachio','pistachios','pecan','pecans']
   };
   
   for (const diet of dietaryRestrictions) {
@@ -48,6 +243,7 @@ function validateDietaryCompliance(foodName, dietaryRestrictions) {
   }
   return true;
 }
+
 // GPT helper function
 async function gptChatJSON({ system, user, max_tokens = 900 }) {
   if (!USE_GPT || !OPENAI_API_KEY) return null;
@@ -111,98 +307,7 @@ function getGlobalFoodExamples(countryCode = '') {
 - Special: Celebration/regional signature dishes`;
 }
 
-// Countries processing
-function extractCountriesFromModule(mod) {
-  const candidates = [];
-  const tryPush = (val) => {
-    if (!val) return;
-    if (Array.isArray(val)) {
-      candidates.push(val);
-    } else if (typeof val === 'object') {
-      const vals = Object.values(val);
-      if (vals.length && typeof vals[0] === 'object') candidates.push(vals);
-    }
-  };
-
-  tryPush(mod?.default);
-  tryPush(mod?.countries);
-  tryPush(mod?.COUNTRIES);
-  tryPush(mod);
-  Object.values(mod || {}).forEach(tryPush);
-
-  const arr = candidates.sort((a, b) => b.length - a.length)[0] || [];
-  return Array.isArray(arr) ? arr : [];
-}
-
-function buildIsoFallbackList() {
-  let regionNames = null;
-  try {
-    if (typeof Intl !== 'undefined' && typeof Intl.DisplayNames === 'function') {
-      regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
-    }
-  } catch {
-    regionNames = null;
-  }
-
-  const CODES = [
-    'AF','AL','DZ','AD','AO','AG','AR','AM','AU','AT','AZ','BS','BH','BD','BB','BY','BE','BZ','BJ','BT','BO','BA','BW','BR','BN','BG','BF','BI',
-    'KH','CM','CA','CV','CF','TD','CL','CN','CO','KM','CG','CD','CK','CR','CI','HR','CU','CY','CZ','DK','DJ','DM','DO','EC','EG','SV','GQ','ER','EE','ET',
-    'FJ','FI','FR','GA','GM','GE','DE','GH','GR','GD','GT','GN','GW','GY','HT','HN','HU','IS','IN','ID','IR','IQ','IE','IL','IT','JM','JP','JO','KZ',
-    'KE','KI','KP','KR','KW','KG','LA','LV','LB','LS','LR','LY','LI','LT','LU','MG','MW','MY','MV','ML','MT','MH','MR','MU','MX','FM','MD','MC','MN',
-    'ME','MA','MZ','MM','NA','NR','NP','NL','NZ','NI','NE','NG','NO','OM','PK','PW','PS','PA','PG','PY','PE','PH','PL','PT','QA','RO','RU','RW',
-    'KN','LC','VC','WS','SM','ST','SA','SN','RS','SC','SL','SG','SK','SI','SB','SO','ZA','SS','ES','LK','SD','SR','SE','CH','SY','TW','TJ','TZ',
-    'TH','TL','TG','TK','TO','TT','TN','TR','TM','TV','UG','UA','AE','GB','US','UY','UZ','VU','VE','VN','YE','ZM','ZW'
-  ];
-
-  return CODES.map(code => ({
-    name: regionNames ? (regionNames.of(code) || code) : code,
-    code
-  }));
-}
-
-function normalizeCountry(c) {
-  const name = c?.name?.common ?? c?.name?.official ?? c?.name ?? c?.commonName ?? c?.official ?? c?.country ?? c?.Country ?? c?.name_en ?? '';
-  const code = (c?.alpha2 ?? c?.alpha_2 ?? c?.code ?? c?.iso2 ?? c?.['alpha-2'] ?? c?.iso ?? c?.cca2 ?? '').toString().toUpperCase();
-  return { name, code };
-}
-
-function extractMoodsFromModule(mod) {
-  const candidates = [];
-  const tryPush = (val) => {
-    if (!val) return;
-    if (Array.isArray(val)) candidates.push(val);
-    else if (typeof val === 'object') {
-      const vals = Object.values(val);
-      if (vals.length && typeof vals[0] === 'object') candidates.push(vals);
-    }
-  };
-  tryPush(mod?.default);
-  tryPush(mod?.moods);
-  tryPush(mod);
-  Object.values(mod || {}).forEach(tryPush);
-  const arr = candidates.sort((a,b)=>b.length-a.length)[0] || [];
-  return Array.isArray(arr) ? arr : [];
-}
-
-function normalizeMood(m) {
-  const id = (m?.id || m?.ID || m?.name || '').toString().trim().toUpperCase();
-  const group = (m?.group || m?.category || 'Emotion').toString();
-  const synonyms = Array.isArray(m?.synonyms) ? m.synonyms : [];
-  return id ? { id, group, synonyms } : null;
-}
-
-const MOODS_FALLBACK = [
-  { id: 'TIRED', group: 'Energy', synonyms: ['exhausted','sleepy','low energy','fatigued'] },
-  { id: 'STRESSED', group: 'Emotion', synonyms: ['anxious','tense','overwhelmed','deadline'] },
-  { id: 'CELEBRATING', group: 'Social', synonyms: ['party','treat','reward','birthday','win'] },
-  { id: 'HUNGRY', group: 'Body', synonyms: ['starving','very hungry','need food fast'] },
-  { id: 'POST_WORKOUT', group: 'Body', synonyms: ['gym','post workout','protein','recovery'] },
-  { id: 'SICK', group: 'Body', synonyms: ['flu','cold','under the weather','sore throat'] },
-  { id: 'FOCUSED', group: 'Intent', synonyms: ['work mode','deep work','productive'] },
-  { id: 'RELAX', group: 'Emotion', synonyms: ['cozy','chill','comforting','calm'] },
-  { id: 'ADVENTUROUS', group: 'Intent', synonyms: ['spicy','new cuisine','explore','try something new'] },
-];
-
+// Mood detection
 function detectMoodIds(mood_text) {
   if (!mood_text) return [];
   const t = mood_text.toLowerCase();
@@ -221,6 +326,7 @@ const app = express();
 
 // Middleware
 app.set('trust proxy', 1);
+
 app.use(cors({
   origin: [
     'http://localhost:5168',
@@ -237,17 +343,7 @@ app.use(cors({
   ],
   credentials: true
 }));
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-  
-  next();
-});
+// Let the CORS middleware handle preflight/headers (no manual ACAO="*")
 
 app.use(helmet({
   contentSecurityPolicy: {
@@ -257,7 +353,15 @@ app.use(helmet({
       scriptSrcAttr: ["'unsafe-inline'"],
       styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
       fontSrc: ["'self'", "fonts.gstatic.com"],
-      connectSrc: ["'self'", "api.openai.com", "api.openweathermap.org", "localhost:*"],
+      connectSrc: [
+        "'self'",
+        "api.openai.com",
+        "api.openweathermap.org",
+        "localhost:*",
+        "https://*.vercel.app",
+        "https://*.onrender.com",
+        "https://vfied-v3.onrender.com"
+      ],
       imgSrc: ["'self'", "data:", "blob:"]
     }
   }
@@ -402,23 +506,59 @@ app.get('/health', (_req, res) => {
     timestamp: new Date().toISOString()
   });
 });
+
 // Add this endpoint to your server/mcp-server.js
 app.post('/v1/quick_decision', async (req, res) => {
-  const { location = {}, dietary = [] } = req.body || {};
-  const request_id = `quick_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+  const t0 = Date.now();
+  try {
+    const { value, error } = QUICK_SCHEMA.validate(req.body || {});
+    if (error) return res.status(400).json({ success: false, error: error.message });
 
-  // Fast fallback without GPT
-  const pick = fallbackSuggestion(location, dietary);
-  
-  res.json({
-    success: true,
-    request_id,
-    decision: pick.name,
-    country_code: (location.country_code || 'GB').toUpperCase(),
-    explanation: `Quick local choice for ${location.city || 'your area'}`,
-    dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null,
-    processingTimeMs: 50 // Always fast
-  });
+    const { location, dietary } = value;
+    const cc = (location?.country_code || location?.countryCode || '').toUpperCase();
+    const country = findCountryByCode(cc);
+
+    // Build pool from country fallbacks + global
+    let countryDishes = country?.dishes || [];
+    let pool = [...countryDishes, ...GLOBAL_POOL];
+
+    // Dietary filter
+    const filtered = pool.filter(item => {
+      try { 
+        return validateDietaryCompliance ? validateDietaryCompliance(item.name, dietary) : true;
+      } catch { 
+        return true; 
+      }
+    });
+
+    // Take 3, with guaranteed top-up
+    let shortlist = shuffle(filtered).slice(0, 3);
+    if (shortlist.length < 3) {
+      const topUp = shuffle(GLOBAL_POOL).filter(i => !shortlist.find(s => s.name === i.name));
+      shortlist = [...shortlist, ...topUp].slice(0, 3);
+    }
+
+    return res.json({
+      success: true,
+      request_id: randomUUID?.() || String(Date.now()),
+      decisions: shortlist,
+      location: {
+        city: location?.city || 'Unknown',
+        country_code: cc || 'GB'
+      },
+      processingTimeMs: Date.now() - t0
+    });
+  } catch (e) {
+    console.error('Quick decision error:', e);
+    const safe = shuffle(GLOBAL_POOL).slice(0, 3);
+    return res.status(200).json({
+      success: true,
+      request_id: randomUUID?.() || String(Date.now()),
+      decisions: safe,
+      note: 'fallback',
+      processingTimeMs: Date.now() - t0
+    });
+  }
 });
 
 
@@ -512,8 +652,9 @@ app.post('/v1/recommend', async (req, res) => {
     });
   }
 
-  // ✅ FIXED: Proper fallback when GPT fails
+  // ✅ FIXED: Proper fallback when GPT fails WITH dietary check
   const pick = fallbackSuggestion(location, dietary);
+  const compliant = validateDietaryCompliance(pick.name, dietary);
   const resolved_moods = detectMoodIds(mood_text);
 
   return res.json({
@@ -551,11 +692,11 @@ app.post('/v1/recommend', async (req, res) => {
     distance: `${(Math.random() * 2 + 0.5).toFixed(1)} mi`,
     coverage_level: 'medium',
     dietaryCompliance: { 
-      compliant: true, 
-      warnings: [],
-      alternatives: [],
-      confidence: 75,
-      source: 'fallback'
+      compliant, 
+      warnings: compliant ? [] : [`${pick.name} may violate: ${dietary.join(', ')}`],
+      alternatives: compliant ? [] : ['Ask for modifications', 'Choose a vegetarian/vegan option'],
+      confidence: compliant ? 80 : 60,
+      source: 'rule_based'
     },
     weather,
     interactionId: `ix_${Date.now().toString(36)}`,
@@ -598,6 +739,7 @@ async function gptTravelPlan({ city, country_code, prompt }) {
   if (!Array.isArray(out.tips)) out.tips = [];
   return out;
 }
+
 app.post('/mcp/validate_dietary_compliance', async (req, res) => {
   const { foodName, dietary } = req.body;
   
@@ -627,6 +769,7 @@ app.post('/mcp/validate_dietary_compliance', async (req, res) => {
     source: 'rule_based'
   });
 });
+
 // ✅ Night plan endpoint - MATCHES OpenAPI NightPlanResponse
 app.post('/v1/travel/nightplan', async (req, res) => {
   const { location = {}, prompt, mode = 'exploring', budget = 'medium', duration = 'full-day', dietary = [] } = req.body || {};
@@ -856,74 +999,64 @@ Return STRICT JSON:
 });
 
 // ✅ Itinerary endpoint - MATCHES OpenAPI ItineraryResponse
+function buildConciseItinerary(city, country_code) {
+  const country = findCountryByCode(country_code);
+  const spots = country?.travel_spots || [];
+  const picks = shuffle(spots).slice(0, 3);
+
+  // If no country data, use generic placeholders
+  const safe = picks.length ? picks : [
+    { name: "Local Breakfast Café", emoji: "🥐", reason: "Cozy start with pastry & coffee" },
+    { name: "Market Lunch", emoji: "🍲", reason: "Authentic comfort food in center" },
+    { name: "Wine/Tapas Bar", emoji: "🍷", reason: "Relaxed evening small plates" }
+  ];
+
+  // Map into simple steps with times
+  return safe.map((s, idx) => ({
+    time: idx === 0 ? "09:00" : idx === 1 ? "13:00" : "19:00",
+    title: s.name,
+    why: s.reason,
+    emoji: s.emoji,
+    neighborhood: city,
+    tags: ["food", "local"]
+  }));
+}
+
 app.post('/v1/travel/itinerary', async (req, res) => {
-  const { location = {}, duration = 'one_day', interests = ['food','culture'], budget = 'medium' } = req.body || {};
-  const city = location?.city || 'London';
-  const cc = (location?.country_code || 'GB').toUpperCase();
+  const t0 = Date.now();
+  try {
+    const { value, error } = ITIN_SCHEMA.validate(req.body || {});
+    if (error) return res.status(400).json({ success: false, error: error.message });
 
-  // Try GPT
-  if (USE_GPT && OPENAI_API_KEY) {
-    const system = `You are VFIED's city planner. Build a ${duration} food + culture itinerary in ${city}.
-Return STRICT JSON:
-{
-  "success": true,
-  "city": "${city}",
-  "country_code": "${cc}",
-  "duration": "${duration}",
-  "steps": [
-    { "time":"09:00", "title":"Breakfast at...", "why":"reason", "link":"", "neighborhood":"", "tags":["food"] }
-  ],
-  "budget": "${budget}",
-  "interests": ${JSON.stringify(interests)}
-}`;
-    const user = `Plan a ${duration} day in ${city}, ${cc}, budget=${budget}, interests=${interests.join(',')}. Avoid tourist traps; prioritize authentic places and walkable clusters.`;
-    const result = await gptChatJSON({ system, user, max_tokens: 1100 });
-    if (result) return res.json(result);
+    const { location, duration, budget, interests } = value;
+    const steps = buildConciseItinerary(location.city, location.country_code);
+
+    return res.json({
+      success: true,
+      city: location.city,
+      country_code: location.country_code,
+      duration,
+      steps,
+      budget,
+      interests,
+      processingTimeMs: Date.now() - t0
+    });
+  } catch (e) {
+    console.error('Itinerary error:', e);
+    const fallbackSteps = buildConciseItinerary('City', 'GB');
+    
+    return res.status(200).json({
+      success: true,
+      city: req.body?.location?.city || 'City',
+      country_code: (req.body?.location?.country_code || 'GB').toUpperCase(),
+      duration: 'one_day',
+      steps: fallbackSteps,
+      budget: 'medium',
+      interests: ['food', 'culture'],
+      note: 'fallback',
+      processingTimeMs: Date.now() - t0
+    });
   }
-
-  // Fallback
-  res.json({
-    success: true,
-    city,
-    country_code: cc,
-    duration,
-    steps: [
-      { 
-        time: '09:00', 
-        title: 'Local breakfast spot', 
-        why: 'Start authentic with local morning rituals', 
-        link: `https://www.google.com/search?q=${encodeURIComponent(city + ' local breakfast')}`, 
-        neighborhood: 'Market district', 
-        tags: ['food'] 
-      },
-      { 
-        time: '12:30', 
-        title: 'Street food lunch', 
-        why: 'Busy vendors = fresh and authentic', 
-        link: `https://www.google.com/search?q=${encodeURIComponent(city + ' street food')}`, 
-        neighborhood: 'Old town', 
-        tags: ['food','street'] 
-      },
-      { 
-        time: '15:00', 
-        title: 'Cultural stop', 
-        why: 'Digest while learning local history', 
-        link: `https://www.google.com/search?q=${encodeURIComponent(city + ' cultural sites')}`, 
-        neighborhood: 'Historic center', 
-        tags: ['culture'] 
-      },
-      { 
-        time: '19:00', 
-        title: 'Neighborhood dinner', 
-        why: 'Where locals eat their signature dishes', 
-        link: `https://www.google.com/search?q=${encodeURIComponent(city + ' local restaurant')}`, 
-        neighborhood: 'Residential area', 
-        tags: ['food'] 
-      }
-    ],
-    budget,
-    interests
-  });
 });
 
 // ✅ NEW: Travel coach endpoint - MATCHES OpenAPI TravelCoachResponse
@@ -999,72 +1132,208 @@ Give specific, local recommendations with neighborhoods and exact places when po
 
 // ===== EVENTS ENDPOINT =====
 
-// Sample events helper
-function sampleEventsFor(city = '', cc = 'GB') {
-  const C = (cc || 'GB').toUpperCase();
-  const cityName = city || (C === 'KE' ? 'Nairobi' : C === 'JP' ? 'Tokyo' : C === 'US' ? 'New York' : 'London');
-  return [
+const EVENT_POOLS = {
+  GB: [
     { 
-      id: 'e1', 
-      title: 'Street Food Festival', 
-      city: cityName, 
-      country_code: C, 
-      when: 'Tonight 6-11pm', 
-      tag: 'food',
-      description: 'Local vendors showcase signature dishes from around the world',
-      location: 'City Center Square',
-      price: 'Free entry',
-      link: `https://www.google.com/search?q=${encodeURIComponent(cityName + ' food festival')}`
+      title: "Borough Market Food Walk", 
+      emoji: "🥧", 
+      time: "Saturday 10am-2pm",
+      explanation: "Historic food market with artisan producers and tastings",
+      food_pairing: "Try the famous bacon sandwich and craft cheeses"
     },
     { 
-      id: 'e2', 
-      title: 'Jazz & Wine Evening', 
-      city: cityName, 
-      country_code: C, 
-      when: 'Tomorrow 8pm', 
-      tag: 'music',
-      description: 'Perfect pairing of smooth jazz and local wine selections',
-      location: 'Riverside Music Hall',
-      price: '$15-25',
-      link: `https://www.google.com/search?q=${encodeURIComponent(cityName + ' jazz wine')}`
+      title: "Pub Quiz & Fish n Chips", 
+      emoji: "🍺", 
+      time: "Wednesday 7pm",
+      explanation: "Classic British pub culture with traditional comfort food",
+      food_pairing: "Perfect with a pint and mushy peas"
     },
     { 
-      id: 'e3', 
-      title: 'Farmers Market', 
-      city: cityName, 
-      country_code: C, 
-      when: 'Saturday 8am-2pm', 
-      tag: 'market',
-      description: 'Fresh produce and artisanal foods direct from local farms',
-      location: 'Town Square',
-      price: 'Free browsing',
-      link: `https://www.google.com/search?q=${encodeURIComponent(cityName + ' farmers market')}`
+      title: "Afternoon Tea Experience", 
+      emoji: "🫖", 
+      time: "Daily 2-5pm",
+      explanation: "Traditional British teatime with scones and sandwiches",
+      food_pairing: "Cucumber sandwiches and clotted cream scones"
+    }
+  ],
+  US: [
+    { 
+      title: "Food Truck Festival", 
+      emoji: "🚚", 
+      time: "Weekend 11am-8pm",
+      explanation: "Mobile kitchens serving diverse street food",
+      food_pairing: "Gourmet burgers, tacos, and fusion cuisine"
     },
-  ];
+    { 
+      title: "BBQ & Blues Night", 
+      emoji: "🎵", 
+      time: "Friday 6pm-11pm",
+      explanation: "Live music paired with smoky barbecue classics",
+      food_pairing: "Pulled pork, ribs, and cornbread"
+    },
+    { 
+      title: "Farmers Market Brunch", 
+      emoji: "🥕", 
+      time: "Saturday 9am-2pm",
+      explanation: "Fresh local produce and artisanal breakfast items",
+      food_pairing: "Farm-fresh eggs and seasonal fruit"
+    }
+  ],
+  KE: [
+    { 
+      title: "Nyama Choma Festival", 
+      emoji: "🔥", 
+      time: "Sunday 2pm-8pm",
+      explanation: "Traditional barbecue gathering with grilled meats",
+      food_pairing: "Goat meat, beef, and ugali with kachumbari"
+    },
+    { 
+      title: "Cultural Food Fair", 
+      emoji: "🎪", 
+      time: "Saturday 10am-6pm",
+      explanation: "Celebrating Kenyan diverse culinary heritage",
+      food_pairing: "Pilau, samosas, and mandazi"
+    },
+    { 
+      title: "Coffee Farm Tour", 
+      emoji: "☕", 
+      time: "Daily 8am-4pm",
+      explanation: "Learn about Kenya's famous coffee production",
+      food_pairing: "Fresh roasted coffee with sweet pastries"
+    }
+  ],
+  JP: [
+    { 
+      title: "Ramen Festival", 
+      emoji: "🍜", 
+      time: "Weekend 11am-9pm",
+      explanation: "Multiple ramen shops showcase their signature bowls",
+      food_pairing: "Tonkotsu, miso, and shoyu ramen varieties"
+    },
+    { 
+      title: "Sushi Making Workshop", 
+      emoji: "🍣", 
+      time: "Saturday 2pm-5pm",
+      explanation: "Learn traditional sushi preparation from master chefs",
+      food_pairing: "Fresh nigiri and maki rolls"
+    },
+    { 
+      title: "Cherry Blossom Picnic", 
+      emoji: "🌸", 
+      time: "Spring weekends",
+      explanation: "Traditional hanami with seasonal foods",
+      food_pairing: "Bento boxes and sakura mochi"
+    }
+  ],
+  IN: [
+    { 
+      title: "Street Food Walk", 
+      emoji: "🌶️", 
+      time: "Evening 5pm-9pm",
+      explanation: "Guided tour through local street food vendors",
+      food_pairing: "Chaat, dosa, and spicy snacks"
+    },
+    { 
+      title: "Spice Market Tour", 
+      emoji: "🧄", 
+      time: "Morning 9am-12pm",
+      explanation: "Explore aromatic spice markets with tastings",
+      food_pairing: "Fresh curries and traditional sweets"
+    },
+    { 
+      title: "Cooking Class & Dinner", 
+      emoji: "🍛", 
+      time: "Saturday 4pm-8pm",
+      explanation: "Learn to cook regional specialties",
+      food_pairing: "Biryani, dal, and homemade naan"
+    }
+  ]
+};
+
+const GLOBAL_EVENTS = [
+  { 
+    title: "International Food Festival", 
+    emoji: "🌍", 
+    time: "Weekend all day",
+    explanation: "Global cuisine from local immigrant communities",
+    food_pairing: "Diverse dishes from around the world"
+  },
+  { 
+    title: "Wine & Cheese Tasting", 
+    emoji: "🍷", 
+    time: "Friday 6pm-9pm",
+    explanation: "Curated pairings with local sommelier guidance",
+    food_pairing: "Artisanal cheeses and charcuterie"
+  },
+  { 
+    title: "Pop-up Restaurant Night", 
+    emoji: "⭐", 
+    time: "Monthly events",
+    explanation: "Rotating chefs create unique dining experiences",
+    food_pairing: "Chef's surprise tasting menu"
+  }
+];
+
+function getEventPool(countryCode) {
+  const code = (countryCode || '').toUpperCase();
+  return EVENT_POOLS[code] && EVENT_POOLS[code].length ? EVENT_POOLS[code] : GLOBAL_EVENTS;
 }
 
 // ✅ Events endpoint - MATCHES OpenAPI EventsResponse
 app.get('/v1/events', async (req, res) => {
-  const city = String(req.query.city || '');
-  const cc = String(req.query.country_code || 'GB').toUpperCase();
-  const category = String(req.query.category || 'all');
-  const time = String(req.query.time || 'today');
+  const t0 = Date.now();
+  try {
+    const { value, error } = EVENTS_SCHEMA.validate(req.query || {});
+    if (error) return res.status(400).json({ success: false, error: error.message });
 
-  // In production, you'd query a real events API here
-  let events = sampleEventsFor(city, cc);
+    const { city, country_code, category, time } = value;
+    const country = findCountryByCode(country_code);
+    
+    // Prefer embedded country events; else curated pool; else global pool
+    const pool = (country?.events && country.events.length) ? country.events : getEventPool(country_code);
+    const events = pool.slice(0, 6).map((e, idx) => ({
+      id: `${country_code}-${idx + 1}`,
+      title: e.title,
+      city,
+      country_code,
+      when: time === 'today' ? 'Tonight'
+           : time === 'tomorrow' ? 'Tomorrow evening'
+           : time === 'this_week' ? 'This week'
+           : 'This weekend',
+      tag: 'food',
+      description: e.explanation || e.description || '',
+      location: `${city} area`,
+      price: e.price || 'Varies',
+      link: `https://www.google.com/search?q=${encodeURIComponent((e.title || 'food event') + ' ' + city)}`
+    }));
 
-  // Filter by category
-  if (category !== 'all') {
-    events = events.filter(event => event.tag === category);
+    return res.json({ 
+      success: true, 
+      events: events.slice(0, 3),
+      processingTimeMs: Date.now() - t0
+    });
+  } catch (e) {
+    console.error('Events error:', e);
+    return res.status(200).json({
+      success: true,
+      events: [
+        { 
+          id: 'global-1', 
+          title: 'Food Truck Night', 
+          city: req.query.city || 'City', 
+          country_code: (req.query.country_code || 'GB').toUpperCase(), 
+          when: 'Tonight', 
+          tag: 'food', 
+          description: 'Casual street eats and community vibes', 
+          location: 'City center', 
+          price: 'Budget-friendly',
+          link: ''
+        }
+      ],
+      note: 'fallback',
+      processingTimeMs: Date.now() - t0
+    });
   }
-
-  // Filter by time (basic implementation)
-  // In production, you'd filter by actual dates
-  
-  res.json({
-    success: true,
-    events
-  });
 });
 
 // ===== DATA QUALITY ENDPOINTS =====
@@ -1180,7 +1449,7 @@ app.post('/v1/feedback', (req, res) => {
   // Mock response times for different issue types
   let message = 'Thank you for your feedback!';
   if (type === 'incorrect_info') {
-    message = 'Thank you for the report! We\'ll investigate and update our data within 24 hours.';
+    message = 'Thank you for the report! We\'ll investigate and update within 24 hours.';
   } else if (type === 'closed_restaurant') {
     message = 'Thanks for letting us know! We\'ll verify and update within 2-4 hours.';
   }
@@ -1231,6 +1500,7 @@ app.post('/mcp/get_food_suggestion', async (req, res) => {
     dietaryNote: dietary.length ? `Filtered for: ${dietary.join(', ')}` : null
   });
 });
+
 // Add after your existing endpoints, before the error handler
 app.post('/v1/analytics/track', (req, res) => {
   const { event, data } = req.body;
@@ -1245,6 +1515,7 @@ app.post('/v1/analytics/track', (req, res) => {
   
   res.json({ success: true });
 });
+
 app.post('/mcp/get_cultural_food_context', async (req, res) => {
   const { location, dietary = [] } = req.body;
   const cc = (location?.country_code || 'GB').toUpperCase();
@@ -1268,6 +1539,7 @@ app.post('/mcp/get_cultural_food_context', async (req, res) => {
     location: `${city}, ${location?.country || 'Unknown'}`
   });
 });
+
 // Error handler
 app.use((err, _req, res, _next) => {
   console.error('Server error:', err);
@@ -1284,3 +1556,6 @@ app.listen(PORT, () => {
   console.log(`📖 OpenAPI docs available at http://localhost:${PORT}/openapi.json`);
   console.log(`🔧 Features: ${USE_GPT ? '✅ GPT' : '❌ GPT'} | ${process.env.OPENWEATHER_API_KEY ? '✅ Weather' : '❌ Weather'}`);
 });
+
+// (Optional) export for testing
+// export default app;
