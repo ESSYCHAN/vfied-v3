@@ -629,54 +629,16 @@
       }
 
       // FIXED: Better request management
-      async makeAPIRequest(url, options = {}, requestKey = null) {
-        // Generate unique request key if not provided
-        const key = requestKey || `req_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
-        
-        // Cancel any existing request with this key
-        if (this.activeRequests.has(key)) {
-          this.activeRequests.get(key).abort();
-        }
-        
-        // Clear any existing timeout
-        if (this.requestTimeouts.has(key)) {
-          clearTimeout(this.requestTimeouts.get(key));
-        }
-        
-        // Create abort controller for this request
-        const controller = new AbortController();
-        this.activeRequests.set(key, controller);
-        
-        // Set a longer timeout (30 seconds instead of 10)
-        // const timeoutId = setTimeout(() => {
-        //   controller.abort();
-        //   this.activeRequests.delete(key);
-        //   this.requestTimeouts.delete(key);
-        // }, 30000);
-        const timeoutId = setTimeout(() => controller.abort(), 5000); 
-        this.requestTimeouts.set(key, timeoutId);
-        
-        try {
-          const response = await fetch(url, {
-            ...options,
-            signal: controller.signal
-          });
-          
-          // Clean up on success
-          clearTimeout(timeoutId);
-          this.activeRequests.delete(key);
-          this.requestTimeouts.delete(key);
-          
-          return response;
-        } catch (error) {
-          // Clean up on error
-          clearTimeout(timeoutId);
-          this.activeRequests.delete(key);
-          this.requestTimeouts.delete(key);
-          
-          throw error;
-        }
-      }
+      async makeAPIRequest(url, options = {}) {
+  const response = await fetch(`${this.API_BASE}${url}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+  return response;
+}
 
       // FIXED: Cancel operation method
       cancelCurrentOperation() {

@@ -249,7 +249,19 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
+      fontSrc: ["'self'", "fonts.gstatic.com"],
+      connectSrc: ["'self'", "api.openai.com", "api.openweathermap.org", "localhost:*"],
+      imgSrc: ["'self'", "data:", "blob:"]
+    }
+  }
+}));
 app.use(rateLimit({ windowMs: 60_000, max: 300 }));
 app.use(express.json({ limit: '1mb' }));
 
@@ -260,7 +272,7 @@ app.use('/public', express.static(path.resolve(__dirname, '../public')));
 app.use(express.static(path.resolve(__dirname, '../dist')));
 
 // Basic routes
-app.get('/', (req, res) => res.sendFile(path.resolve(__dirname, '../index.html')));
+app.get('/', (req, res) => res.sendFile(path.resolve(__dirname, '../app/index.html')));
 app.get('/docs', (req, res) => res.sendFile(path.resolve(__dirname, '../app/docs.html')));
 app.get('/demo', (req, res) => res.sendFile(path.resolve(__dirname, '../app/demo.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.resolve(__dirname, '../app/dashboard.html')));
