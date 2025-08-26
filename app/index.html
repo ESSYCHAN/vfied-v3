@@ -304,7 +304,10 @@
     <header style="text-align: center; padding: 20px;">
       <h1 style="font-weight: 900; font-size: 28px; margin: 0 0 8px 0;
                  background: linear-gradient(135deg, #fff, #c7d2fe);
-                 -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                 -webkit-background-clip: text;
+                 background-clip: text;
+                 -webkit-text-fill-color: transparent;
+                 color: transparent;">
         VFIED 🍽️
       </h1>
       <p style="color: #9fb0c9; font-size: 13px; margin: 0;">
@@ -1020,50 +1023,51 @@
 
       // FIXED: Enhanced makeDecision with proper timeout handling
       async makeDecision() {
-    const mood = document.getElementById('mood-input')?.value?.trim();
-    if (!mood) {
-      this.showToast('Tell me how you\'re feeling first!');
-      this.vibrate('Light');
-      return;
-    }
+        const mood = document.getElementById('mood-input')?.value?.trim();
+        if (!mood) {
+          this.showToast('Tell me how you\'re feeling first!');
+          this.vibrate('Light');
+          return;
+        }
 
-    this.vibrate('Medium');
-    this.showLoading();
+        this.vibrate('Medium');
+        this.showLoading();
 
-    try {
-      // Try fast API first
-      const response = await fetch(`${this.API_BASE}/v1/recommend`, {
-        method: 'POST',
-        body: JSON.stringify({
-          location: this.currentLocation,
-          mood_text: mood,
-          dietary: Array.from(this.selectedDietary),
-          quick: true // Signal for faster response
-        })
-      });
+        try {
+          // Try fast API first
+          const response = await fetch(`${this.API_BASE}/v1/recommend`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              location: this.currentLocation,
+              mood_text: mood,
+              dietary: Array.from(this.selectedDietary),
+              quick: true // Signal for faster response
+            })
+          });
 
-      if (response.ok) {
-        const data = await response.json();
-        this.showResult({
-          emoji: data.food?.emoji || '🍽️',
-          name: data.food?.name || 'Good Choice',
-          reason: data.friendMessage || data.reasoning || 'Perfect for your mood!'
-        });
-        this.vibrate('Light');
-      } else {
-        throw new Error(`API error: ${response.status}`);
+          if (response.ok) {
+            const data = await response.json();
+            this.showResult({
+              emoji: data.food?.emoji || '🍽️',
+              name: data.food?.name || 'Good Choice',
+              reason: data.friendMessage || data.reasoning || 'Perfect for your mood!'
+            });
+            this.vibrate('Light');
+          } else {
+            throw new Error(`API error: ${response.status}`);
+          }
+        } catch (error) {
+          console.warn('API failed, using offline suggestion:', error);
+          
+          // Fast offline fallback
+          const fallback = this.getOfflineSuggestion(mood);
+          this.showResult(fallback);
+          this.vibrate('Heavy');
+        } finally {
+          this.hideLoading();
+        }
       }
-    } catch (error) {
-      console.warn('API failed, using offline suggestion:', error);
-      
-      // Fast offline fallback
-      const fallback = this.getOfflineSuggestion(mood);
-      this.showResult(fallback);
-      this.vibrate('Heavy');
-    } finally {
-      this.hideLoading();
-    }
-  }
 
       // FIXED: Enhanced travel coach with better error handling
       async askTravelCoach() {
