@@ -74,6 +74,7 @@
     @keyframes loading { 0%{transform:translateX(-100%);} 50%{transform:translateX(200%);} 100%{transform:translateX(-100%);} }
   </style>
 </head>
+
 <body>
   <div id="app">
     <header style="text-align:center; padding:20px;">
@@ -265,6 +266,46 @@
   </div>
 
   <script>
+    const COUNTRY_MAP = {
+      'united kingdom': 'GB','uk':'GB','great britain':'GB','england':'GB',
+      'united states':'US','usa':'US','us':'US','america':'US',
+      'kenya':'KE','japan':'JP','india':'IN','france':'FR','germany':'DE',
+      'canada':'CA','australia':'AU','italy':'IT','spain':'ES','netherlands':'NL',
+      'uganda':'UG','tanzania':'TZ','south africa':'ZA','nigeria':'NG',
+    };
+
+    const CITY_DEFAULT_CC = {
+      // helpful defaults when user gives only city
+      'london':'GB','manchester':'GB','birmingham':'GB','edinburgh':'GB',
+      'new york':'US','los angeles':'US','san francisco':'US','chicago':'US','miami':'US',
+      'nairobi':'KE','mombasa':'KE','kisumu':'KE',
+      'kampala':'UG','entebbe':'UG',
+      'tokyo':'JP','osaka':'JP','kyoto':'JP',
+      'paris':'FR','marseille':'FR','lyon':'FR',
+      'berlin':'DE','munich':'DE','hamburg':'DE',
+      'madrid':'ES','barcelona':'ES','valencia':'ES',
+      'rome':'IT','milan':'IT','naples':'IT',
+      'sydney':'AU','melbourne':'AU',
+      'toronto':'CA','vancouver':'CA','montreal':'CA'
+    };
+
+    const ISO2 = new Set(Object.values(COUNTRY_MAP));
+
+    function titleCase(s='') {
+      return s.toLowerCase().split(' ').map(w => w ? w[0].toUpperCase()+w.slice(1) : '').join(' ');
+    }
+    function sanitizeCity(raw='') {
+      return titleCase(String(raw).replace(/[0-9]/g,'').replace(/\s{2,}/g,' ').trim());
+    }
+    function mapCountryTailToISO(tail='') {
+      const t = tail.trim().toLowerCase();
+      if (/^[a-z]{2}$/i.test(t)) return t.toUpperCase();         // ISO like "KE"
+      return COUNTRY_MAP[t] || null;                              // name → ISO
+    }
+    function detectCityDefaultISO(city='') {
+      const iso = CITY_DEFAULT_CC[city.toLowerCase()];
+      return iso || null;
+    }
     class VFIEDApp {
       constructor() {
         this.API_BASE = location.hostname === 'localhost' ? 'http://localhost:3048' : 'https://vfied-v3.onrender.com';
@@ -399,7 +440,12 @@
           });
         });
 
-        document.getElementById('change-location-btn')?.addEventListener('click', () => this.changeLocation());
+        
+        document.getElementById('change-location-btn')?.addEventListener('click', () => this.openLocationModal());
+        document.getElementById('location-modal-close')?.addEventListener('click', () => this.closeLocationModal());
+        document.getElementById('location-save-btn')?.addEventListener('click', () => this.applyLocationFromModal());
+        document.getElementById('location-detect-btn')?.addEventListener('click', () => this.detectLocation());
+        document.getElementById('location-modal')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) this.closeLocationModal(); });
         document.getElementById('accept-btn')?.addEventListener('click', () => this.handleAccept());
         document.getElementById('try-again-btn')?.addEventListener('click', () => this.makeDecision());
         document.getElementById('share-btn')?.addEventListener('click', () => this.shareResult());
@@ -448,43 +494,66 @@
       closeEventsModal() { document.getElementById('events-modal').classList.remove('active'); document.body.style.overflow=''; }
 
       updateLocationDisplay() {
-        const cc = this.currentLocation.country_code || 'GB';
-        document.getElementById('location-display').textContent = `${this.currentLocation.city}, ${cc}`;
+        const cc = (this.currentLocation.country_code || 'GB').toUpperCase();
+        const city = this.titleCase(this.currentLocation.city || 'City');
+        document.getElementById('location-display').textContent = `${city}, ${cc}`;
       }
-      changeLocation() {
-        const input = prompt('Enter location (e.g., "Tokyo, JP" or just "Tokyo"):');
-        if (!input || !input.trim()) return;
+      openLocationModal() {
+        const m = document.getElementById('location-modal');
+        const cityInput = document.getElementById('location-city-input');
+        const countrySel = document.getElementById('location-country-select');
 
-        const raw = input.trim();
-        let city = raw;
-        let cc = null;
+        cityInput.value = this.currentLocation.city || '';
+        this.loadCountryOptions().then(() => {
+          countrySel.value = (this.currentLocation.country_code || 'GB').toUpperCase();
+        });
 
-        // Accept "City, CC" or "City - CC"
-        const m = raw.match(/^(.+?)[,\-]\s*([A-Za-z]{2})$/);
-        if (m) {
-          city = m[1].trim();
-          cc = m[2].trim().toUpperCase();
-        } else {
-          // Try to guess common cities → country code
-          cc = this.guessCountryCode(raw) || this.currentLocation.country_code || 'GB';
-        }
+        m.classList.add('active');
+        document.body.style.overflow = 'hidden';
+        setTimeout(() => cityInput.focus(), 0);
+      }
+
+      closeLocationModal(){
+        const m = document.getElementById('location-modal');
+        m.classList.remove('active');
+        document.body.style.overflow = '';
+      }
+
+      async applyLocationFromModal() {
+        const cityRaw = document.getElementById('location-city-input').value.trim();
+        const cc = (document.getElementById('location-country-select').value || '').toUpperCase();
+        if (!cityRaw || !cc) { this.showToast('Please fill both City and Country'); return; }
+
+        const city = this.titleCase(cityRaw);
 
         this.currentLocation = {
           ...this.currentLocation,
           city,
-          country_code: cc
+          country_code: cc,
+          country: this.findCountryName(cc)
         };
 
         this.updateLocationDisplay();
-
-        // Also refresh modal headers if open
-        const tCity = document.getElementById('travel-modal-city');
-        if (tCity) tCity.textContent = city;
-        const eCity = document.getElementById('events-modal-city');
-        if (eCity) eCity.textContent = city;
-
         this.saveUserPreferences();
+
+        // Update any open modal titles & refresh events list
+        const tCity = document.getElementById('travel-modal-city'); if (tCity) tCity.textContent = city;
+        const eCity = document.getElementById('events-modal-city'); if (eCity) { eCity.textContent = city; this.loadEvents(); }
+
+        this.closeLocationModal();
       }
+
+      detectLocation() {
+        if (!navigator.geolocation) { this.showToast('Geolocation not supported'); return; }
+        navigator.geolocation.getCurrentPosition(pos => {
+          const { latitude, longitude } = pos.coords;
+          this.currentLocation.latitude = latitude;
+          this.currentLocation.longitude = longitude;
+          this.showToast('Coordinates captured; choose City & Country then Save.');
+        }, () => this.showToast('Could not get location'), { enableHighAccuracy:true, timeout:10000 });
+      }
+
+
 
       // Cancel helpers
       cancelAllActiveRequests() {
@@ -510,12 +579,16 @@
             body: JSON.stringify({
               location: {
                 city: this.currentLocation.city,
-                country: this.currentLocation.country || 'United Kingdom',
-                country_code: this.currentLocation.country_code
+                country: this.currentLocation.country,
+                country_code: this.currentLocation.country_code,
+                latitude: this.currentLocation.latitude,
+                longitude: this.currentLocation.longitude
               },
-              dietary: Array.from(this.selectedDietary)
+              dietary: Array.from(this.selectedDietary),           // strings
+              mood_text: document.getElementById('mood-input')?.value || ''
             })
           }, 'quick_decision');
+
           if (response.ok) {
             const data = await response.json();
             if (data.success && data.decisions) {
@@ -950,6 +1023,103 @@
       // Helpers for follow-up
       escapeHtml(t){ const d=document.createElement('div'); d.textContent=t; return d.innerHTML; }
       askFollowUp(question){ document.getElementById('travel-query-modal').value = question; this.askTravelCoach(); }
+
+      titleCase(s){ return String(s||'').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()); }
+
+      async loadCountryOptions() {
+        if (!this._countries) {
+          try {
+            const res = await fetch(`${this.API_BASE}/v1/countries`);
+            const json = await res.json();
+            this._countries = (json.countries || []).map(c => ({ name: c.name, code: c.country_code }));
+          } catch {
+            this._countries = [
+              { name:'United Kingdom', code:'GB' }, { name:'Uganda', code:'UG' },
+              { name:'United States', code:'US' }, { name:'Japan', code:'JP' },
+              { name:'Kenya', code:'KE' }, { name:'France', code:'FR' },
+              { name:'Germany', code:'DE' }, { name:'Italy', code:'IT' },
+              { name:'Spain', code:'ES' }, { name:'Australia', code:'AU' }
+            ];
+          }
+        }
+        const sel = document.getElementById('location-country-select');
+        sel.innerHTML = this._countries
+          .sort((a,b)=>a.name.localeCompare(b.name))
+          .map(c => `<option value="${c.code}">${c.name} (${c.code})</option>`).join('');
+      }
+
+      findCountryName(code){
+        const cc = String(code||'').toUpperCase();
+        const hit = (this._countries||[]).find(c => c.code === cc);
+        return hit?.name || cc;
+      }
+      
+
+      changeLocation() {
+        const input = prompt('Enter location (e.g., "Nairobi, KE" or "Nairobi, Kenya" or just "Nairobi"):');
+        if (!input || !input.trim()) return;
+
+        const parts = input.split(',').map(s => s.trim()).filter(Boolean);
+
+        // Parse city
+        let city = sanitizeCity(parts[0] || this.currentLocation.city);
+
+        // Parse country part (if any)
+        let providedISO = null;
+        if (parts.length > 1) {
+          const tail = parts.slice(1).join(', ').trim();
+          providedISO = mapCountryTailToISO(tail);
+        }
+
+        // Determine target ISO
+        let targetISO = providedISO
+          || detectCityDefaultISO(city)
+          || this.currentLocation.country_code
+          || 'GB';
+
+        // Guard: prevent “country as city”
+        if (COUNTRY_MAP[city.toLowerCase()]) {
+          this.showToast('Please enter a city name, not a country.');
+          return;
+        }
+
+        // Guard: if user gave a country name that maps to a different ISO than current,
+        // let it override; but if it conflicts with a known city default, confirm.
+        const cityDefaultISO = detectCityDefaultISO(city);
+        if (providedISO && cityDefaultISO && providedISO !== cityDefaultISO) {
+          const ok = confirm(
+            `The city "${city}" is usually in ${cityDefaultISO}. You entered ${providedISO}.\n` +
+            `Use ${providedISO} anyway?`
+          );
+          if (!ok) targetISO = cityDefaultISO;
+          else targetISO = providedISO;
+        }
+
+        // Build nice country label
+        const REVERSE_MAP = Object.entries(COUNTRY_MAP)
+          .reduce((acc,[k,v]) => { if (!acc[v]) acc[v]=k; return acc; }, {});
+        const countryName = REVERSE_MAP[targetISO] ? titleCase(REVERSE_MAP[targetISO]) : (this.currentLocation.country || '—');
+
+        // Finalize & persist
+        const newLoc = { city, country: countryName, country_code: targetISO };
+        this.currentLocation = newLoc;
+        this.lastValidLocation = { ...this.currentLocation };
+        this.updateLocationDisplay();
+        this.saveUserPreferences();
+
+        // Proactively refresh dependent views
+        // If events modal is open, reload
+        const eventsModal = document.getElementById('events-modal');
+        if (eventsModal && eventsModal.classList.contains('active')) {
+          this.loadEvents();
+        }
+        // If you want to refresh the food shortlist automatically when visible:
+        const shortlist = document.getElementById('shortlist-result');
+        if (shortlist && !shortlist.classList.contains('hidden')) {
+          this.makeDecision();
+        }
+      }
+
     }
 
     // Expose small helper for inline onclick
@@ -957,5 +1127,35 @@
 
     document.addEventListener('DOMContentLoaded', () => { window.vfiedApp = new VFIEDApp(); });
   </script>
+  <!-- Location Modal -->
+<div id="location-modal" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2 class="modal-title">📍 Set Location</h2>
+      <button class="modal-close" id="location-modal-close">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid; gap:12px;">
+        <div>
+          <label style="font-size:12px; font-weight:700; color:#94a3b8;">City</label>
+          <input id="location-city-input" placeholder="e.g., Kampala"
+                 style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;">
+        </div>
+        <div>
+          <label style="font-size:12px; font-weight:700; color:#94a3b8;">Country</label>
+          <select id="location-country-select"
+                  style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;">
+            <option value="">Loading countries…</option>
+          </select>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <button id="location-detect-btn" class="travel-action-btn" style="flex:1;">📡 Detect</button>
+          <button id="location-save-btn" class="travel-action-btn" style="flex:1; background:linear-gradient(135deg, #7c3aed22, #6366f122); border-color:#7c3aed55; color:#c7d2fe;">✅ Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

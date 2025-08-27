@@ -23,7 +23,9 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API
 const USE_GPT = String(process.env.USE_GPT || process.env.VITE_USE_GPT || '').toLowerCase() === 'true';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const PORT = process.env.MCP_PORT || process.env.PORT || 3048; // ✅ FIXED: Match OpenAPI schema
-
+const USE_EVENTS_PROVIDER = String(process.env.USE_EVENTS_PROVIDER || '').toLowerCase() === 'true';
+const EVENTBRITE_TOKEN = process.env.EVENTBRITE_TOKEN || '';
+const EVENTS_CACHE_TTL = parseInt(process.env.EVENTS_CACHE_TTL || '10800', 10); // 3h
 const moods = moodsModule.MOOD_TAXONOMY?.moods || moodsModule.default?.moods || [];
 const countries = countriesModule.SUPPORTED_COUNTRIES?.countries || countriesModule.default?.countries || [];
 
@@ -137,8 +139,10 @@ const QUICK_SCHEMA = Joi.object({
     latitude: Joi.number().optional(),
     longitude: Joi.number().optional()
   }).default({}),
-  dietary: Joi.array().items(Joi.string().lowercase()).default([])
-});
+  dietary: Joi.array().items(Joi.string().lowercase()).default([]),
+  mood_text: Joi.string().allow('', null)
+  }).unknown(true); // allow harmless extra keys
+
 
 const GLOBAL_POOL = [
   { name: "Grilled Chicken Wrap", emoji: "🌯", explanation: "Quick protein, balanced, travel-friendly" },
@@ -414,7 +418,8 @@ async function getWeather(location) {
 
 // Fallback suggestion
 function fallbackSuggestion(location, dietary = []) {
-  const cc = (location?.country_code || 'GB').toUpperCase();
+  const cc = (location?.country_code || location?.countryCode || '').toString().trim().slice(0, 2).toUpperCase();
+
   const byCountry = {
     GB: [{ name: 'Fish and Chips', emoji: '🍟' }, { name: 'Mushroom Pie', emoji: '🥧' }],
     KE: [{ name: 'Nyama Choma', emoji: '🍖' }, { name: 'Ugali & Sukuma', emoji: '🥬' }],
@@ -508,33 +513,146 @@ app.get('/health', (_req, res) => {
 });
 
 // Add this endpoint to your server/mcp-server.js
+// ---- Replace ALL previous /v1/quick_decision routes with this one ----
 app.post('/v1/quick_decision', async (req, res) => {
   const t0 = Date.now();
   try {
-    const { value, error } = QUICK_SCHEMA.validate(req.body || {});
-    if (error) return res.status(400).json({ success: false, error: error.message });
+    // 1) Validate & allow mood_text + unknown keys (prevents 400s on extra fields)
+    const SCHEMA = QUICK_SCHEMA.keys({
+      mood_text: Joi.string().allow('', null)
+    }).unknown(true);
 
-    const { location, dietary } = value;
-    const cc = (location?.country_code || location?.countryCode || '').toUpperCase();
-    const country = findCountryByCode(cc);
+    const { value, error } = SCHEMA.validate(req.body || {});
+    if (error) {
+      return res.status(400).json({ success: false, error: error.message });
+    }
 
-    // Build pool from country fallbacks + global
-    let countryDishes = country?.dishes || [];
-    let pool = [...countryDishes, ...GLOBAL_POOL];
+    // 2) Sanitize inputs (defensive)
+    const locIn = value.location || {};
+    const location = {
+      city: String(locIn.city || '').trim(),
+      country: String(locIn.country || '').trim(),
+      country_code: String(locIn.country_code || '')
+        .trim()
+        .slice(0, 2)
+        .toUpperCase(),
+      latitude: typeof locIn.latitude === 'number' ? locIn.latitude : undefined,
+      longitude: typeof locIn.longitude === 'number' ? locIn.longitude : undefined
+    };
+    const dietary = Array.isArray(value.dietary)
+      ? value.dietary.map((d) => String(d).toLowerCase())
+      : [];
+    const mood_text = String(value.mood_text || '').trim();
 
-    // Dietary filter
-    const filtered = pool.filter(item => {
-      try { 
-        return validateDietaryCompliance ? validateDietaryCompliance(item.name, dietary) : true;
-      } catch { 
-        return true; 
+    // Ensure we have a usable cc
+    const cc = location.country_code || 'GB';
+
+    // 3) Try GPT for 3 local, diet-aware picks (strict JSON)
+    if (USE_GPT && OPENAI_API_KEY) {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 22000);
+
+        const system = `You are VFIED, a concise, culturally-aware food picker.
+Return STRICT JSON: {"decisions":[{"name":"...","emoji":"...","explanation":"..."}]}. No prose. Exactly 3 items.
+If a requested diet conflicts with local staples, choose safe alternatives still local to the region.`;
+
+        const user = `
+CITY: ${location.city || 'Unknown'}
+COUNTRY_CODE: ${cc}
+DIETARY: ${dietary.join(', ') || 'none'}
+MOOD: ${mood_text || 'not provided'}
+
+TASK: Suggest 3 specific local dishes or common meals available in this city (or country if city is unknown).
+Each item: { "name": "<dish>", "emoji": "🍽️", "explanation": "<why this fits mood/diet/location>" }.
+Avoid chains. Prefer widely available items.`;
+
+        const gptResp = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: OPENAI_MODEL, // e.g. 'gpt-4o-mini'
+            response_format: { type: 'json_object' },
+            temperature: 0.7,
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: user }
+            ]
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeout);
+
+        if (!gptResp.ok) {
+          // fall through to fallback
+          throw new Error(`OpenAI HTTP ${gptResp.status}`);
+        }
+
+        const j = await gptResp.json();
+        const raw = j?.choices?.[0]?.message?.content?.trim();
+        let parsed;
+        try {
+          parsed = raw ? JSON.parse(raw) : null;
+        } catch {
+          parsed = null;
+        }
+
+        let decisions = Array.isArray(parsed?.decisions) ? parsed.decisions : [];
+
+        // 4) Enforce dietary compliance (simple name check)
+        decisions = decisions
+          .filter((d) => d && d.name)
+          .filter((d) => validateDietaryCompliance(d.name, dietary))
+          .slice(0, 3);
+
+        // Top up with country/global pool if GPT gave < 3 or got filtered out
+        if (decisions.length < 3) {
+          const pool = pickCountryPool(cc);
+          const fill = pool
+            .filter((p) => validateDietaryCompliance(p.name, dietary))
+            .map((p) => ({ name: p.name, emoji: p.emoji, explanation: p.explanation }));
+          // Dedup by name
+          const names = new Set(decisions.map((d) => d.name));
+          for (const f of fill) {
+            if (!names.has(f.name)) {
+              decisions.push(f);
+              names.add(f.name);
+              if (decisions.length >= 3) break;
+            }
+          }
+        }
+
+        if (decisions.length >= 1) {
+          return res.json({
+            success: true,
+            request_id: randomUUID?.() || String(Date.now()),
+            decisions: decisions.slice(0, 3),
+            location: { city: location.city || 'Unknown', country_code: cc },
+            processingTimeMs: Date.now() - t0,
+            source: 'gpt'
+          });
+        }
+        // else fall through to fallback
+      } catch (e) {
+        // GPT failed — we’ll gracefully fallback below
+        console.warn('[quick_decision] GPT failed -> fallback:', e?.message || e);
       }
-    });
+    }
 
-    // Take 3, with guaranteed top-up
-    let shortlist = shuffle(filtered).slice(0, 3);
+    // 5) Fallback (country → global), with diet filter + top-up
+    const basePool = pickCountryPool(cc);
+    let shortlist = shuffle(
+      basePool.filter((i) => validateDietaryCompliance(i.name, dietary))
+    ).slice(0, 3);
+
     if (shortlist.length < 3) {
-      const topUp = shuffle(GLOBAL_POOL).filter(i => !shortlist.find(s => s.name === i.name));
+      const topUp = shuffle(GLOBAL_POOL).filter(
+        (i) => validateDietaryCompliance(i.name, dietary) && !shortlist.find((s) => s.name === i.name)
+      );
       shortlist = [...shortlist, ...topUp].slice(0, 3);
     }
 
@@ -542,24 +660,25 @@ app.post('/v1/quick_decision', async (req, res) => {
       success: true,
       request_id: randomUUID?.() || String(Date.now()),
       decisions: shortlist,
-      location: {
-        city: location?.city || 'Unknown',
-        country_code: cc || 'GB'
-      },
-      processingTimeMs: Date.now() - t0
+      location: { city: location.city || 'Unknown', country_code: cc },
+      processingTimeMs: Date.now() - t0,
+      source: 'fallback'
     });
-  } catch (e) {
-    console.error('Quick decision error:', e);
+  } catch (err) {
+    console.error('Quick decision error:', err);
+    // Never leak a 500 if we can give *something* useful
     const safe = shuffle(GLOBAL_POOL).slice(0, 3);
     return res.status(200).json({
       success: true,
       request_id: randomUUID?.() || String(Date.now()),
       decisions: safe,
-      note: 'fallback',
-      processingTimeMs: Date.now() - t0
+      note: 'emergency-fallback',
+      processingTimeMs: Date.now() // not exact, but fine
     });
   }
 });
+
+
 
 
 // ✅ FIXED: Recommendation endpoint with proper fallback handling
@@ -1279,7 +1398,228 @@ function getEventPool(countryCode) {
   return EVENT_POOLS[code] && EVENT_POOLS[code].length ? EVENT_POOLS[code] : GLOBAL_EVENTS;
 }
 
-// ✅ Events endpoint - MATCHES OpenAPI EventsResponse
+function classifyEventTag(e) {
+  const t = `${e.title || ''} ${e.explanation || e.description || ''}`.toLowerCase();
+  if (/(food|tasting|tea|wine|beer|bbq|ramen|sushi|street|pop[- ]?up|brunch|dinner|tea)/.test(t)) return 'food';
+  if (/(market|farmers|bazaar|fair)/.test(t)) return 'market';
+  if (/(music|jazz|blues|gig|concert|live)/.test(t)) return 'music';
+  if (/(culture|cultural|museum|gallery|exhibit|heritage|workshop|class)/.test(t)) return 'culture';
+  if (/(night|pub|bar|club|late)/.test(t)) return 'nightlife';
+  if (/(festival|fest|carnival)/.test(t)) return 'festival';
+  return 'food';
+}
+
+function whenLabelFrom(time) {
+  switch (time) {
+    case 'today': return 'Tonight';
+    case 'tomorrow': return 'Tomorrow evening';
+    case 'this_week': return 'This week';
+    case 'weekend': default: return 'This weekend';
+  }
+}
+// ---------- Eventbrite helpers ----------
+const EB_CATEGORY_MAP = {
+  // VFIED -> Eventbrite category IDs
+  food: ['110'],          // Food & Drink
+  music: ['103'],         // Music
+  culture: ['105','104'], // Arts & Theatre + Film/Media
+  market: [],             // Use keywords
+  nightlife: ['103'],     // Music often covers nightlife; add keywords
+  all: []
+};
+
+// Build time range for Eventbrite filters
+function eventsTimeRange(time) {
+  const now = new Date();
+  const start = new Date();
+  const end = new Date();
+
+  switch (time) {
+    case 'today':
+      start.setHours(0,0,0,0);
+      end.setHours(23,59,59,999);
+      break;
+    case 'tomorrow':
+      start.setDate(start.getDate() + 1);
+      start.setHours(0,0,0,0);
+      end.setDate(end.getDate() + 1);
+      end.setHours(23,59,59,999);
+      break;
+    case 'weekend': {
+      // Next Sat/Sun
+      const day = now.getDay(); // 0 Sun
+      const daysToSat = (6 - day + 7) % 7;
+      const daysToSun = (7 - day + 7) % 7;
+      start.setDate(now.getDate() + daysToSat);
+      start.setHours(0,0,0,0);
+      end.setDate(now.getDate() + daysToSun);
+      end.setHours(23,59,59,999);
+      break;
+    }
+    case 'this_week':
+      // Mon..Sun of this ISO week
+      {
+        const d = new Date(now);
+        const day = (d.getDay() + 6) % 7; // Mon=0
+        start.setDate(d.getDate() - day);
+        start.setHours(0,0,0,0);
+        end.setDate(start.getDate() + 6);
+        end.setHours(23,59,59,999);
+      }
+      break;
+    default:
+      // next 7 days
+      end.setDate(end.getDate() + 7);
+      break;
+  }
+  return {
+    start: start.toISOString(),
+    end: end.toISOString()
+  };
+}
+
+// Simple memory cache for events
+const EVENTS_CACHE = new Map();
+function cacheKey(city, cc, category, time) {
+  return `${city.toLowerCase()}|${cc.toUpperCase()}|${category}|${time}`;
+}
+function setCache(key, data) {
+  EVENTS_CACHE.set(key, { data, expires: Date.now() + EVENTS_CACHE_TTL * 1000 });
+}
+function getCache(key) {
+  const hit = EVENTS_CACHE.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.expires) { EVENTS_CACHE.delete(key); return null; }
+  return hit.data;
+}
+
+// Normalizer: Eventbrite -> VFIED event
+function toVFIEDEvent(eb, city, cc, whenLabel, tag='food') {
+  const price = eb.is_free === true ? 'Free' : (eb.is_free === false ? 'Paid' : 'Varies');
+  const venue =
+    eb.venue?.name ||
+    eb.venue?.address?.localized_address_display ||
+    `${city} area`;
+  const title = eb.name?.text || (eb.summary ? eb.summary.slice(0, 60) : 'Local event');
+  const url = eb.url || '';
+  const desc = (eb.summary || eb.description?.text || '').trim();
+
+  return {
+    id: eb.id || `${cc}-${Date.now()}-${Math.random().toString(36).slice(2,7)}`,
+    title,
+    city,
+    country_code: cc,
+    when: whenLabel,
+    tag,
+    description: desc,
+    location: venue,
+    price,
+    link: url
+  };
+}
+
+// Heuristic: choose VFIED tag from EB category/keywords
+function detectTag(eb, requestedCategory) {
+  if (requestedCategory && requestedCategory !== 'all') return requestedCategory;
+  const catId = eb.category_id;
+  if (catId === '110') return 'food';
+  if (catId === '103') return 'music';
+  if (catId === '105' || catId === '104') return 'culture';
+  // markets/nightlife rely on keywords if needed
+  const t = (eb.name?.text || '').toLowerCase();
+  if (/market|bazaar|fair|farmer/.test(t)) return 'market';
+  if (/night|club|party|dj/.test(t)) return 'nightlife';
+  return 'food'; // VFIED bias
+}
+
+// Fetch from Eventbrite (server-side)
+function sanitizeCity(city = '') {
+  // Remove country codes/numbers/extra commas and trim
+  return String(city).replace(/[0-9]/g, '').replace(/\s{2,}/g, ' ').replace(/,+/g, ',').trim();
+}
+
+async function fetchEventbriteEvents(city, cc, category, time) {
+  if (!USE_EVENTS_PROVIDER || !EVENTBRITE_TOKEN) return null;
+
+  const { start, end } = eventsTimeRange(time);
+  const cats = EB_CATEGORY_MAP[category] || [];
+  const address = `${sanitizeCity(city)}, ${cc.toUpperCase()}`;
+
+  const base = new URL('https://www.eventbriteapi.com/v3/events/search/');
+  const p = base.searchParams;
+  p.set('location.address', address);
+  p.set('location.within', '25km');                     // 🔑 improves hit rate
+  p.set('start_date.range_start', start);               // ISO8601
+  p.set('start_date.range_end', end);
+  p.set('expand', 'venue,category,format');
+  p.set('sort_by', 'date');
+  p.set('page', '1');
+
+  if (cats.length) p.set('categories', cats.join(','));
+
+  // keywords to help “market” / “nightlife”
+  const q = [];
+  if (category === 'market') q.push('market OR bazaar OR fair OR farmers');
+  if (category === 'nightlife') q.push('nightlife OR party OR club OR DJ');
+  if (q.length) p.set('q', q.join(' '));
+
+  // --- try full query ---
+  let r = await fetch(base.toString(), { headers: { Authorization: `Bearer ${EVENTBRITE_TOKEN}` } });
+  if (!r.ok) {
+    const body = await r.text().catch(() => '');
+    console.warn('[Eventbrite] full query failed:', r.status, body);
+
+    // --- retry: minimal query (just address + within) ---
+    const minimal = new URL('https://www.eventbriteapi.com/v3/events/search/');
+    const pm = minimal.searchParams;
+    pm.set('location.address', address);
+    pm.set('location.within', '25km');
+    pm.set('expand', 'venue');
+    pm.set('sort_by', 'date');
+    pm.set('page', '1');
+    r = await fetch(minimal.toString(), { headers: { Authorization: `Bearer ${EVENTBRITE_TOKEN}` } });
+
+    if (!r.ok) {
+      const body2 = await r.text().catch(() => '');
+      console.warn('[Eventbrite] minimal query failed:', r.status, body2);
+      return [];
+    }
+  }
+
+  const j = await r.json().catch(() => ({}));
+  return Array.isArray(j.events) ? j.events : [];
+}
+
+// GPT enrichment (optional, batched)
+async function gptEnrichEvents(vfiedEvents, city, cc) {
+  if (!USE_GPT || !OPENAI_API_KEY || !vfiedEvents?.length) return vfiedEvents;
+
+  const system = `You are VFIED, a concise food & culture coach. 
+Given a list of events, add a short foodie context.
+Return STRICT JSON:
+{"events":[{"id":"...","explanation":"1 sentence why it’s good for food lovers","food_pairing":"1 short phrase","vibe":"1-3 words"}]}`;
+  const user = JSON.stringify({
+    city, cc,
+    events: vfiedEvents.map(e => ({ id: e.id, title: e.title, desc: e.description }))
+  });
+
+  const out = await gptChatJSON({ system, user, max_tokens: 600 });
+  if (!out?.events) return vfiedEvents;
+
+  const map = new Map(out.events.map(x => [x.id, x]));
+  return vfiedEvents.map(e => {
+    const extra = map.get(e.id);
+    if (!extra) return e;
+    const add = [];
+    if (extra.food_pairing) add.push(`Food pairing: ${extra.food_pairing}`);
+    if (extra.vibe) add.push(`Vibe: ${extra.vibe}`);
+    if (extra.explanation) add.unshift(extra.explanation);
+    const enriched = add.join(' • ');
+    return { ...e, description: e.description ? `${e.description}\n\n${enriched}` : enriched };
+  });
+}
+
+// ✅ Live Events with Eventbrite + GPT enrichment + curated fallback
 app.get('/v1/events', async (req, res) => {
   const t0 = Date.now();
   try {
@@ -1287,29 +1627,60 @@ app.get('/v1/events', async (req, res) => {
     if (error) return res.status(400).json({ success: false, error: error.message });
 
     const { city, country_code, category, time } = value;
-    const country = findCountryByCode(country_code);
-    
-    // Prefer embedded country events; else curated pool; else global pool
-    const pool = (country?.events && country.events.length) ? country.events : getEventPool(country_code);
-    const events = pool.slice(0, 6).map((e, idx) => ({
-      id: `${country_code}-${idx + 1}`,
-      title: e.title,
-      city,
-      country_code,
-      when: time === 'today' ? 'Tonight'
-           : time === 'tomorrow' ? 'Tomorrow evening'
-           : time === 'this_week' ? 'This week'
-           : 'This weekend',
-      tag: 'food',
-      description: e.explanation || e.description || '',
-      location: `${city} area`,
-      price: e.price || 'Varies',
-      link: `https://www.google.com/search?q=${encodeURIComponent((e.title || 'food event') + ' ' + city)}`
-    }));
+    const cc = country_code.toUpperCase();
+    const whenLabel = time === 'today' ? 'Tonight'
+                    : time === 'tomorrow' ? 'Tomorrow evening'
+                    : time === 'this_week' ? 'This week'
+                    : 'This weekend';
 
-    return res.json({ 
-      success: true, 
-      events: events.slice(0, 3),
+    // Cache first
+    const key = cacheKey(city, cc, category, time);
+    const cached = getCache(key);
+    if (cached) {
+      return res.json({ success: true, events: cached, from: 'cache', processingTimeMs: Date.now() - t0 });
+    }
+
+    let vfiedEvents = [];
+
+    // 1) Try Eventbrite (if enabled)
+    if (USE_EVENTS_PROVIDER && EVENTBRITE_TOKEN) {
+      try {
+        const ebEvents = await fetchEventbriteEvents(city, cc, category, time);
+        vfiedEvents = (ebEvents || [])
+          .filter(e => !!e && e.status !== 'canceled')
+          .slice(0, 8)
+          .map(e => toVFIEDEvent(e, city, cc, whenLabel, detectTag(e, category)));
+      } catch (e) {
+        console.warn('[events] Eventbrite fetch failed:', e.message);
+      }
+    }
+
+    // 2) If nothing, use curated pools
+    if (!vfiedEvents.length) {
+      const pool = getEventPool(cc);
+      vfiedEvents = pool.slice(0, 6).map((e, idx) => ({
+        id: `${cc}-${idx + 1}`,
+        title: e.title,
+        city,
+        country_code: cc,
+        when: whenLabel,
+        tag: 'food',
+        description: e.explanation || e.description || '',
+        location: `${city} area`,
+        price: e.price || 'Varies',
+        link: `https://www.google.com/search?q=${encodeURIComponent((e.title || 'food event') + ' ' + city)}`
+      }));
+    }
+
+    // 3) GPT Enrichment (optional)
+    const finalList = await gptEnrichEvents(vfiedEvents.slice(0, 6), city, cc);
+
+    // 4) Save cache + respond (UI shows 3, but return up to 6)
+    setCache(key, finalList);
+    return res.json({
+      success: true,
+      events: finalList.slice(0, 3),
+      source: vfiedEvents.length && vfiedEvents[0]?.id?.length > 8 ? 'eventbrite' : 'curated',
       processingTimeMs: Date.now() - t0
     });
   } catch (e) {
@@ -1318,20 +1689,20 @@ app.get('/v1/events', async (req, res) => {
       success: true,
       events: [
         { 
-          id: 'global-1', 
-          title: 'Food Truck Night', 
-          city: req.query.city || 'City', 
-          country_code: (req.query.country_code || 'GB').toUpperCase(), 
-          when: 'Tonight', 
-          tag: 'food', 
-          description: 'Casual street eats and community vibes', 
-          location: 'City center', 
+          id: 'global-1',
+          title: 'Food Truck Night',
+          city: req.query.city || 'City',
+          country_code: (req.query.country_code || 'GB').toUpperCase(),
+          when: 'Tonight',
+          tag: 'food',
+          description: 'Casual street eats and community vibes',
+          location: 'City center',
           price: 'Budget-friendly',
           link: ''
         }
       ],
       note: 'fallback',
-      processingTimeMs: Date.now() - t0
+      processingTimeMs: 0
     });
   }
 });
