@@ -578,14 +578,11 @@
             method: 'POST',
             body: JSON.stringify({
               location: {
-                city: this.currentLocation.city,
-                country: this.currentLocation.country,
-                country_code: this.currentLocation.country_code,
-                latitude: this.currentLocation.latitude,
-                longitude: this.currentLocation.longitude
+                city: this.currentLocation.city,            // "Nairobi"
+                country: this.currentLocation.country || '',// "Kenya" (optional)
+                country_code: this.currentLocation.country_code // "KE"
               },
-              dietary: Array.from(this.selectedDietary),           // strings
-              mood_text: document.getElementById('mood-input')?.value || ''
+              dietary: Array.from(this.selectedDietary)     // ["vegan","nut-free"]
             })
           }, 'quick_decision');
 

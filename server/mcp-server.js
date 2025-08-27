@@ -139,9 +139,9 @@ const QUICK_SCHEMA = Joi.object({
     latitude: Joi.number().optional(),
     longitude: Joi.number().optional()
   }).default({}),
-  dietary: Joi.array().items(Joi.string().lowercase()).default([]),
-  mood_text: Joi.string().allow('', null)
-  }).unknown(true); // allow harmless extra keys
+  dietary: Joi.array().items(Joi.string().lowercase()).default([])
+});
+
 
 
 const GLOBAL_POOL = [
@@ -511,18 +511,28 @@ app.get('/health', (_req, res) => {
     timestamp: new Date().toISOString()
   });
 });
-
+function resolveCountryCode(raw, fallback='GB') {
+  if (!raw) return fallback;
+  const t = String(raw).trim();
+  // exact ISO2
+  if (/^[A-Za-z]{2}$/.test(t)) return t.toUpperCase();
+  // try by name using COUNTRIES_LIST (already computed on boot)
+  const hit = COUNTRIES_LIST.find(c =>
+    [c.name, c.commonName, c.official, c.country]
+      .filter(Boolean)
+      .some(n => String(n).toLowerCase() === t.toLowerCase())
+  );
+  return hit?.code || hit?.country_code || fallback;
+}
 // Add this endpoint to your server/mcp-server.js
 // ---- Replace ALL previous /v1/quick_decision routes with this one ----
 app.post('/v1/quick_decision', async (req, res) => {
   const t0 = Date.now();
   try {
     // 1) Validate & allow mood_text + unknown keys (prevents 400s on extra fields)
-    const SCHEMA = QUICK_SCHEMA.keys({
-      mood_text: Joi.string().allow('', null)
-    }).unknown(true);
+    const { value, error } = SCHEMA.prefs({ allowUnknown: true, stripUnknown: true }).validate(req.body || {});
 
-    const { value, error } = SCHEMA.validate(req.body || {});
+    
     if (error) {
       return res.status(400).json({ success: false, error: error.message });
     }
@@ -532,10 +542,8 @@ app.post('/v1/quick_decision', async (req, res) => {
     const location = {
       city: String(locIn.city || '').trim(),
       country: String(locIn.country || '').trim(),
-      country_code: String(locIn.country_code || '')
-        .trim()
-        .slice(0, 2)
-        .toUpperCase(),
+      country_code: resolveCountryCode(locIn.country_code || locIn.country || ''),
+
       latitude: typeof locIn.latitude === 'number' ? locIn.latitude : undefined,
       longitude: typeof locIn.longitude === 'number' ? locIn.longitude : undefined
     };
