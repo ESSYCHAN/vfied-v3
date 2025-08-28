@@ -531,7 +531,6 @@ app.post('/v1/quick_decision', async (req, res) => {
   try {
     // 1) Validate & allow mood_text + unknown keys (prevents 400s on extra fields)
     const { value, error } = SCHEMA.prefs({ allowUnknown: true, stripUnknown: true }).validate(req.body || {});
-
     
     if (error) {
       return res.status(400).json({ success: false, error: error.message });
