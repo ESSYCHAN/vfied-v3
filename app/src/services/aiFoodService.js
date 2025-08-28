@@ -1051,3 +1051,198 @@ export const getAIServiceStatus = () => {
     effectiveLocation: effectiveLocation
   };
 };
+export async function quickDecision(location = { city: "London", country_code: "GB" }, dietary = []) {
+  try {
+    const response = await fetch("/v1/quick_decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ location, dietary })
+    });
+    
+    const data = await response.json();
+    if (!data.success) throw new Error("No suggestions returned");
+    
+    return data.decisions || [];
+  } catch (error) {
+    console.warn("Quick decision API failed, using fallback:", error);
+    
+    // Local fallback based on country
+    const fallbacks = {
+      'GB': [
+        { name: "Fish & Chips", emoji: "🍟", explanation: "Classic British comfort, crispy & filling" },
+        { name: "Chicken Tikka", emoji: "🍛", explanation: "UK curry favorite, warming spices" },
+        { name: "Sunday Roast", emoji: "🥩", explanation: "Traditional hearty family meal" }
+      ],
+      'US': [
+        { name: "Smash Burger", emoji: "🍔", explanation: "Hearty American classic, always satisfying" },
+        { name: "Caesar Salad", emoji: "🥗", explanation: "Fresh greens with satisfying crunch" },
+        { name: "BBQ Ribs", emoji: "🍖", explanation: "Smoky comfort food, weekend worthy" }
+      ],
+      'KE': [
+        { name: "Ugali & Sukuma", emoji: "🍽️", explanation: "Traditional comfort, hearty and wholesome" },
+        { name: "Nyama Choma", emoji: "🥩", explanation: "Grilled perfection, social and satisfying" },
+        { name: "Pilau", emoji: "🍚", explanation: "Spiced rice, aromatic and satisfying" }
+      ],
+      'JP': [
+        { name: "Tonkotsu Ramen", emoji: "🍜", explanation: "Rich broth comfort, perfect for any mood" },
+        { name: "Chicken Katsu", emoji: "🍱", explanation: "Crispy satisfaction, simple and delicious" },
+        { name: "Sushi Set", emoji: "🍣", explanation: "Clean flavors, light but satisfying" }
+      ]
+    };
+    
+    const countryCode = location.country_code || 'GB';
+    return fallbacks[countryCode] || fallbacks['GB'];
+  }
+}
+
+// Travel Itinerary - 3 stops for the day
+export async function getTravelItinerary(location = { city: "London", country_code: "GB" }) {
+  try {
+    const response = await fetch("/v1/travel/itinerary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        location,
+        duration: "one_day",
+        interests: ["food", "culture"],
+        budget: "medium"
+      })
+    });
+    
+    const data = await response.json();
+    if (!data.success) throw new Error("No itinerary returned");
+    
+    return data.steps || [];
+  } catch (error) {
+    console.warn("Travel API failed, using fallback:", error);
+    return [
+      { time: "09:00", title: "Local Breakfast Café", emoji: "🥐", why: "Cozy start with pastry & coffee" },
+      { time: "13:00", title: "Market Lunch", emoji: "🍲", why: "Authentic comfort food in center" },
+      { time: "19:00", title: "Wine/Tapas Bar", emoji: "🍷", why: "Relaxed evening small plates" }
+    ];
+  }
+}
+
+// Events - Food-linked cultural events
+export async function getFoodEvents(location = { city: "London", country_code: "GB" }) {
+  try {
+    const response = await fetch(`/v1/events?city=${encodeURIComponent(location.city)}&country_code=${location.country_code}`);
+    
+    const data = await response.json();
+    if (!data.success) throw new Error("No events returned");
+    
+    return data.events || [];
+  } catch (error) {
+    console.warn("Events API failed, using fallback:", error);
+    return [
+      { 
+        title: "Local Food Market", 
+        emoji: "🥬", 
+        when: "Weekend mornings",
+        description: "Fresh produce and local specialties",
+        location: `${location.city} center`
+      },
+      { 
+        title: "Happy Hour Specials", 
+        emoji: "🍻", 
+        when: "Weekdays 5-7pm",
+        description: "Discounted appetizers and local favorites",
+        location: `${location.city} restaurants`
+      }
+    ];
+  }
+}
+
+// Render 3-card shortlist
+export function renderFoodShortlist(decisions, containerId = "shortlist-result") {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    console.error(`Container ${containerId} not found`);
+    return;
+  }
+
+  container.innerHTML = `
+    <div style="margin: 24px 20px;">
+      <h3 style="text-align: center; margin: 0 0 20px 0; font-size: 18px; font-weight: 700; color: #a5b4fc;">
+        Your 3 Perfect Picks
+      </h3>
+      <div style="display: grid; gap: 12px;">
+        ${decisions.map((decision, index) => `
+          <div class="decision-card" data-food="${decision.name}" style="
+            background: rgba(255,255,255,0.06); 
+            border: 1px solid rgba(255,255,255,0.12); 
+            border-radius: 12px; 
+            padding: 16px; 
+            cursor: pointer;
+            transition: all 0.2s ease;
+          " onclick="selectFood('${decision.name}')">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="font-size: 28px;">${decision.emoji}</div>
+              <div style="flex: 1;">
+                <div style="font-weight: 700; font-size: 16px; margin-bottom: 4px; color: #e5ecff;">
+                  ${decision.name}
+                </div>
+                <div style="font-size: 13px; color: #94a3b8; line-height: 1.4;">
+                  ${decision.explanation}
+                </div>
+              </div>
+              <div style="background: rgba(16, 185, 129, 0.2); border-radius: 16px; padding: 4px 8px; font-size: 11px; font-weight: 600; color: #10b981;">
+                #${index + 1}
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px;">
+        <button onclick="getNewPicks()" style="
+          padding: 12px; 
+          background: rgba(255,255,255,0.08); 
+          border: 1px solid rgba(255,255,255,0.15); 
+          border-radius: 12px; 
+          color: #e5ecff; 
+          font-weight: 700; 
+          cursor: pointer;
+          font-size: 14px;
+        ">
+          🔄 New Picks
+        </button>
+        <button onclick="showAdvancedMode()" style="
+          padding: 12px; 
+          background: rgba(124, 58, 237, 0.2); 
+          border: 1px solid rgba(124, 58, 237, 0.3); 
+          border-radius: 12px; 
+          color: #a5b4fc; 
+          font-weight: 700; 
+          cursor: pointer;
+          font-size: 14px;
+        ">
+          🧠 Add Mood
+        </button>
+      </div>
+    </div>
+  `;
+  
+  container.classList.remove('hidden');
+}
+
+// Helper functions for button clicks
+window.selectFood = function(foodName) {
+  console.log(`Selected: ${foodName}`);
+  const query = encodeURIComponent(`${foodName} near me`);
+  window.open(`https://maps.google.com/maps?q=${query}`, '_blank');
+};
+
+window.getNewPicks = async function() {
+  const location = { city: "London", country_code: "GB" }; // Get from app state
+  const decisions = await quickDecision(location, []);
+  renderFoodShortlist(decisions);
+};
+
+window.showAdvancedMode = function() {
+  const moodInput = document.getElementById('mood-input');
+  if (moodInput) {
+    moodInput.style.display = 'block';
+    moodInput.focus();
+  }
+  console.log('Advanced mode activated - add your mood for AI suggestions');
+};

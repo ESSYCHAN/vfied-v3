@@ -4,14 +4,18 @@
   "type": "module",
   "private": true,
   "scripts": {
-  "start": "node server/mcp-server.js",
-  "dev:server": "node --watch server/mcp-server.js",
-  "dev:app": "vite",
-  "dev": "npm-run-all -p dev:server dev:app",
-  "build": "vite build",
-  "preview": "vite preview", 
-  "server": "node server/mcp-server.js"
-},
+    "start": "node server/mcp-server.js",
+    "dev:server": "node --watch server/mcp-server.js",
+    "dev:app": "vite",
+    "dev": "npm-run-all -p dev:server dev:app",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node server/mcp-server.js",
+    "assets:cap": "npx @capacitor/assets generate",
+    "cap:sync": "npx cap sync",
+    "cap:ios": "npx cap open ios",
+    "cap:android": "npx cap open android"
+  },
   "dependencies": {
     "@capacitor/app": "^5.0.8",
     "@capacitor/core": "^5.7.8",

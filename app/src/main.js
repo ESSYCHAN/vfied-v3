@@ -1,4 +1,6 @@
-import { CONFIG } from './config.js';
+import { CONFIG } from '../config.js';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { db, COLLECTIONS } from './firebase.js';
 
 export const API_BASE = CONFIG.API_BASE;
 // VFIED Unified Main (Food + Social + Travel + Events) — with Toasts, Skeletons, Fallback & Stats

@@ -1,274 +1,187 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VFIED – One-Tap Shortlists</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; padding: 0; min-height: 100vh;
-      font-family: Inter, system-ui, -apple-system, sans-serif;
-      background: linear-gradient(180deg, #0a0e19, #070b14);
-      color: #e5ecff; line-height: 1.5;
-    }
-    #app { max-width: 430px; margin: 0 auto; min-height: 100vh; }
-    .glass-card { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-      border-radius: 16px; backdrop-filter: blur(20px); margin: 20px; padding: 20px; }
-    .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); backdrop-filter: blur(8px);
-      z-index:1000; opacity:0; transition:opacity .3s ease; }
-    .modal.active { display:flex!important; opacity:1; align-items:center; justify-content:center; padding:20px; }
-    .modal-content { background:rgba(10,14,25,.95); border:1px solid rgba(255,255,255,.12); border-radius:16px;
-      width:100%; max-width:400px; max-height:90vh; overflow:hidden; transform:translateY(20px); transition:transform .3s ease; }
-    .modal.active .modal-content { transform:translateY(0); }
-    .modal-header { display:flex; justify-content:space-between; align-items:center;
-      padding:20px 20px 16px; border-bottom:1px solid rgba(255,255,255,.1); }
-    .modal-title { font-size:18px; font-weight:700; margin:0; color:#e5ecff; }
-    .modal-close { background:rgba(255,255,255,.1); border:none; border-radius:50%; width:32px; height:32px;
-      display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:18px; color:#94a3b8; transition:.2s; }
-    .modal-close:hover { background:rgba(255,255,255,.15); color:#e5ecff; }
-    .modal-body { padding:20px; max-height:calc(90vh - 80px); overflow-y:auto; }
-    .dietary-prefs { background:rgba(255,255,255,0.04); border-radius:12px; padding:16px; margin-bottom:16px; }
-    .dietary-prefs h5 { margin:0 0 12px 0; font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px; }
-    .diet-chips { display:flex; flex-wrap:wrap; gap:8px; }
-    .diet-chip { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px;
-      font-size:12px; cursor:pointer; transition:.2s; user-select:none; }
-    .diet-chip.active { background: linear-gradient(135deg, #10b981, #059669); border-color:#10b981; color:#fff; }
-    .diet-chip:hover:not(.active) { background:rgba(255,255,255,.12); }
-    .tab-btn { border:0; padding:12px 16px; font-weight:700; background:transparent; border-radius:12px; cursor:pointer;
-      font-size:14px; transition:.2s; color:#94a3b8; }
-    .tab-btn.active { color:#fff; background: linear-gradient(135deg, #7c3aed, #6366f1); }
-    .tab-btn:hover:not(.active) { color:#cbd5e1; background: rgba(255,255,255,.04); }
-    #decide-button { width:100%; padding:20px; border:0; border-radius:16px; font-weight:900; color:#fff; font-size:18px; cursor:pointer;
-      background: linear-gradient(135deg, #7c3aed, #6366f1); box-shadow:0 20px 40px rgba(124,58,237,.3); transition:.3s; margin:20px 0; }
-    #decide-button:disabled { opacity:.6; cursor:not-allowed; }
-    #decide-button:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 25px 50px rgba(124,58,237,.4); }
-    .travel-mode-chip,.event-filter-chip { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15);
-      border-radius:10px; padding:12px; text-align:center; cursor:pointer; font-size:13px; font-weight:600; transition:.2s; }
-    .travel-mode-chip:hover,.event-filter-chip:hover { background:rgba(255,255,255,.12); transform:translateY(-1px); }
-    .travel-mode-chip.active { background: linear-gradient(135deg, rgba(124,58,237,.2), rgba(99,102,241,.2)); border-color:rgba(124,58,237,.3); color:#a5b4fc; }
-    .event-filter-chip.active,.time-filter.active { background:rgba(245,158,11,.2); border-color:rgba(245,158,11,.3); color:#fbbf24; }
-    .time-filter { flex:1; padding:8px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:8px;
-      font-size:12px; cursor:pointer; font-weight:600; transition:.2s; }
-    .time-filter:hover:not(.active) { background:rgba(255,255,255,.12); }
-    .travel-action-btn { padding:14px 12px; border:1px solid rgba(255,255,255,.15); background:rgba(255,255,255,.08); color:#e5ecff;
-      border-radius:10px; cursor:pointer; font-weight:700; text-align:center; font-size:12px; transition:.2s; }
-    .travel-action-btn:hover { background:rgba(255,255,255,.12); transform:translateY(-1px); }
-    .event-card { display:flex; align-items:flex-start; gap:12px; padding:14px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08);
-      border-radius:10px; margin-bottom:12px; cursor:pointer; transition:.2s; }
-    .event-card:hover { background:rgba(255,255,255,.08); transform:translateY(-1px); }
-    .event-emoji { font-size:20px; min-width:24px; }
-    .event-info { flex:1; }
-    .event-title { font-weight:700; font-size:14px; margin-bottom:4px; }
-    .event-details { font-size:12px; color:#94a3b8; margin-bottom:4px; }
-    .event-description { font-size:11px; color:#64748b; line-height:1.3; }
-    .suggestion-result { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:16px; padding:20px; margin:20px; }
-    .hidden { display:none !important; }
-    .quick-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:16px 0; }
-    .quick-action { padding:12px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.15); border-radius:12px; text-align:center;
-      cursor:pointer; font-size:13px; font-weight:600; transition:.2s; }
-    .quick-action:hover { background:rgba(255,255,255,.1); transform:translateY(-1px); }
-    .quick-action.primary { background: linear-gradient(135deg, rgba(34,197,94,.2), rgba(16,185,129,.2)); border-color:rgba(34,197,94,.3); }
-    @media (max-width: 480px) { #app { max-width:100%; } .glass-card { margin:16px; padding:16px; } .modal { padding:10px; } .modal-content { max-width:100%; } }
-    @keyframes loading { 0%{transform:translateX(-100%);} 50%{transform:translateX(200%);} 100%{transform:translateX(-100%);} }
-  </style>
-  <script async type="module" crossorigin src="/assets/index-C9V5b6hx.js"></script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>VFIED – One-Tap Shortlists</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+  <script type="module" crossorigin src="/assets/index-B0GWgYr6.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-B3UFU_jU.css">
   <script type="module">import.meta.url;import("_").catch(()=>1);(async function*(){})().next();window.__vite_is_modern_browser=true</script>
   <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
 </head>
-
-<body>
-  <div id="app">
-    <header style="text-align:center; padding:20px;">
-      <h1 style="font-weight:900; font-size:28px; margin:0 0 8px 0;
+<body class="vfied">
+<div id="app">
+<header style="text-align:center; padding:20px;">
+<h1 style="font-weight:900; font-size:28px; margin:0 0 8px 0;
                  background: linear-gradient(135deg, #fff, #c7d2fe);
                  -webkit-background-clip: text; background-clip:text; -webkit-text-fill-color:transparent; color:transparent;">
         VFIED 🍽️
       </h1>
-      <p style="color:#9fb0c9; font-size:13px; margin:0;">One-tap shortlist for food, travel, events</p>
-    </header>
-
-    <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,.04); border-radius:8px; padding:8px 12px; margin:20px; font-size:12px;">
-      <div style="display:flex; align-items:center; gap:4px; color:#10b981;">📍 <span id="location-display">London, GB</span></div>
-      <button id="change-location-btn" style="background:transparent; border:1px solid rgba(255,255,255,.2); border-radius:16px; padding:4px 8px; font-size:10px; cursor:pointer; color:#94a3b8;">
+<p style="color:#9fb0c9; font-size:13px; margin:0;">One-tap shortlist for food, travel, events</p>
+</header>
+<div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,.04); border-radius:8px; padding:8px 12px; margin:20px; font-size:12px;">
+<div style="display:flex; align-items:center; gap:4px; color:#10b981;">📍 <span id="location-display">London, GB</span></div>
+<button id="change-location-btn" style="background:transparent; border:1px solid rgba(255,255,255,.2); border-radius:16px; padding:4px 8px; font-size:10px; cursor:pointer; color:#94a3b8;">
         Change
       </button>
-    </div>
-
-    <div class="glass-card">
-      <div class="dietary-prefs">
-        <h5>🥗 Quick dietary filters (optional)</h5>
-        <div class="diet-chips">
-          <div class="diet-chip" data-diet="vegetarian">🌱 Vegetarian</div>
-          <div class="diet-chip" data-diet="vegan">🌿 Vegan</div>
-          <div class="diet-chip" data-diet="gluten-free">🌾 No Gluten</div>
-          <div class="diet-chip" data-diet="nut-free">🚫🥜 No Nuts</div>
-          <div class="diet-chip" data-diet="dairy-free">🥛❌ No Dairy</div>
-          <div class="diet-chip" data-diet="halal">☪️ Halal</div>
-        </div>
-      </div>
-
-      <h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">🧠 How are you feeling?</h3>
-      <div style="background:rgba(255,255,255,.04); padding:8px 12px; border-radius:8px; margin-bottom:16px; font-size:13px; color:#94a3b8;">
+</div>
+<div class="glass-card">
+<div class="dietary-prefs">
+<h5>🥗 Quick dietary filters (optional)</h5>
+<div class="diet-chips">
+<div class="diet-chip" data-diet="vegetarian">🌱 Vegetarian</div>
+<div class="diet-chip" data-diet="vegan">🌿 Vegan</div>
+<div class="diet-chip" data-diet="gluten-free">🌾 No Gluten</div>
+<div class="diet-chip" data-diet="nut-free">🚫🥜 No Nuts</div>
+<div class="diet-chip" data-diet="dairy-free">🥛❌ No Dairy</div>
+<div class="diet-chip" data-diet="halal">☪️ Halal</div>
+</div>
+</div>
+<h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">🧠 How are you feeling?</h3>
+<div style="background:rgba(255,255,255,.04); padding:8px 12px; border-radius:8px; margin-bottom:16px; font-size:13px; color:#94a3b8;">
         💡 Optional: “Stressed but want something healthy” works better than just “hungry”
       </div>
-      <input id="mood-input" placeholder="e.g., celebrating with friends, need comfort food, post-workout hungry..."
-             style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:12px; padding:14px 16px; font-size:15px; font-weight:500; margin-bottom:12px;" />
-    </div>
-
-    <div style="display:flex; justify-content:center; margin:20px 0;">
-      <div style="display:flex; gap:4px; padding:4px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:16px;">
-        <button class="tab-btn active" data-tab="food">🍽️ Food</button>
-        <button class="tab-btn" id="travel-modal-btn">✈️ Travel</button>
-        <button class="tab-btn" id="events-modal-btn">🎪 Events</button>
-      </div>
-    </div>
-
-    <div id="food-tab" class="tab-content">
-      <button id="decide-button">
-        <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
-          <span style="font-size:24px;">🎯</span>
-          <div>
-            <div>DECIDE FOR ME</div>
-            <div style="font-size:14px; opacity:.9; font-weight:600;">3 picks in seconds</div>
-          </div>
-        </div>
-      </button>
-    </div>
-
-    <div id="shortlist-result" class="shortlist-result hidden"></div>
-
-    <div id="suggestion-result" class="suggestion-result hidden">
-      <div style="text-align:center; margin:20px 0;">
-        <div id="result-emoji" style="font-size:48px; margin-bottom:12px;">🍔</div>
-        <h2 id="result-name" style="font-size:24px; font-weight:900; margin:0 0 8px 0;">Your Perfect Match</h2>
-      </div>
-      <div style="background:rgba(255,255,255,.06); border-radius:12px; padding:12px; margin:16px 0;">
-        <h5 style="margin:0 0 8px 0; font-size:14px; font-weight:700; color:#a5b4fc;">🤔 Why this choice?</h5>
-        <p id="reasoning-text" style="margin:0; font-size:13px; line-height:1.4; color:#cbd5e1;">Based on your mood and preferences, this hits the perfect balance.</p>
-      </div>
-      <div class="quick-actions">
-        <div class="quick-action primary" id="accept-btn">✅ Perfect!</div>
-        <div class="quick-action" id="share-btn">📤 Share</div>
-        <div class="quick-action" id="get-directions-btn">🗺️ Directions</div>
-        <div class="quick-action" id="try-again-btn">🔄 Try Again</div>
-      </div>
-    </div>
-
-    <!-- Travel Modal -->
-    <div id="travel-modal" class="modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="modal-title">🧳 Your Travel Food Coach</h2>
-          <button class="modal-close" id="travel-modal-close">×</button>
-        </div>
-        <div class="modal-body">
-          <div style="background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(99,102,241,0.1)); border:1px solid rgba(124,58,237,0.2); border-radius:12px; padding:16px; margin-bottom:20px; text-align:center;">
-            <p style="margin:0; font-size:13px; color:#94a3b8;">New to <span style="color:#a5b4fc; font-weight:700;" id="travel-modal-city">London</span>? I’ll map your perfect food journey.</p>
-          </div>
-
-          <div style="margin-bottom:20px;">
-            <h5 style="margin:0 0 12px 0; font-weight:700;">🎯 What brings you here?</h5>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-              <div class="travel-mode-chip active" data-mode="exploring">🗺️ Exploring</div>
-              <div class="travel-mode-chip" data-mode="business">💼 Business</div>
-              <div class="travel-mode-chip" data-mode="date">💕 Date Night</div>
-              <div class="travel-mode-chip" data-mode="family">👨‍👩‍👧‍👦 Family</div>
-            </div>
-          </div>
-
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
-            <div>
-              <label style="font-size:13px; font-weight:600; margin-bottom:6px; display:block;">⏱️ How long?</label>
-              <select id="travel-duration-modal" style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;">
-                <option value="quick">2-3 hours</option>
-                <option value="half-day">Half day</option>
-                <option value="full-day" selected>Full day</option>
-                <option value="weekend">Weekend</option>
-              </select>
-            </div>
-            <div>
-              <label style="font-size:13px; font-weight:600; margin-bottom:6px; display:block;">💰 Budget</label>
-              <select id="travel-budget-modal" style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;">
-                <option value="budget">Budget ($)</option>
-                <option value="medium" selected>Moderate ($$)</option>
-                <option value="premium">Premium ($$$)</option>
-                <option value="luxury">Luxury ($$$$)</option>
-              </select>
-            </div>
-          </div>
-
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
-            <button class="travel-action-btn" id="night-plan-modal-btn">🌙 Plan My Night</button>
-            <button class="travel-action-btn" id="food-crawl-modal-btn">🍽️ Food Crawl</button>
-            <button class="travel-action-btn" id="city-guide-modal-btn">🗺️ City Guide</button>
-            <button class="travel-action-btn" id="hidden-gems-modal-btn">💎 Hidden Gems</button>
-          </div>
-
-          <div style="background:rgba(255,255,255,.04); border-radius:10px; padding:12px; margin-bottom:16px;">
-            <h6 style="margin:0 0 8px 0; font-size:13px; font-weight:700; color:#a5b4fc;">🤖 Ask your travel coach</h6>
-            <input id="travel-query-modal" placeholder="e.g., best ramen in Tokyo for first-timer" style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:8px; padding:10px; font-size:13px; margin-bottom:8px;" />
-            <button id="ask-coach-modal-btn" style="width:100%; padding:10px; background: linear-gradient(135deg, #7c3aed, #6366f1); border:0; border-radius:8px; color:white; font-weight:700; font-size:13px; cursor:pointer;">Ask Coach</button>
-          </div>
-
-          <div id="travel-results-modal" class="hidden"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Events Modal -->
-    <div id="events-modal" class="modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="modal-title">🎪 Events in <span id="events-modal-city">London</span></h2>
-          <button class="modal-close" id="events-modal-close">×</button>
-        </div>
-        <div class="modal-body">
-          <div style="background: linear-gradient(135deg, rgba(245,158,11,.1), rgba(251,191,36,.1)); border:1px solid rgba(245,158,11,.2); border-radius:12px; padding:16px; margin-bottom:20px; text-align:center;">
-            <p style="margin:0; font-size:13px; color:#94a3b8;">Never miss the good stuff — food fests, markets, tastings & more</p>
-          </div>
-
-          <div style="margin-bottom:20px;">
-            <h5 style="margin:0 0 12px 0; font-weight:700;">🏷️ Show me:</h5>
-            <div style="display:flex; flex-wrap:wrap; gap:8px;">
-              <div class="event-filter-chip active" data-category="all">All Events</div>
-              <div class="event-filter-chip" data-category="food">🍽️ Food</div>
-              <div class="event-filter-chip" data-category="music">🎵 Music</div>
-              <div class="event-filter-chip" data-category="market">🏪 Markets</div>
-              <div class="event-filter-chip" data-category="culture">🎭 Culture</div>
-              <div class="event-filter-chip" data-category="nightlife">🌃 Nightlife</div>
-            </div>
-          </div>
-
-          <div style="margin-bottom:20px;">
-            <h5 style="margin:0 0 8px 0; font-weight:700;">📅 When:</h5>
-            <div style="display:flex; gap:8px;">
-              <button class="time-filter active" data-time="today">Today</button>
-              <button class="time-filter" data-time="tomorrow">Tomorrow</button>
-              <button class="time-filter" data-time="weekend">Weekend</button>
-              <button class="time-filter" data-time="this_week">This Week</button>
-            </div>
-          </div>
-
-          <div id="events-grid-modal">
-            <div style="text-align:center; padding:20px; color:#94a3b8;">🎪 Loading events...</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <footer style="background: rgba(0,0,0,.2); backdrop-filter: blur(15px); padding:20px; text-align:center; font-size:12px; color:#9fb0c9;">
-      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:12px;">
-        <div><span style="font-size:18px; font-weight:800; color:#e5ecff; display:block;" id="decisions-count">0</span><span style="font-size:10px; color:#94a3b8;">DECISIONS</span></div>
-        <div><span style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">94%</span><span style="font-size:10px; color:#94a3b8;">ACCURACY</span></div>
-        <div><span style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">127</span><span style="font-size:10px; color:#94a3b8;">CITIES</span></div>
-      </div>
-      <div>🌐 Connected • All systems operational</div>
-    </footer>
-  </div>
-
-  <script>
+<input id="mood-input" placeholder="e.g., celebrating with friends, need comfort food, post-workout hungry..." style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:12px; padding:14px 16px; font-size:15px; font-weight:500; margin-bottom:12px;"/>
+</div>
+<div style="display:flex; justify-content:center; margin:20px 0;">
+<div style="display:flex; gap:4px; padding:4px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:16px;">
+<button class="tab-btn active" data-tab="food">🍽️ Food</button>
+<button class="tab-btn" id="travel-modal-btn">✈️ Travel</button>
+<button class="tab-btn" id="events-modal-btn">🎪 Events</button>
+</div>
+</div>
+<div class="tab-content" id="food-tab">
+<button id="decide-button">
+<div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+<span style="font-size:24px;">🎯</span>
+<div>
+<div>DECIDE FOR ME</div>
+<div style="font-size:14px; opacity:.9; font-weight:600;">3 picks in seconds</div>
+</div>
+</div>
+</button>
+</div>
+<div class="shortlist-result hidden" id="shortlist-result"></div>
+<div class="suggestion-result hidden" id="suggestion-result">
+<div style="text-align:center; margin:20px 0;">
+<div id="result-emoji" style="font-size:48px; margin-bottom:12px;">🍔</div>
+<h2 id="result-name" style="font-size:24px; font-weight:900; margin:0 0 8px 0;">Your Perfect Match</h2>
+</div>
+<div style="background:rgba(255,255,255,.06); border-radius:12px; padding:12px; margin:16px 0;">
+<h5 style="margin:0 0 8px 0; font-size:14px; font-weight:700; color:#a5b4fc;">🤔 Why this choice?</h5>
+<p id="reasoning-text" style="margin:0; font-size:13px; line-height:1.4; color:#cbd5e1;">Based on your mood and preferences, this hits the perfect balance.</p>
+</div>
+<div class="quick-actions">
+<div class="quick-action primary" id="accept-btn">✅ Perfect!</div>
+<div class="quick-action" id="share-btn">📤 Share</div>
+<div class="quick-action" id="get-directions-btn">🗺️ Directions</div>
+<div class="quick-action" id="try-again-btn">🔄 Try Again</div>
+</div>
+</div>
+<!-- Travel Modal -->
+<div class="modal" id="travel-modal">
+<div class="modal-content">
+<div class="modal-header">
+<h2 class="modal-title">🧳 Your Travel Food Coach</h2>
+<button class="modal-close" id="travel-modal-close">×</button>
+</div>
+<div class="modal-body">
+<div style="background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(99,102,241,0.1)); border:1px solid rgba(124,58,237,0.2); border-radius:12px; padding:16px; margin-bottom:20px; text-align:center;">
+<p style="margin:0; font-size:13px; color:#94a3b8;">New to <span id="travel-modal-city" style="color:#a5b4fc; font-weight:700;">London</span>? I’ll map your perfect food journey.</p>
+</div>
+<div style="margin-bottom:20px;">
+<h5 style="margin:0 0 12px 0; font-weight:700;">🎯 What brings you here?</h5>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+<div class="travel-mode-chip active" data-mode="exploring">🗺️ Exploring</div>
+<div class="travel-mode-chip" data-mode="business">💼 Business</div>
+<div class="travel-mode-chip" data-mode="date">💕 Date Night</div>
+<div class="travel-mode-chip" data-mode="family">👨‍👩‍👧‍👦 Family</div>
+</div>
+</div>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px;">
+<div>
+<label style="font-size:13px; font-weight:600; margin-bottom:6px; display:block;">⏱️ How long?</label>
+<select id="travel-duration-modal" style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;">
+<option value="quick">2-3 hours</option>
+<option value="half-day">Half day</option>
+<option selected="" value="full-day">Full day</option>
+<option value="weekend">Weekend</option>
+</select>
+</div>
+<div>
+<label style="font-size:13px; font-weight:600; margin-bottom:6px; display:block;">💰 Budget</label>
+<select id="travel-budget-modal" style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;">
+<option value="budget">Budget ($)</option>
+<option selected="" value="medium">Moderate ($$)</option>
+<option value="premium">Premium ($$$)</option>
+<option value="luxury">Luxury ($$$$)</option>
+</select>
+</div>
+</div>
+<div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;">
+<button class="travel-action-btn" id="night-plan-modal-btn">🌙 Plan My Night</button>
+<button class="travel-action-btn" id="food-crawl-modal-btn">🍽️ Food Crawl</button>
+<button class="travel-action-btn" id="city-guide-modal-btn">🗺️ City Guide</button>
+<button class="travel-action-btn" id="hidden-gems-modal-btn">💎 Hidden Gems</button>
+</div>
+<div style="background:rgba(255,255,255,.04); border-radius:10px; padding:12px; margin-bottom:16px;">
+<h6 style="margin:0 0 8px 0; font-size:13px; font-weight:700; color:#a5b4fc;">🤖 Ask your travel coach</h6>
+<input id="travel-query-modal" placeholder="e.g., best ramen in Tokyo for first-timer" style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:8px; padding:10px; font-size:13px; margin-bottom:8px;"/>
+<button id="ask-coach-modal-btn" style="width:100%; padding:10px; background: linear-gradient(135deg, #7c3aed, #6366f1); border:0; border-radius:8px; color:white; font-weight:700; font-size:13px; cursor:pointer;">Ask Coach</button>
+</div>
+<div class="hidden" id="travel-results-modal"></div>
+</div>
+</div>
+</div>
+<!-- Events Modal -->
+<div class="modal" id="events-modal">
+<div class="modal-content">
+<div class="modal-header">
+<h2 class="modal-title">🎪 Events in <span id="events-modal-city">London</span></h2>
+<button class="modal-close" id="events-modal-close">×</button>
+</div>
+<div class="modal-body">
+<div style="background: linear-gradient(135deg, rgba(245,158,11,.1), rgba(251,191,36,.1)); border:1px solid rgba(245,158,11,.2); border-radius:12px; padding:16px; margin-bottom:20px; text-align:center;">
+<p style="margin:0; font-size:13px; color:#94a3b8;">Never miss the good stuff — food fests, markets, tastings &amp; more</p>
+</div>
+<div style="margin-bottom:20px;">
+<h5 style="margin:0 0 12px 0; font-weight:700;">🏷️ Show me:</h5>
+<div style="display:flex; flex-wrap:wrap; gap:8px;">
+<div class="event-filter-chip active" data-category="all">All Events</div>
+<div class="event-filter-chip" data-category="food">🍽️ Food</div>
+<div class="event-filter-chip" data-category="music">🎵 Music</div>
+<div class="event-filter-chip" data-category="market">🏪 Markets</div>
+<div class="event-filter-chip" data-category="culture">🎭 Culture</div>
+<div class="event-filter-chip" data-category="nightlife">🌃 Nightlife</div>
+</div>
+</div>
+<div style="margin-bottom:20px;">
+<h5 style="margin:0 0 8px 0; font-weight:700;">📅 When:</h5>
+<div style="display:flex; gap:8px;">
+<button class="time-filter active" data-time="today">Today</button>
+<button class="time-filter" data-time="tomorrow">Tomorrow</button>
+<button class="time-filter" data-time="weekend">Weekend</button>
+<button class="time-filter" data-time="this_week">This Week</button>
+</div>
+</div>
+<div id="events-grid-modal">
+<div style="text-align:center; padding:20px; color:#94a3b8;">🎪 Loading events...</div>
+</div>
+</div>
+</div>
+</div>
+<footer style="background: rgba(0,0,0,.2); backdrop-filter: blur(15px); padding:20px; text-align:center; font-size:12px; color:#9fb0c9;">
+<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:12px;">
+<div><span id="decisions-count" style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">0</span><span style="font-size:10px; color:#94a3b8;">DECISIONS</span></div>
+<div><span style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">94%</span><span style="font-size:10px; color:#94a3b8;">ACCURACY</span></div>
+<div><span style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">127</span><span style="font-size:10px; color:#94a3b8;">CITIES</span></div>
+</div>
+<div>🌐 Connected • All systems operational</div>
+</footer>
+</div>
+<script>
     const COUNTRY_MAP = {
       'united kingdom': 'GB','uk':'GB','great britain':'GB','england':'GB',
       'united states':'US','usa':'US','us':'US','america':'US',
@@ -1127,38 +1040,39 @@
 
     document.addEventListener('DOMContentLoaded', () => { window.vfiedApp = new VFIEDApp(); });
   </script>
-  <!-- Location Modal -->
-<div id="location-modal" class="modal">
-  <div class="modal-content">
-    <div class="modal-header">
-      <h2 class="modal-title">📍 Set Location</h2>
-      <button class="modal-close" id="location-modal-close">×</button>
-    </div>
-    <div class="modal-body">
-      <div style="display:grid; gap:12px;">
-        <div>
-          <label style="font-size:12px; font-weight:700; color:#94a3b8;">City</label>
-          <input id="location-city-input" placeholder="e.g., Kampala"
-                 style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;">
-        </div>
-        <div>
-          <label style="font-size:12px; font-weight:700; color:#94a3b8;">Country</label>
-          <select id="location-country-select"
-                  style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;">
-            <option value="">Loading countries…</option>
-          </select>
-        </div>
-        <div style="display:flex; gap:8px; margin-top:6px;">
-          <button id="location-detect-btn" class="travel-action-btn" style="flex:1;">📡 Detect</button>
-          <button id="location-save-btn" class="travel-action-btn" style="flex:1; background:linear-gradient(135deg, #7c3aed22, #6366f122); border-color:#7c3aed55; color:#c7d2fe;">✅ Save</button>
-        </div>
-      </div>
-    </div>
-  </div>
+<!-- Location Modal -->
+<div class="modal" id="location-modal">
+<div class="modal-content">
+<div class="modal-header">
+<h2 class="modal-title">📍 Set Location</h2>
+<button class="modal-close" id="location-modal-close">×</button>
 </div>
-
+<div class="modal-body">
+<div style="display:grid; gap:12px;">
+<div>
+<label style="font-size:12px; font-weight:700; color:#94a3b8;">City</label>
+<input id="location-city-input" placeholder="e.g., Kampala" style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;"/>
+</div>
+<div>
+<label style="font-size:12px; font-weight:700; color:#94a3b8;">Country</label>
+<select id="location-country-select" style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;">
+<option value="">Loading countries…</option>
+</select>
+</div>
+<div style="display:flex; gap:8px; margin-top:6px;">
+<button class="travel-action-btn" id="location-detect-btn" style="flex:1;">📡 Detect</button>
+<button class="travel-action-btn" id="location-save-btn" style="flex:1; background:linear-gradient(135deg, #7c3aed22, #6366f122); border-color:#7c3aed55; color:#c7d2fe;">✅ Save</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- CSS -->
+<!-- Manifest (put your manifest.json in /app) -->
+<link rel="manifest" href="./manifest.json">
+<!-- Main script -->
   <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
-  <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-B93rlMtN.js"></script>
-  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-CnvmjJHj.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
+  <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-8Segw8u9.js"></script>
+  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-CTTgt5ZA.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
 </body>
 </html>

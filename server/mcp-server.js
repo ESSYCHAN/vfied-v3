@@ -529,22 +529,30 @@ function resolveCountryCode(raw, fallback='GB') {
 app.post('/v1/quick_decision', async (req, res) => {
   const t0 = Date.now();
   try {
-    // 1) Validate & allow mood_text + unknown keys (prevents 400s on extra fields)
-    const { value, error } = SCHEMA.prefs({ allowUnknown: true, stripUnknown: true }).validate(req.body || {});
-    
+    // Extend base schema to allow mood_text, and allow unknowns at top level
+    const SCHEMA = QUICK_SCHEMA.keys({
+      mood_text: Joi.string().allow('', null)
+    }).unknown(true);
+
+    const { value, error } = SCHEMA.validate(req.body || {});
     if (error) {
+      // Helpful server-side log
+      console.warn('[quick_decision] validation error:', error.details?.[0]?.message || error.message);
       return res.status(400).json({ success: false, error: error.message });
     }
 
-    // 2) Sanitize inputs (defensive)
+    // ---- use value.location.* safely here ----
+    // e.g., normalize aliases
     const locIn = value.location || {};
     const location = {
       city: String(locIn.city || '').trim(),
       country: String(locIn.country || '').trim(),
-      country_code: resolveCountryCode(locIn.country_code || locIn.country || ''),
-
-      latitude: typeof locIn.latitude === 'number' ? locIn.latitude : undefined,
-      longitude: typeof locIn.longitude === 'number' ? locIn.longitude : undefined
+      country_code: String(locIn.country_code || locIn.countryCode || '')
+        .trim()
+        .slice(0, 2)
+        .toUpperCase(),
+      latitude: typeof (locIn.latitude ?? locIn.lat) === 'number' ? (locIn.latitude ?? locIn.lat) : undefined,
+      longitude: typeof (locIn.longitude ?? locIn.lng) === 'number' ? (locIn.longitude ?? locIn.lng) : undefined
     };
     const dietary = Array.isArray(value.dietary)
       ? value.dietary.map((d) => String(d).toLowerCase())
@@ -671,17 +679,9 @@ Avoid chains. Prefer widely available items.`;
       processingTimeMs: Date.now() - t0,
       source: 'fallback'
     });
-  } catch (err) {
-    console.error('Quick decision error:', err);
-    // Never leak a 500 if we can give *something* useful
-    const safe = shuffle(GLOBAL_POOL).slice(0, 3);
-    return res.status(200).json({
-      success: true,
-      request_id: randomUUID?.() || String(Date.now()),
-      decisions: safe,
-      note: 'emergency-fallback',
-      processingTimeMs: Date.now() // not exact, but fine
-    });
+  } catch (e) {
+    console.error('Quick decision error:', e);
+    return res.status(500).json({ success: false, error: e.message });
   }
 });
 
