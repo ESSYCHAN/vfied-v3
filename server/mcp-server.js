@@ -41,6 +41,67 @@ const MOODS_FALLBACK = [
   { id: 'RELAX', group: 'Emotion', synonyms: ['cozy','chill','comforting','calm'] },
   { id: 'ADVENTUROUS', group: 'Intent', synonyms: ['spicy','new cuisine','explore','try something new'] },
 ];
+// ===== Spec-aligned but tolerant validators =====
+
+const DietaryTag = Joi.string().valid('vegetarian','vegan','gluten-free','dairy-free','halal','nut-free');
+const LocationLoose = Joi.alternatives().try(
+  Joi.object({
+    city: Joi.string().allow('', null),
+    country: Joi.string().allow('', null),
+    country_code: Joi.string().min(2).max(2).uppercase().allow('', null),
+    countryCode: Joi.string().min(2).max(2).uppercase().allow('', null),
+    latitude: Joi.alternatives(Joi.number(), Joi.string()),
+    longitude: Joi.alternatives(Joi.number(), Joi.string()),
+    lat: Joi.alternatives(Joi.number(), Joi.string()),
+    lng: Joi.alternatives(Joi.number(), Joi.string())
+  }).unknown(true),
+  Joi.string() // "City, CC"
+).default({});
+
+const QuickDecisionSchema = Joi.object({
+  location: LocationLoose,
+  dietary: Joi.alternatives().try(Joi.array().items(DietaryTag), DietaryTag, Joi.array().items(Joi.string()), Joi.string()).default([]),
+  mood_text: Joi.string().allow('', null),
+  budget: Joi.string().valid('budget','medium','premium','luxury').optional(),
+  social: Joi.string().optional()
+}).unknown(true);
+
+const RecommendSchema = Joi.object({
+  location: LocationLoose.required(),
+  mood_text: Joi.string().allow('', null),
+  dietary: Joi.alternatives().try(Joi.array().items(DietaryTag), DietaryTag, Joi.array().items(Joi.string()), Joi.string()).default([]),
+  social: Joi.string().valid('solo','date','family','friends','work').optional(),
+  budget: Joi.string().valid('budget','medium','premium','luxury').optional()
+}).unknown(true);
+
+// ===== Normalizers =====
+const toNum = (v) => (typeof v === 'number' ? v : (Number.isFinite(Number(v)) ? Number(v) : undefined));
+const parseCityString = (s) => {
+  if (typeof s !== 'string') return {};
+  const [c, cc] = s.split(',').map(x => (x||'').trim());
+  return { city: c || '', country_code: (cc||'').slice(0,2).toUpperCase() };
+};
+const normalizeLocation = (loc) => {
+  if (typeof loc === 'string') loc = parseCityString(loc);
+  const cc = String(loc?.country_code || loc?.countryCode || '').trim().slice(0,2).toUpperCase();
+  return {
+    city: String(loc?.city || '').trim(),
+    country: String(loc?.country || '').trim(),
+    country_code: cc || undefined,
+    latitude: toNum(loc?.latitude ?? loc?.lat),
+    longitude: toNum(loc?.longitude ?? loc?.lng)
+  };
+};
+const normalizeDietary = (d) => {
+  const arr = Array.isArray(d) ? d : (d ? [d] : []);
+  return arr.filter(Boolean).map(s => String(s).trim().toLowerCase());
+};
+
+function normalizeQuickPayload(value = {}) {
+  const location = normalizeLocation(value.location);
+  const dietary = normalizeDietary(value.dietary);
+  return { ...value, location, dietary };
+}
 
 // Countries processing
 function extractCountriesFromModule(mod) {
@@ -132,15 +193,17 @@ const rawMoods = extractMoodsFromModule(moodsModule).map(normalizeMood).filter(B
 const MOODS_TAXONOMY = moods.length ? moods : MOODS_FALLBACK;
 
 const QUICK_SCHEMA = Joi.object({
-  location: Joi.object({
-    city: Joi.string().allow('', null),
-    country: Joi.string().allow('', null),
-    country_code: Joi.string().length(2).uppercase().allow('', null),
-    latitude: Joi.number().optional(),
-    longitude: Joi.number().optional()
-  }).default({}),
-  dietary: Joi.array().items(Joi.string().lowercase()).default([])
-});
+  location: LocationLoose,
+  dietary: Joi.alternatives().try(
+    Joi.array().items(DietaryTag),
+    DietaryTag,
+    Joi.array().items(Joi.string()),
+    Joi.string()
+  ).default([]),
+  mood_text: Joi.string().allow('', null),
+  budget: Joi.string().valid('budget','medium','premium','luxury').optional(),
+  social: Joi.string().optional()
+}).unknown(true);
 
 
 
@@ -482,206 +545,113 @@ Return STRICT JSON:
 // ===== CORE ENDPOINTS =====
 
 // ✅ Health check - MATCHES OpenAPI
-app.get('/health', (_req, res) => {
-  const USE_GPT = String(process.env.USE_GPT || '').toLowerCase() === 'true';
-  const hasOpenAIKey = !!process.env.OPENAI_API_KEY;
-  const hasWeatherKey = !!process.env.OPENWEATHER_API_KEY;
-  const USE_EVENTS_PROVIDER = String(process.env.USE_EVENTS_PROVIDER || '').toLowerCase() === 'true';
-
-  res.json({
-    status: 'healthy',
-    service: 'VFIED MCP Server',
-    version: '2.2.0', // ✅ Match OpenAPI version
-    features: [
-      'global_recommend',
-      'vendor_menus',
-      'countries_lookup',
-      'moods_mapping',
-      'events',
-      'travel_highlights',
-      'travel_plan',
-      'data_freshness_tracking',
-      'coverage_analysis'
-    ],
-    services: {
-      gpt: (USE_GPT && hasOpenAIKey) ? 'on' : 'off',
-      weather: hasWeatherKey ? 'on' : 'off',
-      events_provider: USE_EVENTS_PROVIDER ? 'on' : 'off'
-    },
-    timestamp: new Date().toISOString()
-  });
-});
-function resolveCountryCode(raw, fallback='GB') {
-  if (!raw) return fallback;
-  const t = String(raw).trim();
-  // exact ISO2
-  if (/^[A-Za-z]{2}$/.test(t)) return t.toUpperCase();
-  // try by name using COUNTRIES_LIST (already computed on boot)
-  const hit = COUNTRIES_LIST.find(c =>
-    [c.name, c.commonName, c.official, c.country]
-      .filter(Boolean)
-      .some(n => String(n).toLowerCase() === t.toLowerCase())
-  );
-  return hit?.code || hit?.country_code || fallback;
-}
-// Add this endpoint to your server/mcp-server.js
-// ---- Replace ALL previous /v1/quick_decision routes with this one ----
 app.post('/v1/quick_decision', async (req, res) => {
   const t0 = Date.now();
   try {
-    // Extend base schema to allow mood_text, and allow unknowns at top level
-    const SCHEMA = QUICK_SCHEMA.keys({
-      mood_text: Joi.string().allow('', null)
-    }).unknown(true);
-
-    const { value, error } = SCHEMA.validate(req.body || {});
+    // permissive validate (no hard 400 on shape)
+    const { value, error } = QUICK_SCHEMA.validate(req.body || {}, { abortEarly:false, convert:true });
     if (error) {
-      // Helpful server-side log
-      console.warn('[quick_decision] validation error:', error.details?.[0]?.message || error.message);
-      return res.status(400).json({ success: false, error: error.message });
+      // log but DO NOT fail the request
+      console.warn('[quick_decision] validation warning:', error.details?.map(d=>d.message).join(' | ') || error.message, 'payload=', req.body);
     }
 
-    // ---- use value.location.* safely here ----
-    // e.g., normalize aliases
-    const locIn = value.location || {};
-    const location = {
-      city: String(locIn.city || '').trim(),
-      country: String(locIn.country || '').trim(),
-      country_code: String(locIn.country_code || locIn.countryCode || '')
-        .trim()
-        .slice(0, 2)
-        .toUpperCase(),
-      latitude: typeof (locIn.latitude ?? locIn.lat) === 'number' ? (locIn.latitude ?? locIn.lat) : undefined,
-      longitude: typeof (locIn.longitude ?? locIn.lng) === 'number' ? (locIn.longitude ?? locIn.lng) : undefined
-    };
-    const dietary = Array.isArray(value.dietary)
-      ? value.dietary.map((d) => String(d).toLowerCase())
-      : [];
-    const mood_text = String(value.mood_text || '').trim();
+    // normalize to canonical
+    const v = value || {};
+    const loc = normalizeLocation(v.location);
+    const dietary = normalizeDietary(v.dietary);
+    const mood_text = String(v.mood_text || '').trim();
+    const cc = (loc.country_code || 'GB').toUpperCase();
 
-    // Ensure we have a usable cc
-    const cc = location.country_code || 'GB';
-
-    // 3) Try GPT for 3 local, diet-aware picks (strict JSON)
+    // === Try GPT (optional) ===
     if (USE_GPT && OPENAI_API_KEY) {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 22000);
-
         const system = `You are VFIED, a concise, culturally-aware food picker.
-Return STRICT JSON: {"decisions":[{"name":"...","emoji":"...","explanation":"..."}]}. No prose. Exactly 3 items.
-If a requested diet conflicts with local staples, choose safe alternatives still local to the region.`;
-
+Return STRICT JSON: {"decisions":[{"name":"...","emoji":"...","explanation":"..."}]}. No prose. Exactly 3 items.`;
         const user = `
-CITY: ${location.city || 'Unknown'}
+CITY: ${loc.city || 'Unknown'}
 COUNTRY_CODE: ${cc}
 DIETARY: ${dietary.join(', ') || 'none'}
 MOOD: ${mood_text || 'not provided'}
 
-TASK: Suggest 3 specific local dishes or common meals available in this city (or country if city is unknown).
-Each item: { "name": "<dish>", "emoji": "🍽️", "explanation": "<why this fits mood/diet/location>" }.
-Avoid chains. Prefer widely available items.`;
+TASK: Suggest 3 specific local dishes (avoid chains).`;
 
-        const gptResp = await fetch('https://api.openai.com/v1/chat/completions', {
+        const r = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
-          headers: {
-            Authorization: `Bearer ${OPENAI_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            model: OPENAI_MODEL, // e.g. 'gpt-4o-mini'
+            model: OPENAI_MODEL,
             response_format: { type: 'json_object' },
             temperature: 0.7,
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: user }
-            ]
+            messages: [{ role:'system', content:system }, { role:'user', content:user }]
           }),
           signal: controller.signal
         });
-
         clearTimeout(timeout);
 
-        if (!gptResp.ok) {
-          // fall through to fallback
-          throw new Error(`OpenAI HTTP ${gptResp.status}`);
-        }
+        if (r.ok) {
+          const j = await r.json();
+          const raw = j?.choices?.[0]?.message?.content?.trim();
+          const parsed = raw ? JSON.parse(raw) : null;
+          let decisions = Array.isArray(parsed?.decisions) ? parsed.decisions : [];
+          decisions = decisions
+            .filter(d => d && d.name)
+            .filter(d => validateDietaryCompliance(d.name, dietary))
+            .slice(0,3);
 
-        const j = await gptResp.json();
-        const raw = j?.choices?.[0]?.message?.content?.trim();
-        let parsed;
-        try {
-          parsed = raw ? JSON.parse(raw) : null;
-        } catch {
-          parsed = null;
-        }
-
-        let decisions = Array.isArray(parsed?.decisions) ? parsed.decisions : [];
-
-        // 4) Enforce dietary compliance (simple name check)
-        decisions = decisions
-          .filter((d) => d && d.name)
-          .filter((d) => validateDietaryCompliance(d.name, dietary))
-          .slice(0, 3);
-
-        // Top up with country/global pool if GPT gave < 3 or got filtered out
-        if (decisions.length < 3) {
-          const pool = pickCountryPool(cc);
-          const fill = pool
-            .filter((p) => validateDietaryCompliance(p.name, dietary))
-            .map((p) => ({ name: p.name, emoji: p.emoji, explanation: p.explanation }));
-          // Dedup by name
-          const names = new Set(decisions.map((d) => d.name));
-          for (const f of fill) {
-            if (!names.has(f.name)) {
-              decisions.push(f);
-              names.add(f.name);
-              if (decisions.length >= 3) break;
+          // top-up from pool if needed
+          if (decisions.length < 3) {
+            const pool = pickCountryPool(cc);
+            const fill = pool
+              .filter(p => validateDietaryCompliance(p.name, dietary))
+              .map(p => ({ name:p.name, emoji:p.emoji, explanation:p.explanation }));
+            const names = new Set(decisions.map(d=>d.name));
+            for (const f of fill) {
+              if (!names.has(f.name)) { decisions.push(f); names.add(f.name); if (decisions.length>=3) break; }
             }
           }
-        }
 
-        if (decisions.length >= 1) {
-          return res.json({
-            success: true,
-            request_id: randomUUID?.() || String(Date.now()),
-            decisions: decisions.slice(0, 3),
-            location: { city: location.city || 'Unknown', country_code: cc },
-            processingTimeMs: Date.now() - t0,
-            source: 'gpt'
-          });
+          if (decisions.length) {
+            return res.json({
+              success:true,
+              request_id: randomUUID?.() || String(Date.now()),
+              decisions: decisions.slice(0,3),
+              location: { city: loc.city || 'Unknown', country_code: cc },
+              processingTimeMs: Date.now() - t0,
+              note: dietary.length ? `Dietary: ${dietary.join(', ')}` : 'No dietary filters',
+              source:'gpt'
+            });
+          }
         }
-        // else fall through to fallback
       } catch (e) {
-        // GPT failed — we’ll gracefully fallback below
         console.warn('[quick_decision] GPT failed -> fallback:', e?.message || e);
       }
     }
 
-    // 5) Fallback (country → global), with diet filter + top-up
-    const basePool = pickCountryPool(cc);
-    let shortlist = shuffle(
-      basePool.filter((i) => validateDietaryCompliance(i.name, dietary))
-    ).slice(0, 3);
-
+    // === Fallback: country pool -> global ===
+    const base = pickCountryPool(cc);
+    let shortlist = shuffle(base.filter(i => validateDietaryCompliance(i.name, dietary))).slice(0,3);
     if (shortlist.length < 3) {
-      const topUp = shuffle(GLOBAL_POOL).filter(
-        (i) => validateDietaryCompliance(i.name, dietary) && !shortlist.find((s) => s.name === i.name)
+      const topUp = shuffle(GLOBAL_POOL).filter(i =>
+        validateDietaryCompliance(i.name, dietary) && !shortlist.find(s => s.name === i.name)
       );
-      shortlist = [...shortlist, ...topUp].slice(0, 3);
+      shortlist = [...shortlist, ...topUp].slice(0,3);
     }
 
     return res.json({
-      success: true,
+      success:true,
       request_id: randomUUID?.() || String(Date.now()),
       decisions: shortlist,
-      location: { city: location.city || 'Unknown', country_code: cc },
+      location: { city: loc.city || 'Unknown', country_code: cc },
       processingTimeMs: Date.now() - t0,
-      source: 'fallback'
+      note: dietary.length ? `Dietary: ${dietary.join(', ')}` : 'No dietary filters',
+      source:'fallback'
     });
   } catch (e) {
     console.error('Quick decision error:', e);
-    return res.status(500).json({ success: false, error: e.message });
+    // still never 400 — only 500 on truly unexpected crash
+    return res.status(500).json({ success:false, error:e.message });
   }
 });
 

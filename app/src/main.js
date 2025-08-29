@@ -142,6 +142,30 @@ function setThinking(btn, on = true) {
   }
 }
 
+// --- Quick Decision helpers ---
+async function makeQuickDecision(payload) {
+  const r = await fetch(`${API_BASE}/v1/quick_decision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '');
+    throw new Error(`[quick_decision] ${r.status} ${txt}`);
+  }
+  return r.json();
+}
+
+function quickDecisionToSuggestion(qdJson) {
+  const first = Array.isArray(qdJson?.decisions) ? qdJson.decisions[0] : null;
+  if (!first) return null;
+  return {
+    food: { name: first.name, emoji: first.emoji || '🍽️' },
+    friendMessage: first.explanation || 'Solid local pick.',
+    source: 'quick'
+  };
+}
+
 async function handleDecision() {
   const decideBtn = document.getElementById('decide-button');
   setThinking(decideBtn, true);
@@ -187,18 +211,36 @@ async function handleDecision() {
 
   } catch (error) {
     console.error('Decision error:', error);
-    
-    // Show user-friendly error
+  
+    // Try fast shortlist as fallback
+    try {
+      const mood = document.getElementById('mood-input')?.value?.trim() || 'hungry';
+      const selectedDietary = Array.from(document.querySelectorAll('.diet-chip.active'))
+        .map(chip => chip.dataset.diet);
+  
+      const qd = await makeQuickDecision({
+        location: { city: 'London', country_code: 'GB' }, // or your current location state
+        dietary: selectedDietary,
+        mood_text: mood
+      });
+  
+      const mapped = quickDecisionToSuggestion(qd);
+      if (mapped) {
+        const enriched = addSocialSignals(mapped);
+        showSuggestion(enriched);
+        incrementStats({ timeSavedMin: 2 });
+        updateContext('Using the fast shortlist while the main AI was busy.');
+        return; // stop here (we showed a valid suggestion)
+      }
+    } catch (qdErr) {
+      console.warn('quick_decision fallback failed:', qdErr.message);
+    }
+  
+    // Final local fallback
     toast(`Server unavailable: ${error.message}`, 'warn');
-    
-    // Use fallback
     const fallback = addSocialSignals(sample(fallbackSuggestions));
     showSuggestion(fallback);
     updateContext('Using offline suggestion (server unavailable)');
-    
-  } finally {
-    hideSuggestionSkeleton();
-    setThinking(decideBtn, false);
   }
 }
 
