@@ -179,28 +179,12 @@ function quickDecisionToSuggestion(qdJson) {
     source: 'quick'
   };
 }
-function getCurrentLocation() {
-  console.log('vfiedApp exists:', !!window.vfiedApp);
-  console.log('currentLocation:', window.vfiedApp?.currentLocation);
-  
-  if (window.vfiedApp?.currentLocation) {
-    const loc = window.vfiedApp.currentLocation;
-    const result = {
-      city: loc.city || 'London',
-      country: loc.country || 'United Kingdom', 
-      country_code: loc.country_code || 'GB'
-    };
-    console.log('Using app location:', result);
-    return result;
-  }
-  
-  const fallback = {
+function getValidLocation() {
+  return {
     city: 'London',
     country: 'United Kingdom',
     country_code: 'GB'
   };
-  console.log('Using fallback location:', fallback);
-  return fallback;
 }
 
 function updateRecentSuggestions(suggestion) {
@@ -238,7 +222,7 @@ async function handleDecision() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        location: getCurrentLocation(),
+        location: getValidLocation(),
         mood_text: mood, // Pass the mood to GPT
         dietary: selectedDietary,
         recent_suggestions: recentSuggestions // Pass avoid list
