@@ -49,6 +49,14 @@ const fallbackSuggestions = [
     source: 'local-fallback',
   },
 ];
+// keep last few dish names to avoid repeats
+const LAST_LIMIT = 6;
+let lastPicks = JSON.parse(localStorage.getItem('vfied_recent') || '[]');
+function rememberPick(name) {
+  if (!name) return;
+  lastPicks = [name, ...lastPicks.filter(n => n.toLowerCase() !== name.toLowerCase())].slice(0, LAST_LIMIT);
+  localStorage.setItem('vfied_recent', JSON.stringify(lastPicks));
+}
 
 // ---------------- App State ----------------
 let localGems = [];
@@ -157,11 +165,17 @@ async function makeQuickDecision(payload) {
 }
 
 function quickDecisionToSuggestion(qdJson) {
-  const first = Array.isArray(qdJson?.decisions) ? qdJson.decisions[0] : null;
-  if (!first) return null;
+  const list = Array.isArray(qdJson?.decisions) ? qdJson.decisions : [];
+  if (!list.length) return null;
+
+  const avoid = new Set(lastPicks.map(n => n.toLowerCase()));
+  const fresh = list.filter(d => d?.name && !avoid.has(d.name.toLowerCase()));
+  const pick = fresh.length ? fresh[Math.floor(Math.random() * fresh.length)]
+                            : list[Math.floor(Math.random() * list.length)];
+
   return {
-    food: { name: first.name, emoji: first.emoji || '🍽️' },
-    friendMessage: first.explanation || 'Solid local pick.',
+    food: { name: pick.name, emoji: pick.emoji || '🍽️' },
+    friendMessage: pick.explanation || 'Solid local pick.',
     source: 'quick'
   };
 }
@@ -190,7 +204,8 @@ async function handleDecision() {
         mood_text: mood,
         dietary: selectedDietary,
         budget: 'medium',
-        menu_source: 'global_database'
+        menu_source: 'global_database',
+        recent_suggestions: lastPicks
       })
     });
 
@@ -221,7 +236,8 @@ async function handleDecision() {
       const qd = await makeQuickDecision({
         location: { city: 'London', country_code: 'GB' }, // or your current location state
         dietary: selectedDietary,
-        mood_text: mood
+        mood_text: mood,
+        recent_suggestions: lastPicks 
       });
   
       const mapped = quickDecisionToSuggestion(qd);
@@ -261,6 +277,8 @@ function showSuggestion(s) {
   renderSocialSignals(s);
 
   updateContext('🎉 Perfect match found! How does this sound?');
+
+  rememberPick(s.food?.name);
 }
 
 function handleAccept() {

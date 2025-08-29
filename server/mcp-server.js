@@ -202,7 +202,13 @@ const QUICK_SCHEMA = Joi.object({
   ).default([]),
   mood_text: Joi.string().allow('', null),
   budget: Joi.string().valid('budget','medium','premium','luxury').optional(),
-  social: Joi.string().optional()
+  social: Joi.string().optional(),
+
+  // NEW: recent_suggestions (array or single string)
+  recent_suggestions: Joi.alternatives().try(
+    Joi.array().items(Joi.string()),
+    Joi.string()
+  ).optional()
 }).unknown(true);
 
 
@@ -510,7 +516,7 @@ CRITICAL DIVERSITY RULE:
 - 20% Street foods (snacks/markets)
 - 15% Special dishes (celebration/regional signatures)
 Avoid repeating the same category repeatedly across sessions.
-
+AVOID THESE DISHES THIS TURN: ${avoidList.length ? avoidList.slice(0,8).join(', ') : '—'}   // ← NEW
 LOCATION: ${location.city || 'Unknown'}, ${location.country || 'Unknown'} (${location.country_code || '—'})
 MOOD: ${mood_text || '—'}
 DIETARY: ${dietary.join(', ') || 'none'}
@@ -538,7 +544,7 @@ Return STRICT JSON:
   "confidence": 85
 }`;
 
-  const user = JSON.stringify({ mood_text, location, dietary, weather });
+  const user = JSON.stringify({ mood_text, location, dietary, weather, avoid: avoidList  });
   return await gptChatJSON({ system, user });
 }
 
@@ -560,7 +566,14 @@ app.post('/v1/quick_decision', async (req, res) => {
     const loc = normalizeLocation(v.location);
     const dietary = normalizeDietary(v.dietary);
     const mood_text = String(v.mood_text || '').trim();
-    const cc = (loc.country_code || 'GB').toUpperCase();
+    // NEW: build avoid list (case-insensitive)
+    const avoidRaw = v.recent_suggestions || v.avoid || v.avoid_list || [];
+    const avoidList = Array.isArray(avoidRaw) ? avoidRaw : [avoidRaw];
+    const avoid = new Set(avoidList.map(n => String(n).toLowerCase()).filter(Boolean));
+
+    // Safer CC: default to GB if not ISO-2
+    const maybeCC = (loc.country_code || '').toUpperCase();
+    const cc = /^[A-Z]{2}$/.test(maybeCC) ? maybeCC : 'GB';
 
     // === Try GPT (optional) ===
     if (USE_GPT && OPENAI_API_KEY) {
@@ -574,6 +587,7 @@ CITY: ${loc.city || 'Unknown'}
 COUNTRY_CODE: ${cc}
 DIETARY: ${dietary.join(', ') || 'none'}
 MOOD: ${mood_text || 'not provided'}
+AVOID: ${avoidList.length ? avoidList.slice(0,8).join(', ') : '—'}
 
 TASK: Suggest 3 specific local dishes (avoid chains).`;
 
@@ -595,20 +609,21 @@ TASK: Suggest 3 specific local dishes (avoid chains).`;
           const raw = j?.choices?.[0]?.message?.content?.trim();
           const parsed = raw ? JSON.parse(raw) : null;
           let decisions = Array.isArray(parsed?.decisions) ? parsed.decisions : [];
+          // NEW: filter out avoids, then diet filter
           decisions = decisions
-            .filter(d => d && d.name)
+            .filter(d => d && d.name && !avoid.has(d.name.toLowerCase()))
             .filter(d => validateDietaryCompliance(d.name, dietary))
             .slice(0,3);
-
           // top-up from pool if needed
           if (decisions.length < 3) {
             const pool = pickCountryPool(cc);
             const fill = pool
               .filter(p => validateDietaryCompliance(p.name, dietary))
+              .filter(p => !avoid.has(p.name.toLowerCase()))
               .map(p => ({ name:p.name, emoji:p.emoji, explanation:p.explanation }));
-            const names = new Set(decisions.map(d=>d.name));
+            const names = new Set(decisions.map(d=>d.name.toLowerCase()));
             for (const f of fill) {
-              if (!names.has(f.name)) { decisions.push(f); names.add(f.name); if (decisions.length>=3) break; }
+              if (!names.has(f.name.toLowerCase())) { decisions.push(f); names.add(f.name.toLowerCase()); if (decisions.length>=3) break; }
             }
           }
 
@@ -629,14 +644,29 @@ TASK: Suggest 3 specific local dishes (avoid chains).`;
       }
     }
 
-    // === Fallback: country pool -> global ===
+    // === Fallback: country pool -> global (also avoid) ===
     const base = pickCountryPool(cc);
-    let shortlist = shuffle(base.filter(i => validateDietaryCompliance(i.name, dietary))).slice(0,3);
+    let shortlist = shuffle(
+      base
+        .filter(i => validateDietaryCompliance(i.name, dietary))
+        .filter(i => !avoid.has(i.name.toLowerCase()))         // NEW
+    ).slice(0,3);
+
     if (shortlist.length < 3) {
       const topUp = shuffle(GLOBAL_POOL).filter(i =>
-        validateDietaryCompliance(i.name, dietary) && !shortlist.find(s => s.name === i.name)
+        validateDietaryCompliance(i.name, dietary) &&
+        !shortlist.find(s => s.name.toLowerCase() === i.name.toLowerCase()) &&
+        !avoid.has(i.name.toLowerCase())                         // NEW
       );
       shortlist = [...shortlist, ...topUp].slice(0,3);
+    }
+
+    // If still <3 (avoid list too aggressive), relax avoid last-resort
+    if (shortlist.length < 3) {
+      const relax = shuffle(base.filter(i => validateDietaryCompliance(i.name, dietary)))
+        .filter(i => !shortlist.find(s => s.name.toLowerCase() === i.name.toLowerCase()))
+        .slice(0, 3 - shortlist.length);
+      shortlist = [...shortlist, ...relax];
     }
 
     return res.json({
@@ -650,7 +680,6 @@ TASK: Suggest 3 specific local dishes (avoid chains).`;
     });
   } catch (e) {
     console.error('Quick decision error:', e);
-    // still never 400 — only 500 on truly unexpected crash
     return res.status(500).json({ success:false, error:e.message });
   }
 });
@@ -672,6 +701,7 @@ app.post('/v1/recommend', async (req, res) => {
     social = "", 
     budget = "" 
   } = req.body || {};
+  // const avoidList = Array.isArray(recent_suggestions) ? recent_suggestions.filter(Boolean) : [];
 
   // Build avoidance and context prompts
   const avoidancePrompt = recent_suggestions.length > 0 
@@ -697,7 +727,8 @@ app.post('/v1/recommend', async (req, res) => {
   // Try GPT recommendation
   let gpt = null;
   if (USE_GPT && OPENAI_API_KEY) {
-    gpt = await recommendWithGPT({ mood_text, location, dietary, weather });
+    gpt = await recommendWithGPT({ mood_text, location, dietary, weather, avoidList });
+
     
     // Add dietary compliance validation
     if (gpt && dietary.length > 0 && !validateDietaryCompliance(gpt.food?.name || '', dietary)) {
@@ -749,55 +780,64 @@ app.post('/v1/recommend', async (req, res) => {
   }
 
   // ✅ FIXED: Proper fallback when GPT fails WITH dietary check
-  const pick = fallbackSuggestion(location, dietary);
-  const compliant = validateDietaryCompliance(pick.name, dietary);
-  const resolved_moods = detectMoodIds(mood_text);
+const avoidList = Array.isArray(recent_suggestions) ? recent_suggestions.filter(Boolean) : [];
 
-  return res.json({
-    success: true,
-    request_id,
-    context: {
-      original_mood_text: mood_text,
-      resolved_moods,
-      mood_detection_method: 'fallback',
-      location,
-      dietary
-    },
-    food: {
-      name: pick.name,
-      emoji: pick.emoji,
-      country: location.country || 'Local',
-      country_code: (location.country_code || 'GB').toUpperCase()
-    },
-    friendMessage: `Try ${pick.name} - perfect for ${mood_text || 'your current mood'}!`,
-    reasoning: `Selected based on your location and dietary preferences`,
-    culturalNote: null,
-    weatherNote: weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null,
-    confidence: 75,
-    quality: {
-      verified: false,
-      popular: Math.random() > 0.5,
-      local: true,
-      fresh_data: false
-    },
-    data_freshness: {
-      status: 'cached',
-      updated: new Date().toISOString(),
-      source: 'fallback'
-    },
-    distance: `${(Math.random() * 2 + 0.5).toFixed(1)} mi`,
-    coverage_level: 'medium',
-    dietaryCompliance: { 
-      compliant, 
-      warnings: compliant ? [] : [`${pick.name} may violate: ${dietary.join(', ')}`],
-      alternatives: compliant ? [] : ['Ask for modifications', 'Choose a vegetarian/vegan option'],
-      confidence: compliant ? 80 : 60,
-      source: 'rule_based'
-    },
-    weather,
-    interactionId: `ix_${Date.now().toString(36)}`,
-    processingTimeMs: Date.now() - t0
-  });
+const initial = fallbackSuggestion(location, dietary);
+const avoidSet = new Set(avoidList.map(n => n.toLowerCase()));
+let safePick = initial;
+let tries = 0;
+while (avoidSet.has((safePick.name || '').toLowerCase()) && tries++ < 5) {
+  safePick = fallbackSuggestion(location, dietary);
+}
+
+const compliant = validateDietaryCompliance(safePick.name, dietary);
+const resolved_moods = detectMoodIds(mood_text);
+
+return res.json({
+  success: true,
+  request_id,
+  context: {
+    original_mood_text: mood_text,
+    resolved_moods,
+    mood_detection_method: 'fallback',
+    location,
+    dietary
+  },
+  food: {
+    name: safePick.name,
+    emoji: safePick.emoji,
+    country: location.country || 'Local',
+    country_code: (location.country_code || 'GB').toUpperCase()
+  },
+  friendMessage: `Try ${safePick.name} - perfect for ${mood_text || 'your current mood'}!`,
+  reasoning: `Selected based on your location and dietary preferences`,
+  culturalNote: null,
+  weatherNote: weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null,
+  confidence: 75,
+  quality: {
+    verified: false,
+    popular: Math.random() > 0.5,
+    local: true,
+    fresh_data: false
+  },
+  data_freshness: {
+    status: 'cached',
+    updated: new Date().toISOString(),
+    source: 'fallback'
+  },
+  distance: `${(Math.random() * 2 + 0.5).toFixed(1)} mi`,
+  coverage_level: 'medium',
+  dietaryCompliance: { 
+    compliant, 
+    warnings: compliant ? [] : [`${safePick.name} may violate: ${dietary.join(', ')}`],
+    alternatives: compliant ? [] : ['Ask for modifications', 'Choose a vegetarian/vegan option'],
+    confidence: compliant ? 80 : 60,
+    source: 'rule_based'
+  },
+  weather,
+  interactionId: `ix_${Date.now().toString(36)}`,
+  processingTimeMs: Date.now() - t0
+});
 });
 
 // ===== TRAVEL ENDPOINTS =====
