@@ -437,14 +437,19 @@
         if (!cityRaw || !cc) { this.showToast('Please fill both City and Country'); return; }
 
         const city = this.titleCase(cityRaw);
-
+        const countryName = this.findCountryName(cc);
+  
+        console.log('Location update:', { city, cc, countryName });
+        
         this.currentLocation = {
           ...this.currentLocation,
           city,
           country_code: cc,
-          country: this.findCountryName(cc)
+          country: countryName || 'Unknown'
         };
-
+        
+        console.log('Updated currentLocation:', this.currentLocation);
+        
         this.updateLocationDisplay();
         this.saveUserPreferences();
 

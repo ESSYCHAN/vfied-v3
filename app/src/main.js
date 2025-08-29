@@ -179,33 +179,69 @@ function quickDecisionToSuggestion(qdJson) {
     source: 'quick'
   };
 }
+function getCurrentLocation() {
+  console.log('vfiedApp exists:', !!window.vfiedApp);
+  console.log('currentLocation:', window.vfiedApp?.currentLocation);
+  
+  if (window.vfiedApp?.currentLocation) {
+    const loc = window.vfiedApp.currentLocation;
+    const result = {
+      city: loc.city || 'London',
+      country: loc.country || 'United Kingdom', 
+      country_code: loc.country_code || 'GB'
+    };
+    console.log('Using app location:', result);
+    return result;
+  }
+  
+  const fallback = {
+    city: 'London',
+    country: 'United Kingdom',
+    country_code: 'GB'
+  };
+  console.log('Using fallback location:', fallback);
+  return fallback;
+}
 
+function updateRecentSuggestions(suggestion) {
+  const name = suggestion.food?.name;
+  if (!name) return [];
+
+  let recent = JSON.parse(localStorage.getItem('vfied_recent') || '[]');
+  
+  // Remove if already exists, then add to front
+  recent = recent.filter(r => r.toLowerCase() !== name.toLowerCase());
+  recent.unshift(name);
+  recent = recent.slice(0, 8); // Keep last 8
+  
+  localStorage.setItem('vfied_recent', JSON.stringify(recent));
+  console.log('📝 Updated recent suggestions:', recent);
+  
+  return recent;
+}
 async function handleDecision() {
   const decideBtn = document.getElementById('decide-button');
   setThinking(decideBtn, true);
-  showSuggestionSkeleton();
-  updateContext('Analyzing your mood, weather, and local options...');
-
+  
   try {
-    const mood = document.getElementById('mood-input')?.value?.trim() || 'hungry';
+    const mood = document.getElementById('mood-input')?.value?.trim() || '';
     const selectedDietary = Array.from(document.querySelectorAll('.diet-chip.active'))
       .map(chip => chip.dataset.diet);
 
-    // Use the fixed API call
-    const response = await fetch(`${API_BASE}/v1/recommend`, {
+    console.log('🎯 Making decision with:', { mood, dietary: selectedDietary });
+
+    // Get recent suggestions for avoidance
+    const recentSuggestions = JSON.parse(localStorage.getItem('vfied_recent') || '[]');
+
+    // FIX: Use the quick_decision endpoint that has GPT integration
+    const response = await fetch(`${API_BASE}/v1/quick_decision`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        location: { 
-          city: 'London', 
-          country: 'United Kingdom', 
-          country_code: 'GB' 
-        },
-        mood_text: mood,
+        location: getCurrentLocation(),
+        mood_text: mood, // Pass the mood to GPT
         dietary: selectedDietary,
-        budget: 'medium',
-        menu_source: 'global_database',
-        recent_suggestions: lastPicks
+        recent_suggestions: recentSuggestions // Pass avoid list
       })
     });
 
@@ -215,49 +251,50 @@ async function handleDecision() {
     }
 
     const data = await response.json();
+    console.log('📥 Server response:', data);
     
-    if (data.success) {
-      const enriched = addSocialSignals(data);
+    if (data.success && data.decisions) {
+      // Convert quick_decision format to suggestion format
+      const pick = data.decisions[Math.floor(Math.random() * data.decisions.length)];
+      const suggestion = {
+        food: { 
+          name: pick.name, 
+          emoji: pick.emoji || '🍽️' 
+        },
+        friendMessage: pick.explanation || 'Perfect choice for you right now!',
+        source: data.source || 'server',
+        confidence: 85
+      };
+
+      const enriched = addSocialSignals(suggestion);
       showSuggestion(enriched);
+      
+      // Update recent suggestions
+      updateRecentSuggestions(suggestion);
       incrementStats({ timeSavedMin: 3 });
     } else {
-      throw new Error(data.error || 'Recommendation failed');
+      throw new Error(data.error || 'No decisions returned');
     }
 
   } catch (error) {
-    console.error('Decision error:', error);
-  
-    // Try fast shortlist as fallback
-    try {
-      const mood = document.getElementById('mood-input')?.value?.trim() || 'hungry';
-      const selectedDietary = Array.from(document.querySelectorAll('.diet-chip.active'))
-        .map(chip => chip.dataset.diet);
-  
-      const qd = await makeQuickDecision({
-        location: { city: 'London', country_code: 'GB' }, // or your current location state
-        dietary: selectedDietary,
-        mood_text: mood,
-        recent_suggestions: lastPicks 
-      });
-  
-      const mapped = quickDecisionToSuggestion(qd);
-      if (mapped) {
-        const enriched = addSocialSignals(mapped);
-        showSuggestion(enriched);
-        incrementStats({ timeSavedMin: 2 });
-        updateContext('Using the fast shortlist while the main AI was busy.');
-        return; // stop here (we showed a valid suggestion)
-      }
-    } catch (qdErr) {
-      console.warn('quick_decision fallback failed:', qdErr.message);
-    }
-  
-    // Final local fallback
-    toast(`Server unavailable: ${error.message}`, 'warn');
-    const fallback = addSocialSignals(sample(fallbackSuggestions));
+    console.error('❌ Decision error:', error);
+    
+    // Fallback to local suggestions only if server completely fails
+    const fallback = addSocialSignals({
+      food: { name: 'Something Good', emoji: '🍽️' },
+      friendMessage: 'Server unavailable - try any local favorite!',
+      source: 'client_fallback'
+    });
     showSuggestion(fallback);
-    updateContext('Using offline suggestion (server unavailable)');
+    toast(`Connection issue: ${error.message}`, 'warn');
+  } finally {
+    setThinking(decideBtn, false);
   }
+  console.log('🔍 Client debug:', {
+    api_base: API_BASE,
+    mood_input_value: document.getElementById('mood-input')?.value,
+    selected_dietary: Array.from(document.querySelectorAll('.diet-chip.active')).map(c => c.dataset.diet)
+  });
 }
 
 function showSuggestion(s) {

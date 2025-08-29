@@ -57,7 +57,18 @@ const LocationLoose = Joi.alternatives().try(
   }).unknown(true),
   Joi.string() // "City, CC"
 ).default({});
+console.log('🔧 Environment Check:');
+console.log('- USE_GPT:', USE_GPT);
+console.log('- OPENAI_API_KEY exists:', !!OPENAI_API_KEY);
+console.log('- OPENAI_MODEL:', OPENAI_MODEL);
+console.log('- Port:', PORT);
 
+if (!USE_GPT) {
+  console.warn('⚠️ GPT is disabled! Set USE_GPT=true in your .env file');
+}
+if (!OPENAI_API_KEY) {
+  console.warn('⚠️ OpenAI API key missing! Set VITE_OPENAI_API_KEY in your .env file');
+}
 const QuickDecisionSchema = Joi.object({
   location: LocationLoose,
   dietary: Joi.alternatives().try(Joi.array().items(DietaryTag), DietaryTag, Joi.array().items(Joi.string()), Joi.string()).default([]),
@@ -505,9 +516,12 @@ function fallbackSuggestion(location, dietary = []) {
 }
 
 // GPT recommendation helper
-async function recommendWithGPT({ mood_text = '', location = {}, dietary = [], weather = null }) {
+async function recommendWithGPT({ mood_text = '', location = {}, dietary = [], weather = null, avoidList = [] }) {
   if (!USE_GPT || !OPENAI_API_KEY) return null;
 
+  // FIX: Ensure avoidList is always an array
+  const safeAvoidList = Array.isArray(avoidList) ? avoidList : [];
+  
   const system = `You are VFIED, a global food expert who suggests AUTHENTIC and DIVERSE foods.
 
 CRITICAL DIVERSITY RULE:
@@ -515,8 +529,8 @@ CRITICAL DIVERSITY RULE:
 - 35% Proteins (meat/seafood/plant-protein mains)
 - 20% Street foods (snacks/markets)
 - 15% Special dishes (celebration/regional signatures)
-Avoid repeating the same category repeatedly across sessions.
-AVOID THESE DISHES THIS TURN: ${avoidList.length ? avoidList.slice(0,8).join(', ') : '—'}   // ← NEW
+
+AVOID THESE DISHES THIS TURN: ${safeAvoidList.length ? safeAvoidList.slice(0,8).join(', ') : '—'}
 LOCATION: ${location.city || 'Unknown'}, ${location.country || 'Unknown'} (${location.country_code || '—'})
 MOOD: ${mood_text || '—'}
 DIETARY: ${dietary.join(', ') || 'none'}
@@ -527,25 +541,49 @@ ${getGlobalFoodExamples(location.country_code)}
 
 Return STRICT JSON:
 {
-  "success": true,
-  "source": "gpt",
-  "food": {
-    "name": "specific local dish",
-    "emoji": "emoji",
-    "country": "${location.country || 'Local'}",
-    "country_code": "${(location.country_code || 'GB').toUpperCase()}",
-    "category": "staple|protein|street|special"
-  },
-  "friendMessage": "short friendly why-this pick",
-  "reasoning": "detailed explanation of choice",
-  "culturalNote": "authenticity context",
-  "dietaryNote": ${dietary?.length ? `"Compatible with ${dietary.join(', ')}"` : 'null'},
-  "weatherNote": ${weather ? `"Good for ${weather.temperature}°C"` : 'null'},
-  "confidence": 85
+  "decisions": [
+    {"name": "specific local dish 1", "emoji": "🍜", "explanation": "why this works"},
+    {"name": "specific local dish 2", "emoji": "🍛", "explanation": "why this works"},
+    {"name": "specific local dish 3", "emoji": "🍝", "explanation": "why this works"}
+  ]
 }`;
 
-  const user = JSON.stringify({ mood_text, location, dietary, weather, avoid: avoidList  });
-  return await gptChatJSON({ system, user });
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: `Give me 3 varied food suggestions for ${location.city}` }
+        ],
+        temperature: 0.8,
+        max_tokens: 400
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('GPT API Error:', response.status, errorText);
+      return null;
+    }
+
+    const json = await response.json();
+    const content = json.choices[0].message.content.trim();
+    const parsed = JSON.parse(content);
+    
+    console.log('✅ GPT Response:', parsed);
+    return parsed;
+
+  } catch (error) {
+    console.error('❌ GPT call failed:', error.message);
+    return null;
+  }
 }
 
 // ===== CORE ENDPOINTS =====
@@ -554,143 +592,156 @@ Return STRICT JSON:
 app.post('/v1/quick_decision', async (req, res) => {
   const t0 = Date.now();
   try {
-    // permissive validate (no hard 400 on shape)
-    const { value, error } = QUICK_SCHEMA.validate(req.body || {}, { abortEarly:false, convert:true });
+    console.log('📥 Quick decision request:', req.body);
+
+    const { value, error } = QUICK_SCHEMA.validate(req.body || {}, { abortEarly: false, convert: true });
     if (error) {
-      // log but DO NOT fail the request
-      console.warn('[quick_decision] validation warning:', error.details?.map(d=>d.message).join(' | ') || error.message, 'payload=', req.body);
+      console.warn('[quick_decision] validation warning:', error.details?.map(d=>d.message).join(' | '));
     }
 
-    // normalize to canonical
     const v = value || {};
     const loc = normalizeLocation(v.location);
     const dietary = normalizeDietary(v.dietary);
     const mood_text = String(v.mood_text || '').trim();
-    // NEW: build avoid list (case-insensitive)
+    
+    // Build avoid list properly
     const avoidRaw = v.recent_suggestions || v.avoid || v.avoid_list || [];
     const avoidList = Array.isArray(avoidRaw) ? avoidRaw : [avoidRaw];
     const avoid = new Set(avoidList.map(n => String(n).toLowerCase()).filter(Boolean));
 
-    // Safer CC: default to GB if not ISO-2
     const maybeCC = (loc.country_code || '').toUpperCase();
     const cc = /^[A-Z]{2}$/.test(maybeCC) ? maybeCC : 'GB';
 
-    // === Try GPT (optional) ===
+    console.log('🔍 Processing:', {
+      location: `${loc.city}, ${cc}`,
+      mood: mood_text,
+      dietary: dietary,
+      avoid_count: avoidList.length,
+      use_gpt: USE_GPT,
+      has_key: !!OPENAI_API_KEY
+    });
+
+    // === PRIORITY: Try GPT first with proper error handling ===
     if (USE_GPT && OPENAI_API_KEY) {
+      console.log('🤖 Attempting GPT recommendation...');
+      
       try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 22000);
-        const system = `You are VFIED, a concise, culturally-aware food picker.
-Return STRICT JSON: {"decisions":[{"name":"...","emoji":"...","explanation":"..."}]}. No prose. Exactly 3 items.`;
-        const user = `
-CITY: ${loc.city || 'Unknown'}
-COUNTRY_CODE: ${cc}
-DIETARY: ${dietary.join(', ') || 'none'}
-MOOD: ${mood_text || 'not provided'}
-AVOID: ${avoidList.length ? avoidList.slice(0,8).join(', ') : '—'}
-
-TASK: Suggest 3 specific local dishes (avoid chains).`;
-
-        const r = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${OPENAI_API_KEY}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: OPENAI_MODEL,
-            response_format: { type: 'json_object' },
-            temperature: 0.7,
-            messages: [{ role:'system', content:system }, { role:'user', content:user }]
-          }),
-          signal: controller.signal
+        const gptResult = await recommendWithGPT({ 
+          mood_text, 
+          location: loc, 
+          dietary, 
+          avoidList // Pass the actual array
         });
-        clearTimeout(timeout);
 
-        if (r.ok) {
-          const j = await r.json();
-          const raw = j?.choices?.[0]?.message?.content?.trim();
-          const parsed = raw ? JSON.parse(raw) : null;
-          let decisions = Array.isArray(parsed?.decisions) ? parsed.decisions : [];
-          // NEW: filter out avoids, then diet filter
-          decisions = decisions
-            .filter(d => d && d.name && !avoid.has(d.name.toLowerCase()))
+        if (gptResult && gptResult.decisions && Array.isArray(gptResult.decisions)) {
+          let decisions = gptResult.decisions
+            .filter(d => d && d.name && d.name.length > 2)
+            .filter(d => !avoid.has(d.name.toLowerCase()))
             .filter(d => validateDietaryCompliance(d.name, dietary))
-            .slice(0,3);
-          // top-up from pool if needed
-          if (decisions.length < 3) {
-            const pool = pickCountryPool(cc);
-            const fill = pool
-              .filter(p => validateDietaryCompliance(p.name, dietary))
-              .filter(p => !avoid.has(p.name.toLowerCase()))
-              .map(p => ({ name:p.name, emoji:p.emoji, explanation:p.explanation }));
-            const names = new Set(decisions.map(d=>d.name.toLowerCase()));
-            for (const f of fill) {
-              if (!names.has(f.name.toLowerCase())) { decisions.push(f); names.add(f.name.toLowerCase()); if (decisions.length>=3) break; }
-            }
-          }
+            .slice(0, 3);
 
-          if (decisions.length) {
+          if (decisions.length >= 1) { // Accept even 1 good GPT suggestion
+            console.log('✅ GPT SUCCESS:', decisions.map(d => d.name));
+            
             return res.json({
-              success:true,
+              success: true,
               request_id: randomUUID?.() || String(Date.now()),
-              decisions: decisions.slice(0,3),
+              decisions: decisions,
               location: { city: loc.city || 'Unknown', country_code: cc },
               processingTimeMs: Date.now() - t0,
               note: dietary.length ? `Dietary: ${dietary.join(', ')}` : 'No dietary filters',
-              source:'gpt'
+              source: 'gpt',
+              debug: {
+                gpt_returned: gptResult.decisions?.length || 0,
+                after_filtering: decisions.length,
+                avoided_items: avoidList
+              }
             });
+          } else {
+            console.warn('❌ GPT returned no valid results after filtering');
           }
+        } else {
+          console.warn('❌ GPT returned invalid format:', gptResult);
         }
-      } catch (e) {
-        console.warn('[quick_decision] GPT failed -> fallback:', e?.message || e);
+      } catch (gptError) {
+        console.error('❌ GPT call exception:', gptError.message);
       }
+    } else {
+      console.log('⚠️ GPT disabled - USE_GPT:', USE_GPT, 'HAS_KEY:', !!OPENAI_API_KEY);
     }
 
-    // === Fallback: country pool -> global (also avoid) ===
-    const base = pickCountryPool(cc);
-    let shortlist = shuffle(
-      base
-        .filter(i => validateDietaryCompliance(i.name, dietary))
-        .filter(i => !avoid.has(i.name.toLowerCase()))         // NEW
-    ).slice(0,3);
-
-    if (shortlist.length < 3) {
-      const topUp = shuffle(GLOBAL_POOL).filter(i =>
-        validateDietaryCompliance(i.name, dietary) &&
-        !shortlist.find(s => s.name.toLowerCase() === i.name.toLowerCase()) &&
-        !avoid.has(i.name.toLowerCase())                         // NEW
-      );
-      shortlist = [...shortlist, ...topUp].slice(0,3);
-    }
-
-    // If still <3 (avoid list too aggressive), relax avoid last-resort
-    if (shortlist.length < 3) {
-      const relax = shuffle(base.filter(i => validateDietaryCompliance(i.name, dietary)))
-        .filter(i => !shortlist.find(s => s.name.toLowerCase() === i.name.toLowerCase()))
-        .slice(0, 3 - shortlist.length);
-      shortlist = [...shortlist, ...relax];
-    }
+    // === Last resort fallback (only if GPT completely fails) ===
+    console.log('🆘 Using emergency fallback - GPT failed or disabled');
+    
+    const emergencyOptions = [
+      { name: "Local Chef's Choice", emoji: "👨‍🍳", explanation: "Ask what the chef recommends today" },
+      { name: "Market Fresh Special", emoji: "🥕", explanation: "Whatever looks best at the local market" },
+      { name: "Comfort Food", emoji: "🍲", explanation: "Something warm and satisfying" }
+    ].filter(opt => validateDietaryCompliance(opt.name, dietary));
 
     return res.json({
-      success:true,
+      success: true,
       request_id: randomUUID?.() || String(Date.now()),
-      decisions: shortlist,
+      decisions: emergencyOptions.slice(0, 3),
       location: { city: loc.city || 'Unknown', country_code: cc },
       processingTimeMs: Date.now() - t0,
-      note: dietary.length ? `Dietary: ${dietary.join(', ')}` : 'No dietary filters',
-      source:'fallback'
+      note: 'Emergency fallback - GPT unavailable',
+      source: 'emergency_fallback'
     });
+
   } catch (e) {
     console.error('Quick decision error:', e);
-    return res.status(500).json({ success:false, error:e.message });
+    return res.status(500).json({ success: false, error: e.message });
   }
 });
 
+app.get('/v1/debug/gpt-status', async (req, res) => {
+  const testPayload = {
+    mood_text: 'hungry',
+    location: { city: 'London', country_code: 'GB' },
+    dietary: [],
+    avoidList: []
+  };
 
+  const status = {
+    environment: {
+      USE_GPT: USE_GPT,
+      HAS_OPENAI_KEY: !!OPENAI_API_KEY,
+      KEY_PREFIX: OPENAI_API_KEY ? OPENAI_API_KEY.substring(0, 10) + '...' : 'MISSING',
+      OPENAI_MODEL: OPENAI_MODEL,
+      NODE_ENV: process.env.NODE_ENV
+    },
+    test_gpt_call: null
+  };
+
+  if (USE_GPT && OPENAI_API_KEY) {
+    try {
+      console.log('🧪 Testing GPT call...');
+      const result = await recommendWithGPT(testPayload);
+      status.test_gpt_call = {
+        success: !!result,
+        result: result,
+        error: null
+      };
+    } catch (error) {
+      status.test_gpt_call = {
+        success: false,
+        result: null,
+        error: error.message
+      };
+    }
+  }
+
+  res.json(status);
+});
 
 
 // ✅ FIXED: Recommendation endpoint with proper fallback handling
 app.post('/v1/recommend', async (req, res) => {
   const t0 = Date.now();
   const request_id = `req_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+
+  console.log('📍 Recommend request:', req.body);
 
   const { 
     location = {}, 
@@ -701,143 +752,105 @@ app.post('/v1/recommend', async (req, res) => {
     social = "", 
     budget = "" 
   } = req.body || {};
-  // const avoidList = Array.isArray(recent_suggestions) ? recent_suggestions.filter(Boolean) : [];
-
-  // Build avoidance and context prompts
-  const avoidancePrompt = recent_suggestions.length > 0 
-    ? `AVOID suggesting these recently recommended foods: ${recent_suggestions.join(', ')}. Suggest something different.`
-    : '';
-
-  let contextPrompt = '';
-  if (context.time_context) {
-    const { meal_time, is_weekend, is_late_night } = context.time_context;
-    contextPrompt += `Current meal time: ${meal_time}. `;
-    if (is_weekend) contextPrompt += 'It\'s the weekend. ';
-    if (is_late_night) contextPrompt += 'It\'s late night. ';
-  }
-
-  if (context.weather_context === 'cold_weather') {
-    contextPrompt += 'Weather is cold - suggest warming foods. ';
-  } else if (context.weather_context === 'hot_weather') {
-    contextPrompt += 'Weather is hot - suggest cooling/light foods. ';
-  }
 
   const weather = await getWeather(location).catch(() => null);
+  const avoidList = Array.isArray(recent_suggestions) ? recent_suggestions : [];
 
-  // Try GPT recommendation
-  let gpt = null;
+  console.log('🎯 Recommend processing:', {
+    location: location.city,
+    mood: mood_text,
+    dietary: dietary,
+    avoid_count: avoidList.length,
+    has_weather: !!weather
+  });
+
+  // Try GPT recommendation with proper parameters
   if (USE_GPT && OPENAI_API_KEY) {
-    gpt = await recommendWithGPT({ mood_text, location, dietary, weather, avoidList });
+    try {
+      console.log('🤖 Calling GPT for recommendation...');
+      
+      const gptResponse = await recommendWithGPT({ 
+        mood_text, 
+        location, 
+        dietary, 
+        weather,
+        avoidList // Pass avoid list properly
+      });
 
-    
-    // Add dietary compliance validation
-    if (gpt && dietary.length > 0 && !validateDietaryCompliance(gpt.food?.name || '', dietary)) {
-      gpt = {
-        success: true,
-        food: { name: "Safe Choice", emoji: "🥗" },
-        reasoning: "A dietary-compliant option that matches your restrictions"
-      };
+      if (gptResponse && gptResponse.decisions && gptResponse.decisions.length > 0) {
+        // Use first GPT suggestion
+        const pick = gptResponse.decisions[0];
+        
+        console.log('✅ GPT recommendation success:', pick.name);
+        
+        return res.json({
+          success: true,
+          request_id,
+          food: {
+            name: pick.name,
+            emoji: pick.emoji,
+            country: location.country || 'Local',
+            country_code: (location.country_code || 'GB').toUpperCase()
+          },
+          friendMessage: pick.explanation || `Try ${pick.name} - perfect for your mood!`,
+          reasoning: pick.explanation || 'AI-selected based on your preferences',
+          culturalNote: null,
+          weatherNote: weather ? `Weather: ${weather.temperature}°C • ${weather.condition}` : null,
+          confidence: 85,
+          quality: {
+            verified: true,
+            popular: true,
+            local: true,
+            fresh_data: true
+          },
+          data_freshness: {
+            status: 'fresh',
+            updated: new Date().toISOString(),
+            source: 'gpt'
+          },
+          distance: `${(Math.random() * 2 + 0.1).toFixed(1)} mi`,
+          coverage_level: 'high',
+          dietaryCompliance: { 
+            compliant: true, 
+            warnings: [],
+            alternatives: [],
+            confidence: 90,
+            source: 'ai'
+          },
+          weather,
+          interactionId: `ix_${Date.now().toString(36)}`,
+          processingTimeMs: Date.now() - t0,
+          source: 'gpt'
+        });
+      } else {
+        console.warn('❌ GPT returned empty or invalid response');
+      }
+    } catch (error) {
+      console.error('❌ GPT recommend failed:', error.message);
     }
+  } else {
+    console.log('⚠️ GPT not available for recommend');
   }
 
-  // Return GPT result if successful
-  if (gpt && gpt.success !== false && gpt.food) {
-    return res.json({
-      success: true,
-      request_id,
-      food: gpt.food,
-      friendMessage: gpt.reasoning || `Try ${gpt.food.name} - it matches your mood!`,
-      reasoning: gpt.reasoning || '',
-      culturalNote: gpt.culturalNote || null,
-      weatherNote: gpt.weatherNote || null,
-      confidence: gpt.confidence || 80,
-      quality: {
-        verified: true,
-        popular: Math.random() > 0.3,
-        local: !['mcdonalds', 'kfc', 'subway'].some(chain => 
-          gpt.food.name.toLowerCase().includes(chain)
-        ),
-        fresh_data: true
-      },
-      data_freshness: {
-        status: 'fresh',
-        updated: new Date().toISOString(),
-        source: 'high'
-      },
-      distance: `${(Math.random() * 2 + 0.1).toFixed(1)} mi`,
-      coverage_level: 'high',
-      dietaryCompliance: { 
-        compliant: true, 
-        warnings: [],
-        alternatives: [],
-        confidence: 90,
-        source: 'ai'
-      },
-      weather,
-      interactionId: `ix_${Date.now().toString(36)}`,
-      processingTimeMs: Date.now() - t0
-    });
-  }
+  // Fallback only if GPT fails
+  console.log('🆘 Using fallback for recommend');
+  const fallback = fallbackSuggestion(location, dietary);
 
-  // ✅ FIXED: Proper fallback when GPT fails WITH dietary check
-const avoidList = Array.isArray(recent_suggestions) ? recent_suggestions.filter(Boolean) : [];
-
-const initial = fallbackSuggestion(location, dietary);
-const avoidSet = new Set(avoidList.map(n => n.toLowerCase()));
-let safePick = initial;
-let tries = 0;
-while (avoidSet.has((safePick.name || '').toLowerCase()) && tries++ < 5) {
-  safePick = fallbackSuggestion(location, dietary);
-}
-
-const compliant = validateDietaryCompliance(safePick.name, dietary);
-const resolved_moods = detectMoodIds(mood_text);
-
-return res.json({
-  success: true,
-  request_id,
-  context: {
-    original_mood_text: mood_text,
-    resolved_moods,
-    mood_detection_method: 'fallback',
-    location,
-    dietary
-  },
-  food: {
-    name: safePick.name,
-    emoji: safePick.emoji,
-    country: location.country || 'Local',
-    country_code: (location.country_code || 'GB').toUpperCase()
-  },
-  friendMessage: `Try ${safePick.name} - perfect for ${mood_text || 'your current mood'}!`,
-  reasoning: `Selected based on your location and dietary preferences`,
-  culturalNote: null,
-  weatherNote: weather ? `Weather is ${weather.temperature}°C • ${weather.condition}` : null,
-  confidence: 75,
-  quality: {
-    verified: false,
-    popular: Math.random() > 0.5,
-    local: true,
-    fresh_data: false
-  },
-  data_freshness: {
-    status: 'cached',
-    updated: new Date().toISOString(),
-    source: 'fallback'
-  },
-  distance: `${(Math.random() * 2 + 0.5).toFixed(1)} mi`,
-  coverage_level: 'medium',
-  dietaryCompliance: { 
-    compliant, 
-    warnings: compliant ? [] : [`${safePick.name} may violate: ${dietary.join(', ')}`],
-    alternatives: compliant ? [] : ['Ask for modifications', 'Choose a vegetarian/vegan option'],
-    confidence: compliant ? 80 : 60,
-    source: 'rule_based'
-  },
-  weather,
-  interactionId: `ix_${Date.now().toString(36)}`,
-  processingTimeMs: Date.now() - t0
-});
+  return res.json({
+    success: true,
+    request_id,
+    food: {
+      name: fallback.name,
+      emoji: fallback.emoji,
+      country: location.country || 'Local',
+      country_code: (location.country_code || 'GB').toUpperCase()
+    },
+    friendMessage: `Try ${fallback.name} - ${fallback.explanation}`,
+    reasoning: 'Fallback suggestion - AI unavailable',
+    confidence: 70,
+    source: 'fallback',
+    processingTimeMs: Date.now() - t0
+  });
 });
 
 // ===== TRAVEL ENDPOINTS =====
