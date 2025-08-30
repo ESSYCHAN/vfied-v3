@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>VFIED – One-Tap Shortlists</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
-  <script type="module" crossorigin src="/assets/index-DPjbP3sd.js"></script>
+  <script type="module" crossorigin src="/assets/index-B9NknoJ4.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-B3UFU_jU.css">
   <script type="module">import.meta.url;import("_").catch(()=>1);(async function*(){})().next();window.__vite_is_modern_browser=true</script>
   <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
@@ -438,13 +438,17 @@
       async applyLocationFromModal() {
         const cityRaw = document.getElementById('location-city-input').value.trim();
         const cc = (document.getElementById('location-country-select').value || '').toUpperCase();
+      
+        console.log('Raw inputs:', { cityRaw, cc });
+
         if (!cityRaw || !cc) { this.showToast('Please fill both City and Country'); return; }
 
         const city = this.titleCase(cityRaw);
         const countryName = this.findCountryName(cc);
   
         console.log('Location update:', { city, cc, countryName });
-        
+        console.log('Processed values:', { city, cc, countryName });
+  
         this.currentLocation = {
           ...this.currentLocation,
           city,
@@ -453,7 +457,7 @@
         };
         
         console.log('Updated currentLocation:', this.currentLocation);
-        
+        console.log('Final currentLocation:', JSON.stringify(this.currentLocation, null, 2));
         this.updateLocationDisplay();
         this.saveUserPreferences();
 
@@ -966,10 +970,16 @@
           .map(c => `<option value="${c.code}">${c.name} (${c.code})</option>`).join('');
       }
 
-      findCountryName(code){
-        const cc = String(code||'').toUpperCase();
-        const hit = (this._countries||[]).find(c => c.code === cc);
-        return hit?.name || cc;
+      findCountryName(code) {
+        const cc = String(code || '').toUpperCase();
+        
+        // Guard against invalid codes
+        if (!cc || cc === 'UNDEFINED' || cc.length !== 2) {
+          return 'United Kingdom'; // Safe default
+        }
+        
+        const hit = (this._countries || []).find(c => c.code === cc);
+        return hit?.name || 'Unknown Country';
       }
       
 
@@ -1078,6 +1088,6 @@
 <!-- Main script -->
   <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
   <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-8Segw8u9.js"></script>
-  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-CmSiN8z0.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
+  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-BMywVbGU.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
 </body>
 </html>

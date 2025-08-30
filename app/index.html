@@ -434,13 +434,17 @@
       async applyLocationFromModal() {
         const cityRaw = document.getElementById('location-city-input').value.trim();
         const cc = (document.getElementById('location-country-select').value || '').toUpperCase();
+      
+        console.log('Raw inputs:', { cityRaw, cc });
+
         if (!cityRaw || !cc) { this.showToast('Please fill both City and Country'); return; }
 
         const city = this.titleCase(cityRaw);
         const countryName = this.findCountryName(cc);
   
         console.log('Location update:', { city, cc, countryName });
-        
+        console.log('Processed values:', { city, cc, countryName });
+  
         this.currentLocation = {
           ...this.currentLocation,
           city,
@@ -449,7 +453,7 @@
         };
         
         console.log('Updated currentLocation:', this.currentLocation);
-        
+        console.log('Final currentLocation:', JSON.stringify(this.currentLocation, null, 2));
         this.updateLocationDisplay();
         this.saveUserPreferences();
 
@@ -962,10 +966,16 @@
           .map(c => `<option value="${c.code}">${c.name} (${c.code})</option>`).join('');
       }
 
-      findCountryName(code){
-        const cc = String(code||'').toUpperCase();
-        const hit = (this._countries||[]).find(c => c.code === cc);
-        return hit?.name || cc;
+      findCountryName(code) {
+        const cc = String(code || '').toUpperCase();
+        
+        // Guard against invalid codes
+        if (!cc || cc === 'UNDEFINED' || cc.length !== 2) {
+          return 'United Kingdom'; // Safe default
+        }
+        
+        const hit = (this._countries || []).find(c => c.code === cc);
+        return hit?.name || 'Unknown Country';
       }
       
 
