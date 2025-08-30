@@ -203,6 +203,14 @@ function updateRecentSuggestions(suggestion) {
   
   return recent;
 }
+function getMealPeriod(hour) {
+  if (hour >= 6 && hour < 11) return 'breakfast';
+  if (hour >= 11 && hour < 15) return 'lunch';
+  if (hour >= 15 && hour < 18) return 'snack';
+  if (hour >= 18 && hour < 22) return 'dinner';
+  return 'late_night';
+}
+
 async function handleDecision() {
   const decideBtn = document.getElementById('decide-button');
   setThinking(decideBtn, true);
@@ -225,7 +233,12 @@ async function handleDecision() {
         location: getValidLocation(),
         mood_text: mood, // Pass the mood to GPT
         dietary: selectedDietary,
-        recent_suggestions: recentSuggestions // Pass avoid list
+        recent_suggestions: recentSuggestions, // Pass avoid list
+        time_context: {
+          current_hour: new Date().getHours(),
+          meal_period: getMealPeriod(new Date().getHours()),
+          is_weekend: [0,6].includes(new Date().getDay())
+        }
       })
     });
 

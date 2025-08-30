@@ -217,7 +217,15 @@ const QUICK_SCHEMA = Joi.object({
   recent_suggestions: Joi.alternatives().try(
     Joi.array().items(Joi.string()),
     Joi.string()
-  ).optional()
+  ).optional(), 
+  // ADD TIME CONTEXT SCHEMA:
+  time_context: Joi.object({
+    current_hour: Joi.number().min(0).max(23).optional(),
+    meal_period: Joi.string().valid('breakfast','lunch','snack','dinner','late_night').optional(),
+    is_weekend: Joi.boolean().optional(),
+    day_of_week: Joi.number().min(0).max(6).optional()
+  }).optional()
+
 }).unknown(true);
 
 
@@ -512,7 +520,17 @@ function fallbackSuggestion(location, dietary = []) {
   }
   return picks[Math.floor(Math.random() * picks.length)];
 }
-
+function getMealGuidance(mealPeriod, hour) {
+  const guidance = {
+    breakfast: 'Prioritize breakfast foods: eggs, pastries, coffee pairings, light proteins, morning energy foods',
+    lunch: 'Focus on midday meals: balanced plates, work-friendly options, moderate portions',
+    snack: 'Suggest light snacks: finger foods, quick bites, energy boosters, not full meals',
+    dinner: 'Emphasize dinner foods: hearty mains, evening comfort, social dining options',
+    late_night: 'Recommend late-night friendly: delivery options, comfort foods, easy-to-eat items'
+  };
+  
+  return guidance[mealPeriod] || `Current time (${hour}h): suggest foods appropriate for this hour`;
+}
 // GPT recommendation helper
 async function recommendWithGPT({ mood_text = '', location = {}, dietary = [], weather = null, avoidList = [] }) {
   if (!USE_GPT || !OPENAI_API_KEY) return null;
@@ -521,6 +539,14 @@ async function recommendWithGPT({ mood_text = '', location = {}, dietary = [], w
   const safeAvoidList = Array.isArray(avoidList) ? avoidList : [];
   
   const system = `You are VFIED, a global food expert who suggests AUTHENTIC and DIVERSE foods.
+
+CURRENT TIME CONTEXT:
+- Hour: ${timeContext?.current_hour || 'unknown'}
+- Meal period: ${timeContext?.meal_period || 'unknown'}
+- Weekend: ${timeContext?.is_weekend ? 'yes' : 'no'}
+
+MEAL-APPROPRIATE SUGGESTIONS:
+${getMealGuidance(timeContext?.meal_period, timeContext?.current_hour)}
 
 CRITICAL DIVERSITY RULE:
 - 30% Staples (grains/breads/rice/noodle dishes)
@@ -537,12 +563,12 @@ WEATHER: ${weather ? `${weather.temperature}°C, ${weather.condition}` : 'unknow
 Examples for this region:
 ${getGlobalFoodExamples(location.country_code)}
 
-Return STRICT JSON:
+Return STRICT JSON with meal-appropriate suggestions for ${timeContext?.meal_period || 'current time'}:
 {
   "decisions": [
-    {"name": "specific local dish 1", "emoji": "🍜", "explanation": "why this works"},
-    {"name": "specific local dish 2", "emoji": "🍛", "explanation": "why this works"},
-    {"name": "specific local dish 3", "emoji": "🍝", "explanation": "why this works"}
+    {"name": "specific local dish 1", "emoji": "🍜", "explanation": "why this works for ${timeContext?.meal_period || 'now'}"},
+    {"name": "specific local dish 2", "emoji": "🍛", "explanation": "why this works for ${timeContext?.meal_period || 'now'}"},
+    {"name": "specific local dish 3", "emoji": "🍽", "explanation": "why this works for ${timeContext?.meal_period || 'now'}"}
   ]
 }`;
 
@@ -596,7 +622,7 @@ app.post('/v1/quick_decision', async (req, res) => {
     if (error) {
       console.warn('[quick_decision] validation warning:', error.details?.map(d=>d.message).join(' | '));
     }
-
+    const timeContext = v.time_context || null;
     const v = value || {};
     const loc = normalizeLocation(v.location);
     const dietary = normalizeDietary(v.dietary);
@@ -628,7 +654,8 @@ app.post('/v1/quick_decision', async (req, res) => {
           mood_text, 
           location: loc, 
           dietary, 
-          avoidList // Pass the actual array
+          avoidList, // Pass the actual array
+          timeContext
         });
 
         if (gptResult && gptResult.decisions && Array.isArray(gptResult.decisions)) {

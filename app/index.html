@@ -498,7 +498,13 @@
           <button onclick="window.vfiedApp.hideTravelResults()" style="background: linear-gradient(135deg, #7c3aed, #6366f1); border:0; border-radius:8px; color:white; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; margin-top:12px;">Try Something Else</button>
         </div>`; } }
       hideTravelResults() { const d=document.getElementById('travel-results-modal'); if (d) d.classList.add('hidden'); }
-
+      getMealPeriod(hour) {
+        if (hour >= 6 && hour < 11) return 'breakfast';
+        if (hour >= 11 && hour < 15) return 'lunch';
+        if (hour >= 15 && hour < 18) return 'snack';
+        if (hour >= 18 && hour < 22) return 'dinner';
+        return 'late_night';
+      }
       // Core: one-tap shortlist
       async makeDecision() {
         this.vibrate('Medium');
@@ -512,7 +518,14 @@
                 country: this.currentLocation.country || '',// "Kenya" (optional)
                 country_code: this.currentLocation.country_code // "KE"
               },
-              dietary: Array.from(this.selectedDietary)     // ["vegan","nut-free"]
+              dietary: Array.from(this.selectedDietary),     // ["vegan","nut-free"]
+              time_context: {
+              current_hour: new Date().getHours(),
+              meal_period: this.getMealPeriod(new Date().getHours()),
+              is_weekend: [0,6].includes(new Date().getDay()),
+              day_of_week: new Date().getDay()
+            }
+              // mood: document.getElementById('mood-input').value.trim() // "celebrating with friends"
             })
           }, 'quick_decision');
 
