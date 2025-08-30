@@ -958,7 +958,7 @@
           try {
             const res = await fetch(`${this.API_BASE}/v1/countries`);
             const json = await res.json();
-            this._countries = (json.countries || []).map(c => ({ name: c.name, code: c.country_code }));
+            this._countries = (json.countries || []).map(c => ({ name: c.name, code: c.code }));
             console.log('Countries data structure:', this._countries[0]); // DEBUG LINE
           } catch {
             this._countries = [
