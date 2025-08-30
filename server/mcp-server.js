@@ -164,8 +164,8 @@ function buildIsoFallbackList() {
 }
 
 function normalizeCountry(c) {
-  const name = c?.name?.common ?? c?.name?.official ?? c?.name ?? c?.commonName ?? c?.official ?? c?.country ?? c?.Country ?? c?.name_en ?? '';
-  const code = (c?.alpha2 ?? c?.alpha_2 ?? c?.code ?? c?.iso2 ?? c?.['alpha-2'] ?? c?.iso ?? c?.cca2 ?? '').toString().toUpperCase();
+  const name = c?.name || '';
+  const code = c?.country_code || ''; // Use the correct property
   return { name, code };
 }
 
@@ -196,9 +196,7 @@ function normalizeMood(m) {
 }
 
 // Then process the extracted data
-const rawCountries = extractCountriesFromModule(countriesModule);
-const normalized = rawCountries.map(normalizeCountry).filter(x => x.name && /^[A-Z]{2}$/.test(x.code));
-const COUNTRIES_LIST = countries.length ? countries : (normalized.length ? normalized : buildIsoFallbackList());
+const COUNTRIES_LIST = SUPPORTED_COUNTRIES.countries || [];
 
 const rawMoods = extractMoodsFromModule(moodsModule).map(normalizeMood).filter(Boolean);
 const MOODS_TAXONOMY = moods.length ? moods : MOODS_FALLBACK;
@@ -1865,14 +1863,12 @@ app.post('/v1/feedback', (req, res) => {
 
 // Countries endpoint
 app.get('/v1/countries', (_req, res) => {
-  const out = [...COUNTRIES_LIST]
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map(c => ({
-      name: c.name,
-      country_code: c.code,
-      region: c.region || '—',
-      cuisine: c.cuisine || '—'
-    }));
+  const out = COUNTRIES_LIST.map(c => ({
+    name: c.name,
+    code: c.country_code, // This maps your data to what frontend expects
+    region: c.region || '—',
+    cuisine: c.cuisine || '—'
+  }));
   res.json({ countries: out });
 });
 

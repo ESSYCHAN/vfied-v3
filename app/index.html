@@ -433,23 +433,32 @@
 
       async applyLocationFromModal() {
         const cityRaw = document.getElementById('location-city-input').value.trim();
-        const cc = (document.getElementById('location-country-select').value || '').toUpperCase();
+        const ccRaw = document.getElementById('location-country-select').value;
+        // const cc = (document.getElementById('location-country-select').value || '').toUpperCase();
       
-        console.log('Raw inputs:', { cityRaw, cc });
-
-        if (!cityRaw || !cc) { this.showToast('Please fill both City and Country'); return; }
-
+        
+        // if (!cityRaw || !cc) { this.showToast('Please fill both City and Country'); return; }
+        const cc = ccRaw && ccRaw !== 'UNDEFINED' && /^[A-Z]{2}$/.test(ccRaw) 
+          ? ccRaw 
+          : 'GB'; // Safe fallback
+          
+        if (!cityRaw) { 
+          this.showToast('Please enter a city name'); 
+          return; 
+        }
         const city = this.titleCase(cityRaw);
         const countryName = this.findCountryName(cc);
-  
+        console.log('Raw inputs:', { cityRaw, cc });
+
         console.log('Location update:', { city, cc, countryName });
         console.log('Processed values:', { city, cc, countryName });
   
         this.currentLocation = {
-          ...this.currentLocation,
           city,
-          country_code: cc,
-          country: countryName || 'Unknown'
+          country_code: cc, // Now guaranteed to be valid
+          country: countryName,
+          confidence: 'manual',
+          timestamp: new Date().toISOString()
         };
         
         console.log('Updated currentLocation:', this.currentLocation);
@@ -950,6 +959,7 @@
             const res = await fetch(`${this.API_BASE}/v1/countries`);
             const json = await res.json();
             this._countries = (json.countries || []).map(c => ({ name: c.name, code: c.country_code }));
+            console.log('Countries data structure:', this._countries[0]); // DEBUG LINE
           } catch {
             this._countries = [
               { name:'United Kingdom', code:'GB' }, { name:'Uganda', code:'UG' },
@@ -969,13 +979,19 @@
       findCountryName(code) {
         const cc = String(code || '').toUpperCase();
         
-        // Guard against invalid codes
         if (!cc || cc === 'UNDEFINED' || cc.length !== 2) {
-          return 'United Kingdom'; // Safe default
+          return 'United Kingdom';
         }
         
-        const hit = (this._countries || []).find(c => c.code === cc);
-        return hit?.name || 'Unknown Country';
+        // Try multiple possible property names
+        const hit = (this._countries || []).find(c => 
+          c.code === cc || 
+          c.country_code === cc || 
+          c.alpha2 === cc ||
+          c.iso2 === cc
+        );
+        
+        return hit?.name || (cc === 'GB' ? 'United Kingdom' : 'Unknown Country');
       }
       
 
