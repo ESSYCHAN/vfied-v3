@@ -532,7 +532,7 @@ function getMealGuidance(mealPeriod, hour) {
   return guidance[mealPeriod] || `Current time (${hour}h): suggest foods appropriate for this hour`;
 }
 // GPT recommendation helper
-async function recommendWithGPT({ mood_text = '', location = {}, dietary = [], weather = null, avoidList = [] }) {
+async function recommendWithGPT({ mood_text = '', location = {}, dietary = [], weather = null, avoidList = [], timeContext = null }) {
   if (!USE_GPT || !OPENAI_API_KEY) return null;
 
   // FIX: Ensure avoidList is always an array
@@ -622,12 +622,12 @@ app.post('/v1/quick_decision', async (req, res) => {
     if (error) {
       console.warn('[quick_decision] validation warning:', error.details?.map(d=>d.message).join(' | '));
     }
-    const timeContext = v.time_context || null;
+   
     const v = value || {};
     const loc = normalizeLocation(v.location);
     const dietary = normalizeDietary(v.dietary);
     const mood_text = String(v.mood_text || '').trim();
-    
+    const timeContext = v.time_context || null; 
     // Build avoid list properly
     const avoidRaw = v.recent_suggestions || v.avoid || v.avoid_list || [];
     const avoidList = Array.isArray(avoidRaw) ? avoidRaw : [avoidRaw];

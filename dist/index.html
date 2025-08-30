@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>VFIED – One-Tap Shortlists</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
-  <script type="module" crossorigin src="/assets/index-B9NknoJ4.js"></script>
+  <script type="module" crossorigin src="/assets/index-BRavssnh.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-B3UFU_jU.css">
   <script type="module">import.meta.url;import("_").catch(()=>1);(async function*(){})().next();window.__vite_is_modern_browser=true</script>
   <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
@@ -502,7 +502,13 @@
           <button onclick="window.vfiedApp.hideTravelResults()" style="background: linear-gradient(135deg, #7c3aed, #6366f1); border:0; border-radius:8px; color:white; padding:8px 16px; font-size:13px; font-weight:600; cursor:pointer; margin-top:12px;">Try Something Else</button>
         </div>`; } }
       hideTravelResults() { const d=document.getElementById('travel-results-modal'); if (d) d.classList.add('hidden'); }
-
+      getMealPeriod(hour) {
+        if (hour >= 6 && hour < 11) return 'breakfast';
+        if (hour >= 11 && hour < 15) return 'lunch';
+        if (hour >= 15 && hour < 18) return 'snack';
+        if (hour >= 18 && hour < 22) return 'dinner';
+        return 'late_night';
+      }
       // Core: one-tap shortlist
       async makeDecision() {
         this.vibrate('Medium');
@@ -516,7 +522,14 @@
                 country: this.currentLocation.country || '',// "Kenya" (optional)
                 country_code: this.currentLocation.country_code // "KE"
               },
-              dietary: Array.from(this.selectedDietary)     // ["vegan","nut-free"]
+              dietary: Array.from(this.selectedDietary),     // ["vegan","nut-free"]
+              time_context: {
+              current_hour: new Date().getHours(),
+              meal_period: this.getMealPeriod(new Date().getHours()),
+              is_weekend: [0,6].includes(new Date().getDay()),
+              day_of_week: new Date().getDay()
+            }
+              // mood: document.getElementById('mood-input').value.trim() // "celebrating with friends"
             })
           }, 'quick_decision');
 
@@ -1104,6 +1117,6 @@
 <!-- Main script -->
   <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
   <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-8Segw8u9.js"></script>
-  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-BMywVbGU.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
+  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-D-hvtH12.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
 </body>
 </html>
