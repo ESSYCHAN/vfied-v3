@@ -6,8 +6,8 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>VFIED – One-Tap Shortlists</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
-  <script type="module" crossorigin src="/assets/index-BUvp_dub.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-B3UFU_jU.css">
+  <script type="module" crossorigin src="/assets/index-BBR08a_6.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BpUQ_A4p.css">
   <script type="module">import.meta.url;import("_").catch(()=>1);(async function*(){})().next();window.__vite_is_modern_browser=true</script>
   <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
 </head>
@@ -46,14 +46,14 @@
     💡 Optional: "Stressed but want something healthy" works better than just "hungry"
   </div>
   
-  <!-- NEW: Mood examples bar -->
+  <!-- Mood examples bar -->
   <div class="mood-examples" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-    <button class="mood-chip" onclick="setMood('just got promoted')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎉 Promoted</button>
-    <button class="mood-chip" onclick="setMood('hangover help')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🤕 Hangover</button>
-    <button class="mood-chip" onclick="setMood('birthday celebration')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎂 Birthday</button>
-    <button class="mood-chip" onclick="setMood('chaos mode')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🔥 Chaos</button>
-    <button class="mood-chip" onclick="setMood('date night')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">💕 Date</button>
-    <button class="mood-chip" onclick="setMood('pms cravings')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🌙 PMS</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('just got promoted')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎉 Promoted</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('hangover help')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🤕 Hangover</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('birthday celebration')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎂 Birthday</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('chaos mode')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🔥 Chaos</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('date night')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">💕 Date</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('pms cravings')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🌙 PMS</button>
   </div>
   
   <div style="display:flex; gap:8px; align-items:center;">
@@ -67,7 +67,7 @@
     />
   </div>
   
-  <!-- NEW: Datalist for mood suggestions -->
+  <!-- Datalist for mood suggestions -->
   <datalist id="mood-suggestions">
     <option value="just got promoted but exhausted">
     <option value="birthday celebration mode">
@@ -85,7 +85,7 @@
     <option value="netflix and chill snacks">
   </datalist>
   
-  <!-- NEW: Mood insight display (hidden by default) -->
+  <!-- Mood insight display (hidden by default) -->
   <div id="mood-insight" class="mood-insight-card hidden" style="display:none; background:rgba(124,58,237,0.1); border:1px solid rgba(124,58,237,0.3); border-radius:12px; padding:12px; margin-top:12px;">
     <!-- Content will be dynamically inserted here -->
   </div>
@@ -138,20 +138,20 @@
     </div>
   </div>
 </div>
-<div style="text-align:center; margin:20px 0;">
+<!-- <div style="text-align:center; margin:20px 0;">
 <div id="result-emoji" style="font-size:48px; margin-bottom:12px;">🍔</div>
 <h2 id="result-name" style="font-size:24px; font-weight:900; margin:0 0 8px 0;">Your Perfect Match</h2>
-</div>
+</div> -->
 <div style="background:rgba(255,255,255,.06); border-radius:12px; padding:12px; margin:16px 0;">
 <h5 style="margin:0 0 8px 0; font-size:14px; font-weight:700; color:#a5b4fc;">🤔 Why this choice?</h5>
 <p id="reasoning-text" style="margin:0; font-size:13px; line-height:1.4; color:#cbd5e1;">Based on your mood and preferences, this hits the perfect balance.</p>
 </div>
-<div class="quick-actions">
+<!-- <div class="quick-actions">
 <div class="quick-action primary" id="accept-btn">✅ Perfect!</div>
 <div class="quick-action" id="share-btn">📤 Share</div>
 <div class="quick-action" id="get-directions-btn">🗺️ Directions</div>
 <div class="quick-action" id="try-again-btn">🔄 Try Again</div>
-</div>
+</div> -->
 </div>
 <!-- Travel Modal -->
 <div class="modal" id="travel-modal">
@@ -582,6 +582,42 @@
         if (hour >= 18 && hour < 22) return 'dinner';
         return 'late_night';
       }
+
+      showMoodInsight(moodAnalysis) {
+        if (!moodAnalysis) return;
+        
+        const insightDiv = document.getElementById('mood-insight');
+        if (!insightDiv) return;
+        
+        const { vibes, message } = moodAnalysis;
+        
+        // Build vibe badges
+        const vibeBadges = (vibes || []).map(vibe => {
+          const vibeMap = {
+            'celebration': '🎉 Celebrating',
+            'hangover': '🤕 Hangover',
+            'pms': '🌙 PMS',
+            'date': '💕 Date Night',
+            'chaos': '🔥 Chaos Mode',
+            'tired': '😴 Tired',
+            'stressed': '😰 Stressed'
+          };
+          return `<span class="vibe-badge">${vibeMap[vibe] || vibe}</span>`;
+        }).join(' ');
+        
+        insightDiv.innerHTML = `
+          ${vibeBadges ? `<div class="vibe-badges" style="display:flex; gap:8px; margin-bottom:8px;">${vibeBadges}</div>` : ''}
+          ${message ? `<div class="mood-message" style="color:#e5ecff; font-size:13px; font-style:italic;">${message}</div>` : ''}
+        `;
+        
+        insightDiv.classList.remove('hidden');
+        insightDiv.style.display = 'block';
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+          insightDiv.style.display = 'none';
+        }, 5000);
+      }
       // Core: one-tap shortlist
       async makeDecision() {
         this.vibrate('Medium');
@@ -606,12 +642,26 @@
               // mood: document.getElementById('mood-input').value.trim() // "celebrating with friends"
             })
           }, 'quick_decision');
-
+          if (data.mood_analysis) {
+            this.showMoodInsight(data.mood_analysis);
+          }
           if (response.ok) {
             const data = await response.json();
             if (data.success && data.decisions) {
               this.showShortlistResult(data.decisions);
-              this.vibrate('Light');
+              const topPick = data.decisions[0];
+    // if (topPick) {
+    //   // Update the "Your Perfect Match" section
+    //   const emojiEl = document.getElementById('result-emoji');
+    //   const nameEl = document.getElementById('result-name');
+    //   const descEl = document.getElementById('reasoning-text');
+      
+    //   if (emojiEl) emojiEl.textContent = topPick.emoji || '🍽️';
+    //   if (nameEl) nameEl.textContent = topPick.name || 'Something Good';
+    //   if (descEl) descEl.textContent = topPick.explanation || 'Perfect for your mood';
+    // }
+    
+    this.vibrate('Light');
             } else throw new Error('No decisions returned');
           } else throw new Error(`HTTP ${response.status}`);
         } catch (e) {
@@ -1200,6 +1250,6 @@
 <!-- Main script -->
   <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
   <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-8Segw8u9.js"></script>
-  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-B2tOrOUk.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
+  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-B_27H1jL.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
 </body>
 </html>

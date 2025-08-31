@@ -134,20 +134,20 @@
     </div>
   </div>
 </div>
-<div style="text-align:center; margin:20px 0;">
+<!-- <div style="text-align:center; margin:20px 0;">
 <div id="result-emoji" style="font-size:48px; margin-bottom:12px;">🍔</div>
 <h2 id="result-name" style="font-size:24px; font-weight:900; margin:0 0 8px 0;">Your Perfect Match</h2>
-</div>
+</div> -->
 <div style="background:rgba(255,255,255,.06); border-radius:12px; padding:12px; margin:16px 0;">
 <h5 style="margin:0 0 8px 0; font-size:14px; font-weight:700; color:#a5b4fc;">🤔 Why this choice?</h5>
 <p id="reasoning-text" style="margin:0; font-size:13px; line-height:1.4; color:#cbd5e1;">Based on your mood and preferences, this hits the perfect balance.</p>
 </div>
-<div class="quick-actions">
+<!-- <div class="quick-actions">
 <div class="quick-action primary" id="accept-btn">✅ Perfect!</div>
 <div class="quick-action" id="share-btn">📤 Share</div>
 <div class="quick-action" id="get-directions-btn">🗺️ Directions</div>
 <div class="quick-action" id="try-again-btn">🔄 Try Again</div>
-</div>
+</div> -->
 </div>
 <!-- Travel Modal -->
 <div class="modal" id="travel-modal">
@@ -645,7 +645,19 @@
             const data = await response.json();
             if (data.success && data.decisions) {
               this.showShortlistResult(data.decisions);
-              this.vibrate('Light');
+              const topPick = data.decisions[0];
+    // if (topPick) {
+    //   // Update the "Your Perfect Match" section
+    //   const emojiEl = document.getElementById('result-emoji');
+    //   const nameEl = document.getElementById('result-name');
+    //   const descEl = document.getElementById('reasoning-text');
+      
+    //   if (emojiEl) emojiEl.textContent = topPick.emoji || '🍽️';
+    //   if (nameEl) nameEl.textContent = topPick.name || 'Something Good';
+    //   if (descEl) descEl.textContent = topPick.explanation || 'Perfect for your mood';
+    // }
+    
+    this.vibrate('Light');
             } else throw new Error('No decisions returned');
           } else throw new Error(`HTTP ${response.status}`);
         } catch (e) {
