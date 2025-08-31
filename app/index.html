@@ -42,14 +42,14 @@
     💡 Optional: "Stressed but want something healthy" works better than just "hungry"
   </div>
   
-  <!-- NEW: Mood examples bar -->
+  <!-- Mood examples bar -->
   <div class="mood-examples" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-    <button class="mood-chip" onclick="setMood('just got promoted')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎉 Promoted</button>
-    <button class="mood-chip" onclick="setMood('hangover help')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🤕 Hangover</button>
-    <button class="mood-chip" onclick="setMood('birthday celebration')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎂 Birthday</button>
-    <button class="mood-chip" onclick="setMood('chaos mode')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🔥 Chaos</button>
-    <button class="mood-chip" onclick="setMood('date night')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">💕 Date</button>
-    <button class="mood-chip" onclick="setMood('pms cravings')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🌙 PMS</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('just got promoted')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎉 Promoted</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('hangover help')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🤕 Hangover</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('birthday celebration')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎂 Birthday</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('chaos mode')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🔥 Chaos</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('date night')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">💕 Date</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('pms cravings')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🌙 PMS</button>
   </div>
   
   <div style="display:flex; gap:8px; align-items:center;">
@@ -63,7 +63,7 @@
     />
   </div>
   
-  <!-- NEW: Datalist for mood suggestions -->
+  <!-- Datalist for mood suggestions -->
   <datalist id="mood-suggestions">
     <option value="just got promoted but exhausted">
     <option value="birthday celebration mode">
@@ -81,7 +81,7 @@
     <option value="netflix and chill snacks">
   </datalist>
   
-  <!-- NEW: Mood insight display (hidden by default) -->
+  <!-- Mood insight display (hidden by default) -->
   <div id="mood-insight" class="mood-insight-card hidden" style="display:none; background:rgba(124,58,237,0.1); border:1px solid rgba(124,58,237,0.3); border-radius:12px; padding:12px; margin-top:12px;">
     <!-- Content will be dynamically inserted here -->
   </div>
@@ -578,6 +578,42 @@
         if (hour >= 18 && hour < 22) return 'dinner';
         return 'late_night';
       }
+
+      showMoodInsight(moodAnalysis) {
+        if (!moodAnalysis) return;
+        
+        const insightDiv = document.getElementById('mood-insight');
+        if (!insightDiv) return;
+        
+        const { vibes, message } = moodAnalysis;
+        
+        // Build vibe badges
+        const vibeBadges = (vibes || []).map(vibe => {
+          const vibeMap = {
+            'celebration': '🎉 Celebrating',
+            'hangover': '🤕 Hangover',
+            'pms': '🌙 PMS',
+            'date': '💕 Date Night',
+            'chaos': '🔥 Chaos Mode',
+            'tired': '😴 Tired',
+            'stressed': '😰 Stressed'
+          };
+          return `<span class="vibe-badge">${vibeMap[vibe] || vibe}</span>`;
+        }).join(' ');
+        
+        insightDiv.innerHTML = `
+          ${vibeBadges ? `<div class="vibe-badges" style="display:flex; gap:8px; margin-bottom:8px;">${vibeBadges}</div>` : ''}
+          ${message ? `<div class="mood-message" style="color:#e5ecff; font-size:13px; font-style:italic;">${message}</div>` : ''}
+        `;
+        
+        insightDiv.classList.remove('hidden');
+        insightDiv.style.display = 'block';
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+          insightDiv.style.display = 'none';
+        }, 5000);
+      }
       // Core: one-tap shortlist
       async makeDecision() {
         this.vibrate('Medium');
@@ -602,7 +638,9 @@
               // mood: document.getElementById('mood-input').value.trim() // "celebrating with friends"
             })
           }, 'quick_decision');
-
+          if (data.mood_analysis) {
+            this.showMoodInsight(data.mood_analysis);
+          }
           if (response.ok) {
             const data = await response.json();
             if (data.success && data.decisions) {
