@@ -71,6 +71,8 @@ document.addEventListener('DOMContentLoaded', () => {
   wireCoreEvents();
   wireTabs();
 
+  addMoodSuggestions();
+
   renderFriendChips();
   loadLocalGems();
   loadTravelLists();
@@ -251,6 +253,9 @@ async function handleDecision() {
     console.log('📥 Server response:', data);
     
     if (data.success && data.decisions) {
+      if (data.mood_analysis) {
+        showMoodInsight(data.mood_analysis);
+      }
       // Convert quick_decision format to suggestion format
       const pick = data.decisions[Math.floor(Math.random() * data.decisions.length)];
       const suggestion = {
@@ -260,7 +265,8 @@ async function handleDecision() {
         },
         friendMessage: pick.explanation || 'Perfect choice for you right now!',
         source: data.source || 'server',
-        confidence: 85
+        confidence: 85,
+        moodVibe: data.mood_analysis?.vibes?.[0] // NEW: Store the vibe
       };
 
       const enriched = addSocialSignals(suggestion);
@@ -293,13 +299,77 @@ async function handleDecision() {
     selected_dietary: Array.from(document.querySelectorAll('.diet-chip.active')).map(c => c.dataset.diet)
   });
 }
-
+function showMoodInsight(moodAnalysis) {
+  if (!moodAnalysis) return;
+  
+  const { vibes, message } = moodAnalysis;
+  
+  // Create or update mood insight element
+  let moodInsight = document.getElementById('mood-insight');
+  if (!moodInsight) {
+    moodInsight = document.createElement('div');
+    moodInsight.id = 'mood-insight';
+    moodInsight.className = 'mood-insight-card';
+    
+    // Insert after mood input section
+    const moodSection = document.querySelector('.mood-section');
+    if (moodSection) {
+      moodSection.appendChild(moodInsight);
+    }
+  }
+  
+  // Build vibe badges
+  const vibeBadges = (vibes || []).map(vibe => 
+    `<span class="vibe-badge vibe-${vibe}">${formatVibe(vibe)}</span>`
+  ).join('');
+  
+  moodInsight.innerHTML = `
+    <div class="mood-insight-content">
+      ${vibeBadges ? `<div class="vibe-badges">${vibeBadges}</div>` : ''}
+      ${message ? `<div class="mood-message">${message}</div>` : ''}
+    </div>
+  `;
+  
+  moodInsight.classList.add('show');
+  
+  // Auto-hide after 5 seconds
+  setTimeout(() => {
+    moodInsight.classList.remove('show');
+  }, 5000);
+}
+function formatVibe(vibe) {
+  const vibeMap = {
+    'celebration': '🎉 Celebrating',
+    'hangover': '🤕 Hangover',
+    'pms': '🌙 PMS',
+    'date': '💕 Date Night',
+    'study': '📚 Study Mode',
+    'chaos': '🔥 Chaos Mode',
+    'main-character': '✨ Main Character',
+    'goblin': '👺 Goblin Mode',
+    'heartbreak': '💔 Heartbreak',
+    'payday': '💰 Payday',
+    'friday': '🎊 Friday Vibes',
+    'anxious': '😰 Anxious',
+    'tired': '😴 Tired',
+    'post-workout': '💪 Post-Workout'
+  };
+  
+  return vibeMap[vibe] || vibe;
+}
 function showSuggestion(s) {
   show('suggestion-result');
 
   setText('result-emoji', s.food?.emoji || '🍽️');
   setText('result-name', s.food?.name || 'Something delicious');
-  setText('result-description', s.friendMessage || s.reasoning || 'Perfect for your mood!');
+  
+  // NEW: Add mood-specific messaging
+  let description = s.friendMessage || s.reasoning || 'Perfect for your mood!';
+  if (s.moodVibe) {
+    description = `${description} (Perfect for ${formatVibe(s.moodVibe)})`;
+  }
+  setText('result-description', description);
+  
   setText('restaurant-info', s.availabilityNote || '');
 
   // insights
@@ -648,43 +718,59 @@ function toast(msg, type = 'info') {
 function injectRuntimeStyles() {
   if (document.getElementById('vfied-runtime-styles')) return;
   const css = `
-  #vfied-toast-host {
-    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
-    display: flex; flex-direction: column; gap: 8px; z-index: 9999; pointer-events: none;
+  /* Existing styles... */
+  
+  /* Mood Insight Card */
+  .mood-insight-card {
+    background: rgba(124, 58, 237, 0.1);
+    border: 1px solid rgba(124, 58, 237, 0.3);
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 12px;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s ease;
+    display: none;
   }
-  .vfied-toast {
-    pointer-events: auto;
-    min-width: 240px; max-width: 92vw;
-    padding: 10px 14px; border-radius: 10px; backdrop-filter: blur(8px);
-    background: rgba(0,0,0,.65); color: #fff; font-weight: 600; font-size: 14px;
-    opacity: 0; transform: translateY(8px); transition: all .25s ease;
-    border: 1px solid rgba(255,255,255,.15);
+  
+  .mood-insight-card.show {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
   }
-  .vfied-toast.show { opacity: 1; transform: translateY(0); }
-  .vfied-toast.success { background: rgba(34,197,94,.85); }
-  .vfied-toast.warn { background: rgba(245,158,11,.9); }
-  .vfied-toast.error { background: rgba(239,68,68,.9); }
-
-  .skeleton-card {
-    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18);
-    border-radius: 16px; padding: 18px; max-width: 420px; margin: 8px auto;
+  
+  .vibe-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
   }
-  .sk-line {
-    height: 14px; margin: 10px 0;
-    background: linear-gradient(90deg, rgba(255,255,255,.15), rgba(255,255,255,.25), rgba(255,255,255,.15));
-    background-size: 200% 100%; animation: sk-shimmer 1.4s infinite;
-    border-radius: 8px;
+  
+  .vibe-badge {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
   }
-  .sk-emoji { height: 46px; width: 46px; border-radius: 50%; margin: 0 auto 10px; }
-  .sk-title { height: 18px; width: 70%; margin: 12px auto; }
-  .sk-sub { width: 90%; margin: 10px auto; }
-  .sk-sub.short { width: 60%; }
-  @keyframes sk-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-
-  /* Friend avatar chip (if your CSS doesn't already style it) */
-  .friend-chip { display:inline-flex; align-items:center; gap:8px; }
-  .friend-avatar { width:22px; height:22px; border-radius:50%; object-fit:cover; }
+  
+  .vibe-celebration { background: rgba(255, 215, 0, 0.2); border-color: gold; }
+  .vibe-hangover { background: rgba(255, 99, 71, 0.2); border-color: tomato; }
+  .vibe-date { background: rgba(255, 105, 180, 0.2); border-color: hotpink; }
+  .vibe-chaos { background: rgba(255, 69, 0, 0.2); border-color: orangered; }
+  .vibe-main-character { background: rgba(138, 43, 226, 0.2); border-color: blueviolet; }
+  
+  .mood-message {
+    color: #e5ecff;
+    font-size: 14px;
+    font-weight: 500;
+    font-style: italic;
+  }
+  
+  /* Rest of existing styles... */
   `;
+  
   const style = document.createElement('style');
   style.id = 'vfied-runtime-styles';
   style.textContent = css;
@@ -753,4 +839,44 @@ window.VFIED = {
   tryTravel,
   goEvent,
   goMaps,
+};
+
+function addMoodSuggestions() {
+  const moodInput = document.getElementById('mood-input');
+  if (!moodInput) return;
+  
+  // Add example moods as datalist
+  const datalist = document.createElement('datalist');
+  datalist.id = 'mood-suggestions';
+  datalist.innerHTML = `
+    <option value="just got promoted">
+    <option value="birthday celebration">
+    <option value="small win today">
+    <option value="hangover need help">
+    <option value="pms cravings">
+    <option value="date night">
+    <option value="chaos mode">
+    <option value="main character energy">
+    <option value="goblin mode activated">
+    <option value="heartbreak comfort">
+    <option value="friday vibes">
+    <option value="3am can't sleep">
+    <option value="studying for finals">
+    <option value="post workout hungry">
+  `;
+  
+  moodInput.setAttribute('list', 'mood-suggestions');
+  moodInput.parentNode.appendChild(datalist);
+}
+
+window.VFIED = {
+  ...window.VFIED,
+  setMood: function(moodText) {
+    const input = document.getElementById('mood-input');
+    if (input) {
+      input.value = moodText;
+      // Optional: auto-trigger decision
+      document.getElementById('decide-button')?.click();
+    }
+  }
 };

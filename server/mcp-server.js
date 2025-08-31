@@ -13,14 +13,15 @@ import * as moodsModule from './data/moods.js';
 import * as countriesModule from './data/countries.js';
 import { randomUUID } from 'crypto';
 import { SUPPORTED_COUNTRIES } from './data/countries.js'; // adjust path as needed
-
+import culturalMeals from './data/cultural_meals.json' assert { type: 'json' };
+import { parseCravings, enhanceMoodText } from './craving_parser.js';
 // Optional polyfill if your Node is <18
 // import fetch from 'node-fetch';
 // globalThis.fetch = globalThis.fetch || fetch;
 
 // Environment variables
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || process.env.VITE_OPENAI_API_KEY || '';
-const USE_GPT = String(process.env.USE_GPT || process.env.VITE_USE_GPT || '').toLowerCase() === 'true';
+const USE_GPT = ['true', '1', 'yes', 'on'].includes(String(process.env.USE_GPT || process.env.VITE_USE_GPT || '').toLowerCase().trim());
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const PORT = process.env.MCP_PORT || process.env.PORT || 3048; // ✅ FIXED: Match OpenAPI schema
 const USE_EVENTS_PROVIDER = String(process.env.USE_EVENTS_PROVIDER || '').toLowerCase() === 'true';
@@ -534,44 +535,85 @@ function getMealGuidance(mealPeriod, hour) {
 // GPT recommendation helper
 async function recommendWithGPT({ mood_text = '', location = {}, dietary = [], weather = null, avoidList = [], timeContext = null }) {
   if (!USE_GPT || !OPENAI_API_KEY) return null;
-
-  // FIX: Ensure avoidList is always an array
+  const enhanced = enhanceMoodText(mood_text); 
   const safeAvoidList = Array.isArray(avoidList) ? avoidList : [];
+  const cc = location.country_code || 'GB';
+  const mealPeriod = timeContext?.meal_period || 'lunch';
   
-  const system = `You are VFIED, a global food expert who suggests AUTHENTIC and DIVERSE foods.
+  // Get cultural meal data for this country and meal period
+  const countryData = culturalMeals[cc];
+  const mealData = countryData?.[mealPeriod] || {};
+  
+  // Build the "NEVER" list - foods that should never be served at this meal
+  const neverFoods = mealData.never || [];
+  
+  // Build appropriate foods list based on meal period
+  const appropriateFoods = [];
+  if (mealData.traditional) {
+    Object.values(mealData.traditional).forEach(items => {
+      if (Array.isArray(items)) appropriateFoods.push(...items);
+    });
+  }
+  if (mealData.modern) {
+    appropriateFoods.push(...(Array.isArray(mealData.modern) ? mealData.modern : []));
+  }
+  if (mealData.popular) {
+    appropriateFoods.push(...(Array.isArray(mealData.popular) ? mealData.popular : []));
+  }
+  
+  // Get snacks and street food if appropriate
+  const snackOptions = countryData?.snacks || {};
+  const streetFood = countryData?.street_food || {};
+  
+  // Parse mood/craving for better matching
+  const cravingContext = parseMoodForCravings(mood_text);
+  
+  const system = `You are VFIED, a culturally-aware food expert who MUST follow strict cultural meal rules.
 
-CURRENT TIME CONTEXT:
-- Hour: ${timeContext?.current_hour || 'unknown'}
-- Meal period: ${timeContext?.meal_period || 'unknown'}
+CRITICAL LOCATION & TIME:
+- Location: ${location.city || 'Unknown'}, ${countryData?.country || location.country || 'Unknown'} (${cc})
+- Current time: ${timeContext?.current_hour || 'unknown'}h (${mealPeriod})
 - Weekend: ${timeContext?.is_weekend ? 'yes' : 'no'}
 
-MEAL-APPROPRIATE SUGGESTIONS:
-${getMealGuidance(timeContext?.meal_period, timeContext?.current_hour)}
+🚫 NEVER SUGGEST THESE FOR ${mealPeriod.toUpperCase()}:
+${neverFoods.length > 0 ? neverFoods.join(', ') : 'No restrictions'}
+${mealData.notes ? `\nCULTURAL RULE: ${mealData.notes}` : ''}
 
-CRITICAL DIVERSITY RULE:
-- 30% Staples (grains/breads/rice/noodle dishes)
-- 35% Proteins (meat/seafood/plant-protein mains)
-- 20% Street foods (snacks/markets)
-- 15% Special dishes (celebration/regional signatures)
+✅ APPROPRIATE ${mealPeriod.toUpperCase()} FOODS FOR ${cc}:
+${appropriateFoods.slice(0, 20).join(', ')}
 
-AVOID THESE DISHES THIS TURN: ${safeAvoidList.length ? safeAvoidList.slice(0,8).join(', ') : '—'}
-LOCATION: ${location.city || 'Unknown'}, ${location.country || 'Unknown'} (${location.country_code || '—'})
-MOOD: ${mood_text || '—'}
-DIETARY: ${dietary.join(', ') || 'none'}
-WEATHER: ${weather ? `${weather.temperature}°C, ${weather.condition}` : 'unknown'}
+USER MOOD ANALYSIS:
+- Original request: "${mood_text}"
+- Mood vibe: ${enhanced.vibes?.join(', ') || 'general hunger'}
+- They want: ${enhanced.food_attributes?.join(', ') || 'satisfying'} food
+- Consider these: ${enhanced.suggested_categories?.slice(0, 5).join(', ') || 'local favorites'}
 
-Examples for this region:
-${getGlobalFoodExamples(location.country_code)}
+USER CONTEXT:
+- Dietary restrictions: ${dietary.length > 0 ? dietary.join(', ') : 'none'}
+- Weather: ${weather ? `${weather.temperature}°C, ${weather.condition}` : 'unknown'}
+${weather && weather.temperature < 15 ? '- Cold weather: Suggest warm, comforting foods' : ''}
+${weather && weather.temperature > 30 ? '- Hot weather: Suggest cool, refreshing foods' : ''}
+${weather && weather.isRaining ? '- Rainy: Comfort foods and hot drinks work well' : ''}
 
-Return STRICT JSON with meal-appropriate suggestions for ${timeContext?.meal_period || 'current time'}:
+RECENTLY SUGGESTED (AVOID): ${safeAvoidList.slice(0, 5).join(', ') || 'none'}
+
+STRICT REQUIREMENTS:
+1. ONLY suggest foods culturally appropriate for ${mealPeriod} in ${cc}
+2. NEVER suggest items from the "never" list above
+3. Match their mood vibe: ${enhanced.vibes?.[0] || mood_text} with ${enhanced.food_attributes?.join(', ') || 'appropriate'} foods
+4. Consider the weather conditions
+5. Respect dietary restrictions: ${dietary.join(', ') || 'none'}
+
+Return EXACTLY this JSON with 3 culturally correct suggestions:
 {
   "decisions": [
-    {"name": "specific local dish 1", "emoji": "🍜", "explanation": "why this works for ${timeContext?.meal_period || 'now'}"},
-    {"name": "specific local dish 2", "emoji": "🍛", "explanation": "why this works for ${timeContext?.meal_period || 'now'}"},
-    {"name": "specific local dish 3", "emoji": "🍽", "explanation": "why this works for ${timeContext?.meal_period || 'now'}"}
+    {"name": "specific dish from ${cc} that matches ${enhanced.vibes?.[0] || 'their mood'}", "emoji": "🍜", "explanation": "why this matches their ${enhanced.vibes?.[0] || 'mood'} and is perfect for ${mealPeriod}"},
+    {"name": "another ${cc} ${mealPeriod} dish for ${enhanced.vibes?.[0] || 'this mood'}", "emoji": "🍛", "explanation": "why this fits their craving and current time"},
+    {"name": "third option matching ${enhanced.vibes?.[0] || 'their vibe'}", "emoji": "🍽", "explanation": "why this works for ${mealPeriod}"}
   ]
-}`;
+}
 
+BE SPECIFIC: Use actual dish names from ${cc} cuisine, not generic descriptions.`;
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -584,9 +626,9 @@ Return STRICT JSON with meal-appropriate suggestions for ${timeContext?.meal_per
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: system },
-          { role: 'user', content: `Give me 3 varied food suggestions for ${location.city}` }
+          { role: 'user', content: `I'm in ${location.city}, ${cc} and it's ${mealPeriod} time (${timeContext?.current_hour}h). I'm feeling "${mood_text || 'hungry'}". What should I eat? Give me 3 specific ${mealPeriod} options that are culturally appropriate for ${cc}.` }
         ],
-        temperature: 0.8,
+        temperature: 0.7, // Lower temperature for more consistent cultural accuracy
         max_tokens: 400
       })
     });
@@ -601,13 +643,73 @@ Return STRICT JSON with meal-appropriate suggestions for ${timeContext?.meal_per
     const content = json.choices[0].message.content.trim();
     const parsed = JSON.parse(content);
     
-    console.log('✅ GPT Response:', parsed);
+    // Validate that suggestions aren't in the "never" list
+    if (parsed.decisions && neverFoods.length > 0) {
+      parsed.decisions = parsed.decisions.filter(decision => {
+        const nameLC = decision.name.toLowerCase();
+        const isInvalid = neverFoods.some(never => nameLC.includes(never.toLowerCase()));
+        if (isInvalid) {
+          console.warn(`❌ Filtered out culturally inappropriate suggestion: ${decision.name} for ${mealPeriod}`);
+        }
+        return !isInvalid;
+      });
+    }
+    
+    console.log('✅ GPT Response with cultural rules:', parsed);
     return parsed;
 
   } catch (error) {
     console.error('❌ GPT call failed:', error.message);
     return null;
   }
+}
+
+// Helper function to parse mood text for cravings
+function parseMoodForCravings(moodText) {
+  if (!moodText) return '';
+  
+  const text = moodText.toLowerCase();
+  const cravingHints = [];
+  
+  // Physical states
+  if (/hangover|rough morning|too much/.test(text)) {
+    cravingHints.push('(needs: greasy, salty, hydrating foods)');
+  }
+  if (/pms|period|cramps/.test(text)) {
+    cravingHints.push('(needs: comfort foods, chocolate, warm foods)');
+  }
+  if (/sick|cold|flu|unwell/.test(text)) {
+    cravingHints.push('(needs: soup, broth, easy to digest)');
+  }
+  
+  // Taste desires
+  if (/spicy|hot|fire/.test(text)) {
+    cravingHints.push('(wants: spicy, bold flavors)');
+  }
+  if (/sweet|dessert|sugar/.test(text)) {
+    cravingHints.push('(wants: sweet treats, desserts)');
+  }
+  if (/savory|savoury|umami|salty/.test(text)) {
+    cravingHints.push('(wants: savory, rich flavors)');
+  }
+  
+  // Texture
+  if (/crunchy|crispy|fried/.test(text)) {
+    cravingHints.push('(wants: crispy, crunchy textures)');
+  }
+  if (/soup|broth|liquid|warm/.test(text)) {
+    cravingHints.push('(wants: liquid, warming foods)');
+  }
+  
+  // Diet intentions
+  if (/light|healthy|fresh/.test(text)) {
+    cravingHints.push('(wants: light, fresh, healthy options)');
+  }
+  if (/heavy|filling|hearty/.test(text)) {
+    cravingHints.push('(wants: filling, substantial meals)');
+  }
+  
+  return cravingHints.join(' ');
 }
 
 // ===== CORE ENDPOINTS =====
@@ -622,7 +724,7 @@ app.post('/v1/quick_decision', async (req, res) => {
     if (error) {
       console.warn('[quick_decision] validation warning:', error.details?.map(d=>d.message).join(' | '));
     }
-   
+
     const v = value || {};
     const loc = normalizeLocation(v.location);
     const dietary = normalizeDietary(v.dietary);
@@ -644,10 +746,19 @@ app.post('/v1/quick_decision', async (req, res) => {
       use_gpt: USE_GPT,
       has_key: !!OPENAI_API_KEY
     });
-
+    const moodAnalysis = enhanceMoodText(mood_text);
+  
+    console.log('🔍 Mood analysis:', {
+      original: mood_text,
+      vibes: moodAnalysis.vibes,
+      attributes: moodAnalysis.food_attributes,
+      friendly_response: moodAnalysis.friendly_response
+    });
     // === PRIORITY: Try GPT first with proper error handling ===
     if (USE_GPT && OPENAI_API_KEY) {
-      console.log('🤖 Attempting GPT recommendation...');
+      const system = `You are VFIED. User mood: "${mood_text}"
+      Analysis: ${moodAnalysis.gpt_context}
+      Suggest foods that match these attributes: ${moodAnalysis.food_attributes.join(', ')}`;
       
       try {
         const gptResult = await recommendWithGPT({ 
@@ -708,6 +819,10 @@ app.post('/v1/quick_decision', async (req, res) => {
       success: true,
       request_id: randomUUID?.() || String(Date.now()),
       decisions: emergencyOptions.slice(0, 3),
+      mood_analysis: {
+        vibes: moodAnalysis.vibes,
+        message: moodAnalysis.friendly_response
+      },
       location: { city: loc.city || 'Unknown', country_code: cc },
       processingTimeMs: Date.now() - t0,
       note: 'Emergency fallback - GPT unavailable',
@@ -1983,3 +2098,4 @@ app.listen(PORT, () => {
 
 // (Optional) export for testing
 // export default app;
+

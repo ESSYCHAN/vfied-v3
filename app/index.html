@@ -23,23 +23,68 @@
         Change
       </button>
 </div>
-<div class="glass-card">
-<div class="dietary-prefs">
-<h5>🥗 Quick dietary filters (optional)</h5>
-<div class="diet-chips">
-<div class="diet-chip" data-diet="vegetarian">🌱 Vegetarian</div>
-<div class="diet-chip" data-diet="vegan">🌿 Vegan</div>
-<div class="diet-chip" data-diet="gluten-free">🌾 No Gluten</div>
-<div class="diet-chip" data-diet="nut-free">🚫🥜 No Nuts</div>
-<div class="diet-chip" data-diet="dairy-free">🥛❌ No Dairy</div>
-<div class="diet-chip" data-diet="halal">☪️ Halal</div>
-</div>
-</div>
-<h3 style="margin:0 0 8px 0; font-size:18px; font-weight:700;">🧠 How are you feeling?</h3>
-<div style="background:rgba(255,255,255,.04); padding:8px 12px; border-radius:8px; margin-bottom:16px; font-size:13px; color:#94a3b8;">
-        💡 Optional: “Stressed but want something healthy” works better than just “hungry”
-      </div>
-<input id="mood-input" placeholder="e.g., celebrating with friends, need comfort food, post-workout hungry..." style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:12px; padding:14px 16px; font-size:15px; font-weight:500; margin-bottom:12px;"/>
+<div class="glass-card mood-section">
+  <div class="dietary-prefs">
+    <h5>🥗 Quick dietary filters (optional)</h5>
+    <div class="diet-chips">
+      <div class="diet-chip" data-diet="vegetarian">🌱 Vegetarian</div>
+      <div class="diet-chip" data-diet="vegan">🌿 Vegan</div>
+      <div class="diet-chip" data-diet="gluten-free">🌾 No Gluten</div>
+      <div class="diet-chip" data-diet="nut-free">🚫🥜 No Nuts</div>
+      <div class="diet-chip" data-diet="dairy-free">🥛❌ No Dairy</div>
+      <div class="diet-chip" data-diet="halal">☪️ Halal</div>
+    </div>
+  </div>
+  
+  <h3 style="margin:20px 0 8px 0; font-size:18px; font-weight:700;">🧠 How are you feeling?</h3>
+  
+  <div style="background:rgba(255,255,255,.04); padding:8px 12px; border-radius:8px; margin-bottom:16px; font-size:13px; color:#94a3b8;">
+    💡 Optional: "Stressed but want something healthy" works better than just "hungry"
+  </div>
+  
+  <!-- NEW: Mood examples bar -->
+  <div class="mood-examples" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+    <button class="mood-chip" onclick="setMood('just got promoted')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎉 Promoted</button>
+    <button class="mood-chip" onclick="setMood('hangover help')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🤕 Hangover</button>
+    <button class="mood-chip" onclick="setMood('birthday celebration')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎂 Birthday</button>
+    <button class="mood-chip" onclick="setMood('chaos mode')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🔥 Chaos</button>
+    <button class="mood-chip" onclick="setMood('date night')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">💕 Date</button>
+    <button class="mood-chip" onclick="setMood('pms cravings')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🌙 PMS</button>
+  </div>
+  
+  <div style="display:flex; gap:8px; align-items:center;">
+    <input 
+      id="mood-input" 
+      type="text"
+      placeholder="e.g., celebrating with friends, need comfort food, post-workout hungry..." 
+      list="mood-suggestions"
+      autocomplete="off"
+      style="flex:1; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:12px; padding:14px 16px; font-size:15px; font-weight:500;"
+    />
+  </div>
+  
+  <!-- NEW: Datalist for mood suggestions -->
+  <datalist id="mood-suggestions">
+    <option value="just got promoted but exhausted">
+    <option value="birthday celebration mode">
+    <option value="small win today">
+    <option value="hangover need greasy food">
+    <option value="pms chocolate cravings">
+    <option value="heartbreak comfort needed">
+    <option value="main character energy">
+    <option value="goblin mode activated">
+    <option value="friday vibes">
+    <option value="sunday scaries">
+    <option value="3am can't sleep hungry">
+    <option value="post workout starving">
+    <option value="studying need brain food">
+    <option value="netflix and chill snacks">
+  </datalist>
+  
+  <!-- NEW: Mood insight display (hidden by default) -->
+  <div id="mood-insight" class="mood-insight-card hidden" style="display:none; background:rgba(124,58,237,0.1); border:1px solid rgba(124,58,237,0.3); border-radius:12px; padding:12px; margin-top:12px;">
+    <!-- Content will be dynamically inserted here -->
+  </div>
 </div>
 <div style="display:flex; justify-content:center; margin:20px 0;">
 <div style="display:flex; gap:4px; padding:4px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:16px;">
@@ -61,6 +106,34 @@
 </div>
 <div class="shortlist-result hidden" id="shortlist-result"></div>
 <div class="suggestion-result hidden" id="suggestion-result">
+  <div class="suggestion-card">
+    <div id="result-emoji"></div>
+    <div id="result-name"></div>
+    <div id="result-description"></div>
+    
+    <!-- NEW: Mood context display -->
+    <div id="mood-context" class="mood-context hidden">
+      <div class="mood-context-label">Matched your vibe:</div>
+      <div id="mood-context-badges"></div>
+    </div>
+    
+    <div id="restaurant-info"></div>
+    <div id="social-signals"></div>
+    
+    <div class="insights-section hidden" id="insights-content">
+      <div id="cultural-note"></div>
+      <div id="personal-note"></div>
+      <div id="weather-note"></div>
+    </div>
+    
+    <button id="insights-toggle">🤖 Why this choice? ↓</button>
+    
+    <div class="decision-actions">
+      <button class="action-btn accept" id="accept-btn">✅ Perfect!</button>
+      <button class="action-btn" id="try-again-btn">🔄 Try Again</button>
+    </div>
+  </div>
+</div>
 <div style="text-align:center; margin:20px 0;">
 <div id="result-emoji" style="font-size:48px; margin-bottom:12px;">🍔</div>
 <h2 id="result-name" style="font-size:24px; font-weight:900; margin:0 0 8px 0;">Your Perfect Match</h2>
@@ -519,6 +592,7 @@
                 country_code: this.currentLocation.country_code // "KE"
               },
               dietary: Array.from(this.selectedDietary),     // ["vegan","nut-free"]
+              mood: document.getElementById('mood-input').value.trim(),
               time_context: {
               current_hour: new Date().getHours(),
               meal_period: this.getMealPeriod(new Date().getHours()),
@@ -1074,12 +1148,21 @@
       }
 
     }
+    function setMood(moodText) {
+    const input = document.getElementById('mood-input');
+    if (input) {
+      input.value = moodText;
+      // Optionally trigger the decision immediately
+      // document.getElementById('decide-button')?.click();
+    }
+  }
 
     // Expose small helper for inline onclick
     window.askFollowUp = (q) => window.vfiedApp?.askFollowUp(q);
 
     document.addEventListener('DOMContentLoaded', () => { window.vfiedApp = new VFIEDApp(); });
   </script>
+  
 <!-- Location Modal -->
 <div class="modal" id="location-modal">
 <div class="modal-content">
