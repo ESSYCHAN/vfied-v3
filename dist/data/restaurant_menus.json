@@ -1,0 +1,41 @@
+{
+    "GB_London_dishoom_covent_garden": {
+      "restaurant_id": "dishoom_covent_garden",
+      "restaurant_name": "Dishoom Covent Garden",
+      "location": {
+        "city": "London",
+        "country_code": "GB"
+      },
+      "delivery_platforms": {
+        "deliveroo_id": "dishoom-covent-garden",
+        "ubereats_id": "dishoom-london"
+      },
+      "menu_items": [
+        {
+          "name": "Bacon Naan Roll",
+          "emoji": "🥓",
+          "price": "£7.50",
+          "description": "Crispy bacon in fresh naan",
+          "meal_period": "breakfast",
+          "available": true,
+          "dietary": {
+            "vegetarian": false,
+            "vegan": false
+          }
+        },
+        {
+          "name": "House Black Daal",
+          "emoji": "🍛",
+          "price": "£8.90",
+          "description": "24-hour slow-cooked lentils",
+          "meal_period": "all_day",
+          "available": true,
+          "dietary": {
+            "vegetarian": true,
+            "vegan": false,
+            "gluten_free": true
+          }
+        }
+      ]
+    }
+  }
