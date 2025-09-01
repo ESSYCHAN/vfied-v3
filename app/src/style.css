@@ -796,3 +796,83 @@ body.vfied {
     transform: translateY(0);
   }
 }
+/* Better mobile scaling */
+:root {
+  /* Use dvh (dynamic viewport height) for better mobile support */
+  --vh: 1dvh;
+  --safe-area-top: env(safe-area-inset-top, 20px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 20px);
+}
+
+/* Fix the header sizing */
+header {
+  padding: calc(var(--safe-area-top) + 1rem) 1rem 1rem;
+  position: relative;
+}
+
+/* Fix the main content area */
+.glass-card {
+  max-width: 100%;
+  margin: 0.75rem;
+  padding: 1.25rem;
+}
+
+/* Adjust button heights for better touch targets */
+.diet-chip, .mood-chip {
+  min-height: 44px; /* iOS recommended touch target */
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+/* Fix the decision button */
+#decide-button {
+  min-height: 56px; /* Material Design touch target */
+  font-size: 1rem;
+  padding: 1rem 2rem;
+  margin: 1.5rem 1rem;
+}
+
+/* Responsive font sizing */
+@media (max-width: 390px) {
+  /* iPhone 12/13 mini and smaller Android devices */
+  body {
+    font-size: 14px;
+  }
+  
+  h1 {
+    font-size: 1.75rem;
+  }
+  
+  .diet-chip, .mood-chip {
+    font-size: 0.8rem;
+    padding: 0.6rem 0.8rem;
+  }
+}
+
+@media (min-width: 391px) and (max-width: 430px) {
+  /* Standard phones */
+  body {
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 431px) {
+  /* Larger phones and tablets */
+  body {
+    font-size: 16px;
+  }
+}
+/* Fix bottom nav positioning */
+nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding-bottom: calc(var(--safe-area-bottom) + 0.5rem);
+  z-index: 100;
+}
+
+/* Add padding to main content to prevent overlap */
+#app {
+  padding-bottom: calc(80px + var(--safe-area-bottom));
+}
