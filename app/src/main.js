@@ -224,7 +224,6 @@ async function handleDecision() {
 
     console.log('🎯 Making decision with:', { mood, dietary: selectedDietary });
 
-    // Get recent suggestions for avoidance
     const recentSuggestions = JSON.parse(localStorage.getItem('vfied_recent') || '[]');
 
     const response = await fetch(`${API_BASE}/v1/quick_decision`, {
@@ -256,10 +255,15 @@ async function handleDecision() {
         showMoodInsight(data.mood_analysis);
       }
       
-      // FIXED: Show all 3 decisions instead of picking one random
-      showShortlistResult(data.decisions);
+      // FIXED: Direct call to the global vfiedApp instance
+      if (typeof window.vfiedApp !== 'undefined' && typeof window.vfiedApp.showShortlistResult === 'function') {
+        window.vfiedApp.showShortlistResult(data.decisions);
+      } else {
+        // Fallback: create the display directly
+        displayShortlistFallback(data.decisions);
+      }
       
-      // Update recent suggestions with all decisions
+      // Update recent suggestions
       data.decisions.forEach(decision => {
         updateRecentSuggestions({ food: { name: decision.name } });
       });
@@ -272,53 +276,96 @@ async function handleDecision() {
   } catch (error) {
     console.error('❌ Decision error:', error);
     
-    // Fallback: show 3 offline suggestions
+    // Show fallback suggestions
     const fallbackDecisions = [
       { name: 'Local Favorite', emoji: '🍽️', explanation: 'Server unavailable - try any local spot!' },
       { name: 'Comfort Food', emoji: '🍲', explanation: 'Something warm and familiar' },
       { name: 'Quick Bite', emoji: '🥪', explanation: 'Fast and satisfying option' }
     ];
     
-    showShortlistResult(fallbackDecisions);
+    if (typeof window.vfiedApp !== 'undefined' && typeof window.vfiedApp.showShortlistResult === 'function') {
+      window.vfiedApp.showShortlistResult(fallbackDecisions);
+    } else {
+      displayShortlistFallback(fallbackDecisions);
+    }
+    
     toast(`Connection issue: ${error.message}`, 'warn');
   } finally {
     setThinking(decideBtn, false);
   }
 }
 
-function showShortlistResult(decisions) {
-  const single = document.getElementById('suggestion-result'); 
-  if (single) single.classList.add('hidden');
+// Add this fallback display function
+function displayShortlistFallback(decisions) {
+  // Hide any single suggestion result
+  const singleResult = document.getElementById('suggestion-result');
+  if (singleResult) singleResult.classList.add('hidden');
   
+  // Get or create shortlist section
   let section = document.getElementById('shortlist-result');
   if (!section) {
     section = document.createElement('div');
     section.id = 'shortlist-result';
     section.className = 'shortlist-result';
-    document.getElementById('decide-button').parentNode.insertBefore(section, document.getElementById('decide-button').nextSibling);
+    const foodTab = document.getElementById('food-tab');
+    if (foodTab) {
+      foodTab.appendChild(section);
+    }
   }
   
+  // Display the decisions
   section.innerHTML = `
     <div style="margin:24px 20px;">
       <h3 style="text-align:center; margin:0 0 20px 0; font-size:18px; font-weight:700; color:#a5b4fc;">Your 3 Perfect Picks</h3>
       <div style="display:grid; gap:12px;">
-        ${decisions.map((d,i)=>`
-          <div class="decision-card" style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:16px; cursor:pointer;">
+        ${decisions.map((d, i) => `
+          <div class="decision-card" data-food="${escapeHtml(d.name)}" 
+               style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:16px; cursor:pointer; transition:.2s;">
             <div style="display:flex; align-items:center; gap:12px;">
               <div style="font-size:28px;">${d.emoji || '🍽️'}</div>
               <div style="flex:1;">
-                <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#e5ecff;">${d.name}</div>
-                <div style="font-size:13px; color:#94a3b8; line-height:1.4;">${d.explanation || ''}</div>
+                <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#e5ecff;">${escapeHtml(d.name)}</div>
+                <div style="font-size:13px; color:#94a3b8; line-height:1.4;">${escapeHtml(d.explanation || '')}</div>
               </div>
-              <div style="background:rgba(16,185,129,.2); border-radius:16px; padding:4px 8px; font-size:11px; font-weight:600; color:#10b981;">#${i+1}</div>
+              <div style="background:rgba(16,185,129,.2); border-radius:16px; padding:4px 8px; font-size:11px; font-weight:600; color:#10b981;">#${i + 1}</div>
             </div>
-          </div>`).join('')}
+          </div>
+        `).join('')}
       </div>
-    </div>`;
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:20px;">
+        <button onclick="handleDecision()" style="padding:12px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:12px; color:#e5ecff; font-weight:700; cursor:pointer; font-size:14px;">🔄 New Picks</button>
+        <button onclick="document.getElementById('mood-input').focus()" style="padding:12px; background:rgba(124,58,237,.2); border:1px solid rgba(124,58,237,.3); border-radius:12px; color:#a5b4fc; font-weight:700; cursor:pointer; font-size:14px;">🧠 Add Mood</button>
+      </div>
+    </div>
+  `;
   
   section.classList.remove('hidden');
-  section.scrollIntoView({ behavior:'smooth', block:'center' });
+  section.style.display = 'block';
+  
+  // Add click handlers
+  section.querySelectorAll('.decision-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const foodName = card.dataset.food;
+      const query = encodeURIComponent(`${foodName} near London`);
+      window.open(`https://maps.google.com/maps?q=${query}`, '_blank');
+    });
+  });
+  
+  // Update decision counter
+  const count = parseInt(localStorage.getItem('vfied_decisions') || '0') + 1;
+  localStorage.setItem('vfied_decisions', String(count));
+  const counterEl = document.getElementById('decisions-count');
+  if (counterEl) counterEl.textContent = count;
 }
+
+// Helper function
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text || '';
+  return div.innerHTML;
+}
+
+
 function showMoodInsight(moodAnalysis) {
   if (!moodAnalysis) return;
   
@@ -900,3 +947,90 @@ window.VFIED = {
     }
   }
 };
+function showShortlistResult(decisions) {
+  // Get or create the shortlist result section
+  let section = document.getElementById('shortlist-result');
+  if (!section) {
+    section = document.createElement('div');
+    section.id = 'shortlist-result';
+    section.className = 'shortlist-result';
+    
+    // Insert after the decide button
+    const decideBtn = document.getElementById('decide-button');
+    if (decideBtn && decideBtn.parentNode) {
+      decideBtn.parentNode.insertBefore(section, decideBtn.nextSibling);
+    }
+  }
+  
+  // Render the actual decisions from API
+  section.innerHTML = `
+    <div style="margin:24px 20px;">
+      <h3 style="text-align:center; margin:0 0 20px 0; font-size:18px; font-weight:700; color:#a5b4fc;">Your 3 Perfect Picks</h3>
+      <div style="display:grid; gap:12px;">
+        ${decisions.map((d, i) => `
+          <div class="decision-card" data-food="${escapeHtml(d.name)}" 
+               style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:16px; cursor:pointer; transition:.2s;"
+               onmouseover="this.style.background='rgba(255,255,255,.1)'" 
+               onmouseout="this.style.background='rgba(255,255,255,.06)'">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="font-size:28px;">${d.emoji || '🍽️'}</div>
+              <div style="flex:1;">
+                <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#e5ecff;">${escapeHtml(d.name)}</div>
+                <div style="font-size:13px; color:#94a3b8; line-height:1.4;">${escapeHtml(d.explanation || '')}</div>
+              </div>
+              <div style="background:rgba(16,185,129,.2); border-radius:16px; padding:4px 8px; font-size:11px; font-weight:600; color:#10b981;">#${i + 1}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:20px;">
+        <button id="shuffle-picks" style="padding:12px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:12px; color:#e5ecff; font-weight:700; cursor:pointer; font-size:14px;">🔄 New Picks</button>
+        <button id="add-mood-context" style="padding:12px; background:rgba(124,58,237,.2); border:1px solid rgba(124,58,237,.3); border-radius:12px; color:#a5b4fc; font-weight:700; cursor:pointer; font-size:14px;">🧠 Add Mood</button>
+      </div>
+    </div>
+  `;
+  
+  // Show the section
+  section.classList.remove('hidden');
+  section.style.display = 'block';
+  
+  // Add event listeners
+  const shuffleBtn = document.getElementById('shuffle-picks');
+  if (shuffleBtn) {
+    shuffleBtn.addEventListener('click', () => {
+      // Trigger new decision
+      document.getElementById('decide-button')?.click();
+    });
+  }
+  
+  const addMoodBtn = document.getElementById('add-mood-context');
+  if (addMoodBtn) {
+    addMoodBtn.addEventListener('click', () => {
+      const moodInput = document.getElementById('mood-input');
+      if (moodInput) {
+        moodInput.focus();
+        moodInput.placeholder = 'Tell me your specific mood for better picks...';
+      }
+    });
+  }
+  
+  // Add click handlers to each decision card
+  document.querySelectorAll('.decision-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const foodName = card.dataset.food;
+      // Open directions or show more details
+      const query = encodeURIComponent(`${foodName} near London`);
+      window.open(`https://maps.google.com/maps?q=${query}`, '_blank');
+    });
+  });
+  
+  // Scroll into view
+  section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+// Helper function if not already present
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text || '';
+  return div.innerHTML;
+}

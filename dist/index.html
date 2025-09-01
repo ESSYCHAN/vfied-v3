@@ -6,7 +6,7 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>VFIED – One-Tap Shortlists</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
-  <script type="module" crossorigin src="/assets/index-BBR08a_6.js"></script>
+  <script async type="module" crossorigin src="/assets/index-DHyW_XFM.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-BpUQ_A4p.css">
   <script type="module">import.meta.url;import("_").catch(()=>1);(async function*(){})().next();window.__vite_is_modern_browser=true</script>
   <script type="module">!function(){if(window.__vite_is_modern_browser)return;console.warn("vite: loading legacy chunks, syntax error above and the same error below should be ignored");var e=document.getElementById("vite-legacy-polyfill"),n=document.createElement("script");n.src=e.src,n.onload=function(){System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))},document.body.appendChild(n)}();</script>
@@ -642,26 +642,16 @@
               // mood: document.getElementById('mood-input').value.trim() // "celebrating with friends"
             })
           }, 'quick_decision');
-          if (data.mood_analysis) {
-            this.showMoodInsight(data.mood_analysis);
-          }
+          
+          
           if (response.ok) {
             const data = await response.json();
             if (data.success && data.decisions) {
+              if (data.mood_analysis) {
+                this.showMoodInsight(data.mood_analysis);
+              }
               this.showShortlistResult(data.decisions);
-              const topPick = data.decisions[0];
-    // if (topPick) {
-    //   // Update the "Your Perfect Match" section
-    //   const emojiEl = document.getElementById('result-emoji');
-    //   const nameEl = document.getElementById('result-name');
-    //   const descEl = document.getElementById('reasoning-text');
-      
-    //   if (emojiEl) emojiEl.textContent = topPick.emoji || '🍽️';
-    //   if (nameEl) nameEl.textContent = topPick.name || 'Something Good';
-    //   if (descEl) descEl.textContent = topPick.explanation || 'Perfect for your mood';
-    // }
-    
-    this.vibrate('Light');
+              this.vibrate('Light');
             } else throw new Error('No decisions returned');
           } else throw new Error(`HTTP ${response.status}`);
         } catch (e) {
@@ -716,7 +706,11 @@
 
       async askTravelCoach() {
         const query = document.getElementById('travel-query-modal').value.trim();
-        if (!query) { this.showToast('Ask me anything about food in ' + this.currentLocation.city); return; }
+        if (!query) {
+          this.showToast('Ask me anything about food in ' + this.currentLocation.city);
+          return;
+        }
+        
         this.showTravelCoachLoading();
         try {
           const response = await this.makeAPIRequest('/v1/travel/coach', {
@@ -732,9 +726,20 @@
               }
             })
           }, 'travel_coach');
+          
           const data = await response.json();
-          if (data.success) this.showTravelCoachResponse(data); else throw new Error(data.error || 'Failed');
-        } catch (e) { if (e.name === 'AbortError') this.showTravelCoachCancelled(); else this.showTravelActionError('coach'); }
+          if (data.success) {
+            this.showTravelCoachResponse(data);
+          } else {
+            throw new Error(data.error || 'Failed to get coach response');
+          }
+        } catch (e) {
+          if (e.name === 'AbortError') {
+            this.showTravelCoachCancelled();
+          } else {
+            this.showTravelActionError('coach');
+          }
+        }
       }
 
       async generateNightPlan() {
@@ -746,6 +751,7 @@
             date: `Romantic evening in ${this.currentLocation.city}. Intimate spots, memorable food.`,
             family: `Family-friendly evening in ${this.currentLocation.city}. Options for all ages.`
           };
+          
           const response = await this.makeAPIRequest('/v1/travel/nightplan', {
             method: 'POST',
             body: JSON.stringify({
@@ -757,20 +763,35 @@
               dietary: Array.from(this.selectedDietary)
             })
           }, 'night_plan');
+          
           const data = await response.json();
-          if (data.success) this.showNightPlanResult(data); else throw new Error('Failed');
-        } catch (e) { if (e.name !== 'AbortError') this.showTravelActionError('night plan'); }
-      }
+          if (data.success) {
+            this.showNightPlanResult(data);
+          } else {
+            throw new Error('Failed to generate night plan');
+          }
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            this.showTravelActionError('night plan');
+          }
+        }
+}
 
       async generateFoodCrawl() {
         this.showTravelActionLoading('🍽️ Mapping your food adventure...');
         try {
           const duration = document.getElementById('travel-duration-modal')?.value || 'full-day';
           const budget = document.getElementById('travel-budget-modal')?.value || 'medium';
+          
+          // Map travel mode to crawl type
           let crawlType = 'street_food';
           if (this.travelMode === 'business') crawlType = 'restaurant_hop';
           if (this.travelMode === 'date') crawlType = 'cultural_food';
-          const crawlDuration = duration === 'quick' ? '2_hours' : duration === 'half-day' ? '3_hours' : duration === 'full-day' ? 'half_day' : '3_hours';
+          
+          // Map duration properly
+          const crawlDuration = duration === 'quick' ? '2_hours' : 
+                              duration === 'half-day' ? '3_hours' : 
+                              duration === 'full-day' ? 'half_day' : '3_hours';
 
           const response = await this.makeAPIRequest('/v1/travel/food-crawl', {
             method: 'POST',
@@ -782,24 +803,47 @@
               dietary: Array.from(this.selectedDietary)
             })
           }, 'food_crawl');
+          
           const data = await response.json();
-          if (data.success) this.showFoodCrawlResult(data); else throw new Error('Failed');
-        } catch (e) { if (e.name !== 'AbortError') this.showTravelActionError('food crawl'); }
+          if (data.success) {
+            this.showFoodCrawlResult(data);
+          } else {
+            throw new Error('Failed to generate food crawl');
+          }
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            this.showTravelActionError('food crawl');
+          }
+        }
       }
 
       async loadCityGuide() {
         this.showTravelActionLoading('🗺️ Loading insider knowledge...');
         try {
-          const response = await this.makeAPIRequest(`/v1/travel/guide/${encodeURIComponent(this.currentLocation.city)}?country_code=${this.currentLocation.country_code}`, {}, 'city_guide');
+          const response = await this.makeAPIRequest(
+            `/v1/travel/guide/${encodeURIComponent(this.currentLocation.city)}?country_code=${this.currentLocation.country_code}`, 
+            {}, 
+            'city_guide'
+          );
+          
           const data = await response.json();
-          if (data.success) this.showCityGuideResult(data); else throw new Error('Failed');
-        } catch (e) { if (e.name !== 'AbortError') this.showTravelActionError('city guide'); }
+          if (data.success) {
+            this.showCityGuideResult(data);
+          } else {
+            throw new Error('Failed to load city guide');
+          }
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            this.showTravelActionError('city guide');
+          }
+        }
       }
 
       async findHiddenGems() {
         this.showTravelActionLoading('💎 Discovering hidden gems...');
         try {
           const hiddenGemsQuery = `What are the best hidden food gems in ${this.currentLocation.city} that only locals know about?`;
+          
           const response = await this.makeAPIRequest('/v1/travel/coach', {
             method: 'POST',
             body: JSON.stringify({
@@ -814,9 +858,18 @@
               }
             })
           }, 'hidden_gems');
+          
           const data = await response.json();
-          if (data.success) this.showHiddenGemsResult(data); else throw new Error('Failed');
-        } catch (e) { if (e.name !== 'AbortError') this.showTravelActionError('hidden gems'); }
+          if (data.success) {
+            this.showHiddenGemsResult(data);
+          } else {
+            throw new Error('Failed to find hidden gems');
+          }
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            this.showTravelActionError('hidden gems');
+          }
+        }
       }
 
       // Events
@@ -934,31 +987,117 @@
       }
 
       showNightPlanResult(data) {
-        const r=document.getElementById('travel-results-modal');
-        r.innerHTML = `<div style="background:rgba(255,255,255,.06); border-radius:12px; padding:20px;">
-          <h4 style="margin:0 0 16px 0; color:#a5b4fc;">${data.planTitle}</h4>
-          ${data.timeline.map(it=>`
-            <div style="margin-bottom:16px; padding:14px; background:rgba(255,255,255,.04); border-radius:8px;">
-              <div style="font-weight:700; margin-bottom:6px;">${it.time} - ${it.activity}</div>
-              <div style="color:#fbbf24; margin-bottom:6px;">${it.emoji} ${it.food}</div>
-              <div style="font-size:12px; color:#94a3b8;">${it.note}</div>
-              <div style="font-size:11px; color:#10b981; margin-top:4px;">${it.estimated_cost}</div>
-            </div>`).join('')}
-        </div>`;
+        const r = document.getElementById('travel-results-modal');
+        r.innerHTML = `
+          <div style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:20px;">
+            <h4 style="margin:0 0 16px 0; color:#a5b4fc; font-size:18px;">
+              ${data.planTitle || `Your ${this.currentLocation.city} Night`}
+            </h4>
+            ${data.timeline.map(item => `
+              <div style="margin-bottom:16px; padding:14px; background:rgba(255,255,255,.04); border-radius:8px; border-left:3px solid #7c3aed;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <div style="font-weight:700; color:#e5ecff;">${item.time} - ${item.activity}</div>
+                  <div style="font-size:11px; color:#10b981; background:rgba(16,185,129,.2); padding:4px 8px; border-radius:12px;">
+                    ${item.estimated_cost || '$'}
+                  </div>
+                </div>
+                <div style="color:#fbbf24; margin-bottom:6px; font-size:15px;">
+                  ${item.emoji} ${item.food}
+                </div>
+                <div style="font-size:12px; color:#94a3b8; line-height:1.4;">${item.note}</div>
+                ${item.link ? `
+                  <a href="${item.link}" target="_blank" style="display:inline-block; margin-top:8px; font-size:11px; color:#7c3aed; text-decoration:none;">
+                    🔗 Find on Google →
+                  </a>
+                ` : ''}
+              </div>
+            `).join('')}
+            
+            ${data.tips && data.tips.length > 0 ? `
+              <div style="background:rgba(124,58,237,.1); border:1px solid rgba(124,58,237,.3); border-radius:8px; padding:12px; margin-top:16px;">
+                <h5 style="margin:0 0 8px 0; font-size:13px; color:#a5b4fc;">💡 Pro Tips</h5>
+                ${data.tips.map(tip => `
+                  <div style="font-size:12px; color:#cbd5e1; margin-bottom:4px;">• ${tip}</div>
+                `).join('')}
+              </div>
+            ` : ''}
+            
+            <div style="display:flex; justify-content:space-between; margin-top:16px; padding-top:12px; border-top:1px solid rgba(255,255,255,.1);">
+              <div style="font-size:12px; color:#94a3b8;">
+                <span style="color:#a5b4fc;">Total:</span> ${data.total_cost || '$40-60'}
+              </div>
+              <div style="font-size:12px; color:#94a3b8;">
+                <span style="color:#a5b4fc;">Walking:</span> ${data.walking_distance || '2km'}
+              </div>
+            </div>
+          </div>
+        `;
+        r.classList.remove('hidden');
       }
 
       showFoodCrawlResult(data) {
-        const r=document.getElementById('travel-results-modal');
-        r.innerHTML = `<div style="background:rgba(255,255,255,.06); border-radius:12px; padding:20px;">
-          <h4 style="margin:0 0 16px 0; color:#a5b4fc;">${data.crawl_title}</h4>
-          ${data.stops.map(s=>`
-            <div style="margin-bottom:16px; padding:14px; background:rgba(255,255,255,.04); border-radius:8px;">
-              <div style="font-weight:700; margin-bottom:6px;">${s.order}. ${s.time} - ${s.location}</div>
-              <div style="color:#fbbf24; margin-bottom:6px;">${s.emoji} ${s.food}</div>
-              <div style="font-size:12px; color:#94a3b8; margin-bottom:4px;">${s.reason}</div>
-              <div style="font-size:11px; color:#10b981;">💡 ${s.tip}</div>
-            </div>`).join('')}
-        </div>`;
+        const r = document.getElementById('travel-results-modal');
+        r.innerHTML = `
+          <div style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:20px;">
+            <h4 style="margin:0 0 16px 0; color:#a5b4fc; font-size:18px;">
+              ${data.crawl_title || 'Food Adventure'}
+            </h4>
+            
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+              <span style="background:rgba(255,255,255,.08); padding:4px 8px; border-radius:12px; font-size:11px; color:#94a3b8;">
+                📍 ${data.city}
+              </span>
+              <span style="background:rgba(255,255,255,.08); padding:4px 8px; border-radius:12px; font-size:11px; color:#94a3b8;">
+                ⏱️ ${data.duration}
+              </span>
+              <span style="background:rgba(255,255,255,.08); padding:4px 8px; border-radius:12px; font-size:11px; color:#94a3b8;">
+                💰 ${data.total_cost}
+              </span>
+            </div>
+            
+            ${data.stops.map(stop => `
+              <div style="margin-bottom:16px; padding:14px; background:rgba(255,255,255,.04); border-radius:8px; position:relative;">
+                <div style="position:absolute; left:-8px; top:50%; transform:translateY(-50%); width:24px; height:24px; background:#7c3aed; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; color:white; font-weight:bold;">
+                  ${stop.order}
+                </div>
+                <div style="margin-left:12px;">
+                  <div style="font-weight:700; margin-bottom:6px; color:#e5ecff;">
+                    ${stop.time} - ${stop.location}
+                  </div>
+                  <div style="color:#fbbf24; margin-bottom:6px; font-size:15px;">
+                    ${stop.emoji} ${stop.food}
+                  </div>
+                  <div style="font-size:12px; color:#94a3b8; margin-bottom:4px;">
+                    ${stop.reason}
+                  </div>
+                  <div style="font-size:11px; color:#10b981; background:rgba(16,185,129,.1); padding:4px 8px; border-radius:6px; display:inline-block;">
+                    💡 ${stop.tip}
+                  </div>
+                  <div style="font-size:11px; color:#a5b4fc; margin-top:4px;">
+                    Cost: ${stop.cost}
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+            
+            ${data.pro_tips && data.pro_tips.length > 0 ? `
+              <div style="background:rgba(124,58,237,.1); border:1px solid rgba(124,58,237,.3); border-radius:8px; padding:12px; margin-top:16px;">
+                <h5 style="margin:0 0 8px 0; font-size:13px; color:#a5b4fc;">🎯 Pro Tips</h5>
+                ${data.pro_tips.map(tip => `
+                  <div style="font-size:12px; color:#cbd5e1; margin-bottom:4px;">• ${tip}</div>
+                `).join('')}
+              </div>
+            ` : ''}
+            
+            ${data.backup_spots && data.backup_spots.length > 0 ? `
+              <div style="margin-top:12px; padding:8px; background:rgba(255,255,255,.04); border-radius:6px;">
+                <div style="font-size:11px; color:#94a3b8; margin-bottom:4px;">🔄 Backup options:</div>
+                <div style="font-size:12px; color:#cbd5e1;">${data.backup_spots.join(', ')}</div>
+              </div>
+            ` : ''}
+          </div>
+        `;
+        r.classList.remove('hidden');
       }
 
       showHiddenGemsResult(data) {
@@ -1248,8 +1387,9 @@
 <!-- Manifest (put your manifest.json in /app) -->
 <link rel="manifest" href="./manifest.json">
 <!-- Main script -->
+<!-- <script type="module" src="./src/main.js"></script> -->
   <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
-  <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-8Segw8u9.js"></script>
-  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-B_27H1jL.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
+  <script nomodule crossorigin id="vite-legacy-polyfill" src="/assets/polyfills-legacy-B93rlMtN.js"></script>
+  <script nomodule crossorigin id="vite-legacy-entry" data-src="/assets/index-legacy-Cz0Bk8Ho.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
 </body>
 </html>
