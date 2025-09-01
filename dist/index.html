@@ -458,7 +458,35 @@
           });
         });
       }
+      async trackEvent(event, data = {}) {
+        try {
+          await fetch(`${this.API_BASE}/v1/analytics/track`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event,
+              data: {
+                ...data,
+                location: this.currentLocation,
+                dietary: Array.from(this.selectedDietary),
+                timestamp: new Date().toISOString()
+              }
+            })
+          });
+        } catch (e) {
+          console.error('Analytics tracking failed:', e);
+        }
+      }
 
+      // Track food selection
+      selectFood(name) {
+        this.trackEvent('food_selected', { 
+          food_name: name,
+          source: 'shortlist'
+        });
+        this.showToast(`Great choice! Enjoy your ${name}`);
+        this.getDirectionsFor(name);
+      }
       vibrate(style = 'Medium') {
         if (navigator.vibrate) {
           const duration = style === 'Light' ? 50 : style === 'Heavy' ? 100 : 75;
@@ -620,6 +648,10 @@
       }
       // Core: one-tap shortlist
       async makeDecision() {
+        this.trackEvent('decision_requested', {
+          mood: document.getElementById('mood-input').value,
+          meal_period: this.getMealPeriod(new Date().getHours())
+        });
         this.vibrate('Medium');
         this.showLoadingShortlist();
         try {
@@ -873,7 +905,7 @@
       }
 
       // Events
-      async loadEvents() {
+      async loadEvents() {  
         const g = document.getElementById('events-grid-modal');
         g.innerHTML = `<div style="text-align:center; padding:20px; color:#94a3b8;">🎪 Loading events...</div>`;
         try {
@@ -882,8 +914,11 @@
             {}, 'events'
           );
           const data = await response.json();
-          if (data.success && Array.isArray(data.events)) this.showEventsResults(data.events);
-          else throw new Error('No events');
+          if (data.success && Array.isArray(data.events)) {
+            this.showEventsResults(data.events);
+          } else {
+            throw new Error('No events');
+          }
         } catch {
           this.showEventsFallback();
         }

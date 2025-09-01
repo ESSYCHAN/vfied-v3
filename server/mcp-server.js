@@ -108,6 +108,42 @@ const normalizeDietary = (d) => {
   const arr = Array.isArray(d) ? d : (d ? [d] : []);
   return arr.filter(Boolean).map(s => String(s).trim().toLowerCase());
 };
+const analytics = {
+  events: [],
+  
+  addEvent(event, data) {
+    this.events.push({
+      id: randomUUID(),
+      event,
+      data,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Keep only last 1000 events in memory
+    if (this.events.length > 1000) {
+      this.events = this.events.slice(-1000);
+    }
+  },
+  
+  getStats() {
+    const foodSelections = this.events
+      .filter(e => e.event === 'food_selected')
+      .map(e => e.data.food_name);
+    
+    const popularFoods = foodSelections.reduce((acc, food) => {
+      acc[food] = (acc[food] || 0) + 1;
+      return acc;
+    }, {});
+    
+    return {
+      total_events: this.events.length,
+      unique_users: new Set(this.events.map(e => e.data.ip)).size,
+      popular_foods: Object.entries(popularFoods)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+    };
+  }
+};
 
 function normalizeQuickPayload(value = {}) {
   const location = normalizeLocation(value.location);
@@ -2061,18 +2097,12 @@ app.post('/mcp/get_food_suggestion', async (req, res) => {
 // Add after your existing endpoints, before the error handler
 app.post('/v1/analytics/track', (req, res) => {
   const { event, data } = req.body;
-  
-  // Log tracking events (in production, save to database)
-  console.log('Analytics Event:', {
-    timestamp: new Date().toISOString(),
-    event,
-    data,
-    ip: req.ip
-  });
-  
+  analytics.addEvent(event, { ...data, ip: req.ip });
   res.json({ success: true });
 });
-
+app.get('/v1/analytics/stats', (req, res) => {
+  res.json(analytics.getStats());
+})
 app.post('/mcp/get_cultural_food_context', async (req, res) => {
   const { location, dietary = [] } = req.body;
   const cc = (location?.country_code || 'GB').toUpperCase();
@@ -2096,7 +2126,14 @@ app.post('/mcp/get_cultural_food_context', async (req, res) => {
     location: `${city}, ${location?.country || 'Unknown'}`
   });
 });
-
+app.post('/v1/restaurant/menu', async (req, res) => {
+  try {
+    const result = await menuManager.addRestaurantMenu(req.body);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 // Error handler
 app.use((err, _req, res, _next) => {
   console.error('Server error:', err);
