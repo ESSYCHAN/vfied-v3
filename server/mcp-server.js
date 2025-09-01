@@ -13,7 +13,7 @@ import * as moodsModule from './data/moods.js';
 import * as countriesModule from './data/countries.js';
 import { randomUUID } from 'crypto';
 import { SUPPORTED_COUNTRIES } from './data/countries.js'; // adjust path as needed
-import culturalMeals from './data/cultural_meals.json' assert { type: 'json' };
+import fs from 'fs';
 import { parseCravings, enhanceMoodText } from './craving_parser.js';
 // Optional polyfill if your Node is <18
 // import fetch from 'node-fetch';
@@ -29,7 +29,7 @@ const EVENTBRITE_TOKEN = process.env.EVENTBRITE_TOKEN || '';
 const EVENTS_CACHE_TTL = parseInt(process.env.EVENTS_CACHE_TTL || '10800', 10); // 3h
 const moods = moodsModule.MOOD_TAXONOMY?.moods || moodsModule.default?.moods || [];
 const countries = countriesModule.SUPPORTED_COUNTRIES?.countries || countriesModule.default?.countries || [];
-
+const culturalMeals = JSON.parse(fs.readFileSync('./server/data/cultural_meals.json', 'utf8'));
 // --- define mood fallbacks FIRST (prevents use-before-define) ---
 const MOODS_FALLBACK = [
   { id: 'TIRED', group: 'Energy', synonyms: ['exhausted','sleepy','low energy','fatigued'] },
@@ -747,6 +747,7 @@ app.post('/v1/quick_decision', async (req, res) => {
       has_key: !!OPENAI_API_KEY
     });
     const moodAnalysis = enhanceMoodText(mood_text);
+
   
     console.log('🔍 Mood analysis:', {
       original: mood_text,
@@ -754,6 +755,23 @@ app.post('/v1/quick_decision', async (req, res) => {
       attributes: moodAnalysis.food_attributes,
       friendly_response: moodAnalysis.friendly_response
     });
+    const menuSuggestions = await recommendFromMenus({
+      location: loc,
+      mood_text,
+      dietary,
+      meal_period: timeContext?.meal_period,
+      cravingAttributes: parseCravings(mood_text).attributes
+    });
+    
+    if (menuSuggestions && menuSuggestions.length > 0) {
+      // Return actual restaurant items!
+      return res.json({
+        success: true,
+        decisions: menuSuggestions,
+        source: 'restaurant_menus',
+        note: 'Available now from local restaurants'
+      });
+    }
     // === PRIORITY: Try GPT first with proper error handling ===
     if (USE_GPT && OPENAI_API_KEY) {
       const system = `You are VFIED. User mood: "${mood_text}"
