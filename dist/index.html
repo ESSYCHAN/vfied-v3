@@ -56,7 +56,15 @@ VFIED ✨
     <button class="mood-chip" onclick="window.vfiedApp.setMood('date night')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">💕 Date</button>
     <button class="mood-chip" onclick="window.vfiedApp.setMood('pms cravings')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🌙 PMS</button>
   </div> -->
-  
+  <div class="mood-examples" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('need energy')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">⚡ Energy</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('feeling adventurous')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎲 Adventure</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('quick bite')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">⏱️ Quick</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('comfort food')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🛋️ Comfort</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('healthy choice')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🥗 Healthy</button>
+    <button class="mood-chip" onclick="window.vfiedApp.setMood('feeling fancy')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">✨ Fancy</button>
+  </div>
+
   <div style="display:flex; gap:8px; align-items:center;">
     <input 
       id="mood-input" 
@@ -104,13 +112,13 @@ VFIED ✨
     <!-- Content will be dynamically inserted here -->
   </div>
 </div>
-<div style="display:flex; justify-content:center; margin:20px 0;">
+<!-- <div style="display:flex; justify-content:center; margin:20px 0;">
 <div style="display:flex; gap:4px; padding:4px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:16px;">
 <button class="tab-btn active" data-tab="food">🍽️ Food</button>
 <button class="tab-btn" id="travel-modal-btn">✈️ Travel</button>
 <button class="tab-btn" id="events-modal-btn">🎪 Events</button>
 </div>
-</div>
+</div> -->
 <div class="tab-content" id="food-tab">
 <button id="decide-button">
 <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
@@ -259,15 +267,38 @@ VFIED ✨
 </div>
 </div>
 </div>
-<footer style="background: rgba(0,0,0,.2); backdrop-filter: blur(15px); padding:20px; text-align:center; font-size:12px; color:#9fb0c9;">
+<!-- <footer style="background: rgba(0,0,0,.2); backdrop-filter: blur(15px); padding:20px; text-align:center; font-size:12px; color:#9fb0c9;">
 <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:12px;">
 <div><span id="decisions-count" style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">0</span><span style="font-size:10px; color:#94a3b8;">DECISIONS</span></div>
 <div><span style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">94%</span><span style="font-size:10px; color:#94a3b8;">ACCURACY</span></div>
 <div><span style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">127</span><span style="font-size:10px; color:#94a3b8;">CITIES</span></div>
 </div>
 <div>🌐 Connected • All systems operational</div>
-</footer>
-</div>
+</footer> -->
+<div style="height: 80px;"></div>
+
+<!-- Bottom Navigation -->
+<nav style="position:fixed; bottom:0; left:0; right:0; background:rgba(10,14,25,0.95); backdrop-filter:blur(20px); border-top:1px solid rgba(255,255,255,0.1); padding:16px 0 20px 0; z-index:100;">
+  <div style="max-width:430px; margin:0 auto; display:flex; justify-content:space-around;">
+    <div onclick="document.querySelector('.tab-btn[data-tab=food]').click()" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#667eea; cursor:pointer;">
+      <span style="font-size:20px;">🍽️</span>
+      <span style="font-size:11px; font-weight:600;">Food</span>
+    </div>
+    <div onclick="document.getElementById('travel-modal-btn').click()" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
+      <span style="font-size:20px;">✈️</span>
+      <span style="font-size:11px; font-weight:600;">Travel</span>
+    </div>
+    <div onclick="document.getElementById('events-modal-btn').click()" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
+      <span style="font-size:20px;">🎭</span>
+      <span style="font-size:11px; font-weight:600;">Events</span>
+    </div>
+    <div onclick="alert('Profile feature coming soon!')" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
+      <span style="font-size:20px;">👤</span>
+      <span style="font-size:11px; font-weight:600;">Profile</span>
+    </div>
+  </div>
+</nav>
+</div> 
 <script>
     const COUNTRY_MAP = {
       'united kingdom': 'GB','uk':'GB','great britain':'GB','england':'GB',
@@ -1431,27 +1462,7 @@ VFIED ✨
 </div>
 </div>
 </div>
-<!-- Bottom Navigation -->
-<nav style="position:fixed; bottom:0; left:0; right:0; background:rgba(10,14,25,0.95); backdrop-filter:blur(20px); border-top:1px solid rgba(255,255,255,0.1); padding:16px 0 20px 0;">
-  <div style="max-width:430px; margin:0 auto; display:flex; justify-content:space-around;">
-    <div style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#667eea; cursor:pointer;">
-      <span style="font-size:20px;">🍽️</span>
-      <span style="font-size:11px; font-weight:600;">Food</span>
-    </div>
-    <div style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
-      <span style="font-size:20px;">✈️</span>
-      <span style="font-size:11px; font-weight:600;">Travel</span>
-    </div>
-    <div style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
-      <span style="font-size:20px;">🎭</span>
-      <span style="font-size:11px; font-weight:600;">Events</span>
-    </div>
-    <div style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
-      <span style="font-size:20px;">👤</span>
-      <span style="font-size:11px; font-weight:600;">Profile</span>
-    </div>
-  </div>
-</nav>
+
 </div>
 <!-- CSS -->
 <!-- Manifest (put your manifest.json in /app) -->
