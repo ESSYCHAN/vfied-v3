@@ -13,7 +13,6 @@ import * as moodsModule from './data/moods.js';
 import * as countriesModule from './data/countries.js';
 import { randomUUID } from 'crypto';
 import { SUPPORTED_COUNTRIES } from './data/countries.js'; // adjust path as needed
-import fs from 'fs';
 import { parseCravings, enhanceMoodText } from './craving_parser.js';
 // Optional polyfill if your Node is <18
 // import fetch from 'node-fetch';
