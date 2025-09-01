@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
@@ -22,12 +21,14 @@ VFIED ✨
 </h1>
 <p style="color:#9fb0c9; font-size:13px; margin:0;">One-tap shortlist for food, travel, events</p>
 </header>
+
 <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,.04); border-radius:8px; padding:8px 12px; margin:20px; font-size:12px;">
 <div style="display:flex; align-items:center; gap:4px; color:#10b981;">📍 <span id="location-display">London, GB</span></div>
 <button id="change-location-btn" style="background:transparent; border:1px solid rgba(255,255,255,.2); border-radius:16px; padding:4px 8px; font-size:10px; cursor:pointer; color:#94a3b8;">
         Change
       </button>
 </div>
+
 <div class="glass-card mood-section">
   <div class="dietary-prefs">
     <h5>🥗 Quick dietary filters (optional)</h5>
@@ -47,15 +48,6 @@ VFIED ✨
     💡 Optional: "Stressed but want something healthy" works better than just "hungry"
   </div>
   
-  <!-- Mood examples bar -->
-  <!-- <div class="mood-examples" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
-    <button class="mood-chip" onclick="window.vfiedApp.setMood('just got promoted')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎉 Promoted</button>
-    <button class="mood-chip" onclick="window.vfiedApp.setMood('hangover help')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🤕 Hangover</button>
-    <button class="mood-chip" onclick="window.vfiedApp.setMood('birthday celebration')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎂 Birthday</button>
-    <button class="mood-chip" onclick="window.vfiedApp.setMood('chaos mode')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🔥 Chaos</button>
-    <button class="mood-chip" onclick="window.vfiedApp.setMood('date night')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">💕 Date</button>
-    <button class="mood-chip" onclick="window.vfiedApp.setMood('pms cravings')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🌙 PMS</button>
-  </div> -->
   <div class="mood-examples" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
     <button class="mood-chip" onclick="window.vfiedApp.setMood('need energy')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">⚡ Energy</button>
     <button class="mood-chip" onclick="window.vfiedApp.setMood('feeling adventurous')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎲 Adventure</button>
@@ -76,49 +68,30 @@ VFIED ✨
     />
   </div>
   
-  <!-- Datalist for mood suggestions -->
   <datalist id="mood-suggestions">
-    <option value="just got promoted but exhausted">
-    <option value="birthday celebration mode">
-    <option value="small win today">
-    <option value="hangover need greasy food">
-    <option value="pms chocolate cravings">
-    <option value="heartbreak comfort needed">
-    <option value="main character energy">
-    <option value="goblin mode activated">
-    <option value="friday vibes">
-    <option value="sunday scaries">
-    <option value="3am can't sleep hungry">
-    <option value="post workout starving">
-    <option value="studying need brain food">
-    <option value="netflix and chill snacks">
     <option value="need something quick and filling">
     <option value="feeling adventurous today">
     <option value="want comfort food">
-        <option value="healthy but satisfying">
-      <option value="treating myself">
-        <option value="low energy need easy option">
-        <option value="sharing with friends">
-        <option value="working late need fuel">
-        <option value="weekend vibes">
-        <option value="rainy day comfort">
-        <option value="post workout hungry">
-        <option value="studying need brain food">
-        <option value="movie night snacks">
+    <option value="healthy but satisfying">
+    <option value="treating myself">
+    <option value="low energy need easy option">
+    <option value="sharing with friends">
+    <option value="working late need fuel">
+    <option value="weekend vibes">
+    <option value="rainy day comfort">
+    <option value="post workout hungry">
+    <option value="studying need brain food">
+    <option value="movie night snacks">
   </datalist>
   
-  <!-- Mood insight display (hidden by default) -->
   <div id="mood-insight" class="mood-insight-card hidden" style="display:none; background:rgba(124,58,237,0.1); border:1px solid rgba(124,58,237,0.3); border-radius:12px; padding:12px; margin-top:12px;">
-    <!-- Content will be dynamically inserted here -->
   </div>
 </div>
-<!-- <div style="display:flex; justify-content:center; margin:20px 0;">
-<div style="display:flex; gap:4px; padding:4px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:16px;">
-<button class="tab-btn active" data-tab="food">🍽️ Food</button>
-<button class="tab-btn" id="travel-modal-btn">✈️ Travel</button>
-<button class="tab-btn" id="events-modal-btn">🎪 Events</button>
-</div>
-</div> -->
+
+<!-- Hidden buttons for JavaScript event listeners -->
+<button id="travel-modal-btn" style="display:none;"></button>
+<button id="events-modal-btn" style="display:none;"></button>
+
 <div class="tab-content" id="food-tab">
 <button id="decide-button">
 <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
@@ -130,14 +103,15 @@ VFIED ✨
 </div>
 </button>
 </div>
+
 <div class="shortlist-result hidden" id="shortlist-result"></div>
+
 <div class="suggestion-result hidden" id="suggestion-result">
   <div class="suggestion-card">
     <div id="result-emoji"></div>
     <div id="result-name"></div>
     <div id="result-description"></div>
     
-    <!-- NEW: Mood context display -->
     <div id="mood-context" class="mood-context hidden">
       <div class="mood-context-label">Matched your vibe:</div>
       <div id="mood-context-badges"></div>
@@ -160,21 +134,38 @@ VFIED ✨
     </div>
   </div>
 </div>
-<!-- <div style="text-align:center; margin:20px 0;">
-<div id="result-emoji" style="font-size:48px; margin-bottom:12px;">🍔</div>
-<h2 id="result-name" style="font-size:24px; font-weight:900; margin:0 0 8px 0;">Your Perfect Match</h2>
-</div> -->
+
 <div style="background:rgba(255,255,255,.06); border-radius:12px; padding:12px; margin:16px 0;">
 <h5 style="margin:0 0 8px 0; font-size:14px; font-weight:700; color:#a5b4fc;">🤔 Why this choice?</h5>
 <p id="reasoning-text" style="margin:0; font-size:13px; line-height:1.4; color:#cbd5e1;">Based on your mood and preferences, this hits the perfect balance.</p>
 </div>
-<!-- <div class="quick-actions">
-<div class="quick-action primary" id="accept-btn">✅ Perfect!</div>
-<div class="quick-action" id="share-btn">📤 Share</div>
-<div class="quick-action" id="get-directions-btn">🗺️ Directions</div>
-<div class="quick-action" id="try-again-btn">🔄 Try Again</div>
-</div> -->
-</div>
+
+<div style="height: 80px;"></div>
+
+</div> <!-- CLOSE APP DIV HERE -->
+
+<!-- Bottom Navigation -->
+<nav style="position:fixed; bottom:0; left:0; right:0; background:rgba(10,14,25,0.95); backdrop-filter:blur(20px); border-top:1px solid rgba(255,255,255,0.1); padding:16px 0 20px 0; z-index:100;">
+  <div style="max-width:430px; margin:0 auto; display:flex; justify-content:space-around;">
+    <div onclick="document.getElementById('food-tab').scrollIntoView()" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#667eea; cursor:pointer;">
+      <span style="font-size:20px;">🍽️</span>
+      <span style="font-size:11px; font-weight:600;">Food</span>
+    </div>
+    <div onclick="window.vfiedApp.openTravelModal()" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
+      <span style="font-size:20px;">✈️</span>
+      <span style="font-size:11px; font-weight:600;">Travel</span>
+    </div>
+    <div onclick="window.vfiedApp.openEventsModal()" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
+      <span style="font-size:20px;">🎭</span>
+      <span style="font-size:11px; font-weight:600;">Events</span>
+    </div>
+    <div onclick="alert('Profile feature coming soon!')" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
+      <span style="font-size:20px;">👤</span>
+      <span style="font-size:11px; font-weight:600;">Profile</span>
+    </div>
+  </div>
+</nav>
+
 <!-- Travel Modal -->
 <div class="modal" id="travel-modal">
 <div class="modal-content">
@@ -184,7 +175,7 @@ VFIED ✨
 </div>
 <div class="modal-body">
 <div style="background: linear-gradient(135deg, rgba(124,58,237,0.1), rgba(99,102,241,0.1)); border:1px solid rgba(124,58,237,0.2); border-radius:12px; padding:16px; margin-bottom:20px; text-align:center;">
-<p style="margin:0; font-size:13px; color:#94a3b8;">New to <span id="travel-modal-city" style="color:#a5b4fc; font-weight:700;">London</span>? I’ll map your perfect food journey.</p>
+<p style="margin:0; font-size:13px; color:#94a3b8;">New to <span id="travel-modal-city" style="color:#a5b4fc; font-weight:700;">London</span>? I'll map your perfect food journey.</p>
 </div>
 <div style="margin-bottom:20px;">
 <h5 style="margin:0 0 12px 0; font-weight:700;">🎯 What brings you here?</h5>
@@ -230,6 +221,7 @@ VFIED ✨
 </div>
 </div>
 </div>
+
 <!-- Events Modal -->
 <div class="modal" id="events-modal">
 <div class="modal-content">
@@ -267,38 +259,35 @@ VFIED ✨
 </div>
 </div>
 </div>
-<!-- <footer style="background: rgba(0,0,0,.2); backdrop-filter: blur(15px); padding:20px; text-align:center; font-size:12px; color:#9fb0c9;">
-<div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:12px;">
-<div><span id="decisions-count" style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">0</span><span style="font-size:10px; color:#94a3b8;">DECISIONS</span></div>
-<div><span style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">94%</span><span style="font-size:10px; color:#94a3b8;">ACCURACY</span></div>
-<div><span style="font-size:18px; font-weight:800; color:#e5ecff; display:block;">127</span><span style="font-size:10px; color:#94a3b8;">CITIES</span></div>
-</div>
-<div>🌐 Connected • All systems operational</div>
-</footer> -->
-<div style="height: 80px;"></div>
 
-<!-- Bottom Navigation -->
-<nav style="position:fixed; bottom:0; left:0; right:0; background:rgba(10,14,25,0.95); backdrop-filter:blur(20px); border-top:1px solid rgba(255,255,255,0.1); padding:16px 0 20px 0; z-index:100;">
-  <div style="max-width:430px; margin:0 auto; display:flex; justify-content:space-around;">
-    <div onclick="document.querySelector('.tab-btn[data-tab=food]').click()" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#667eea; cursor:pointer;">
-      <span style="font-size:20px;">🍽️</span>
-      <span style="font-size:11px; font-weight:600;">Food</span>
-    </div>
-    <div onclick="document.getElementById('travel-modal-btn').click()" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
-      <span style="font-size:20px;">✈️</span>
-      <span style="font-size:11px; font-weight:600;">Travel</span>
-    </div>
-    <div onclick="document.getElementById('events-modal-btn').click()" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
-      <span style="font-size:20px;">🎭</span>
-      <span style="font-size:11px; font-weight:600;">Events</span>
-    </div>
-    <div onclick="alert('Profile feature coming soon!')" style="display:flex; flex-direction:column; align-items:center; gap:4px; color:#64748b; cursor:pointer;">
-      <span style="font-size:20px;">👤</span>
-      <span style="font-size:11px; font-weight:600;">Profile</span>
-    </div>
-  </div>
-</nav>
-</div> 
+<!-- Location Modal -->
+<div class="modal" id="location-modal">
+<div class="modal-content">
+<div class="modal-header">
+<h2 class="modal-title">📍 Set Location</h2>
+<button class="modal-close" id="location-modal-close">×</button>
+</div>
+<div class="modal-body">
+<div style="display:grid; gap:12px;">
+<div>
+<label style="font-size:12px; font-weight:700; color:#94a3b8;">City</label>
+<input id="location-city-input" placeholder="e.g., Kampala" style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;"/>
+</div>
+<div>
+<label style="font-size:12px; font-weight:700; color:#94a3b8;">Country</label>
+<select id="location-country-select" style="width:100%; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); color:#e5ecff; border-radius:10px; padding:10px; font-size:13px;">
+<option value="">Loading countries…</option>
+</select>
+</div>
+<div style="display:flex; gap:8px; margin-top:6px;">
+<button class="travel-action-btn" id="location-detect-btn" style="flex:1;">📡 Detect</button>
+<button class="travel-action-btn" id="location-save-btn" style="flex:1; background:linear-gradient(135deg, #7c3aed22, #6366f122); border-color:#7c3aed55; color:#c7d2fe;">✅ Save</button>
+</div>
+</div>
+</div>
+</div>
+</div>
+
 <script>
     const COUNTRY_MAP = {
       'united kingdom': 'GB','uk':'GB','great britain':'GB','england':'GB',
