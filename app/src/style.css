@@ -238,3 +238,189 @@ nav > div {
     padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 20px) + 100px);
   }
 }
+
+/* === Additional VFIED Styles === */
+
+/* Travel Modal Specific */
+.travel-mode-chip {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.travel-mode-chip.active {
+  background: linear-gradient(135deg, rgba(124,58,237,0.2), rgba(99,102,241,0.2));
+  border-color: rgba(124,58,237,0.3);
+  color: #a5b4fc;
+}
+
+.travel-action-btn {
+  padding: 14px 12px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: #e5ecff;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 700;
+  text-align: center;
+  font-size: 12px;
+  transition: 0.2s;
+}
+
+/* Events Modal Specific */
+.event-filter-chip {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 12px;
+  text-align: center;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.event-filter-chip.active {
+  background: rgba(245,158,11,0.2);
+  border-color: rgba(245,158,11,0.3);
+  color: #fbbf24;
+}
+
+.time-filter {
+  flex: 1;
+  padding: 8px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #e5ecff;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: 0.2s;
+}
+
+.time-filter.active {
+  background: rgba(245,158,11,0.2);
+  border-color: rgba(245,158,11,0.3);
+  color: #fbbf24;
+}
+
+.event-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+/* Mood Insight Card */
+.mood-insight-card {
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.3);
+  border-radius: 12px;
+  padding: 12px;
+  margin-top: 12px;
+  display: none;
+}
+
+.mood-insight-card.show {
+  display: block !important;
+  animation: slideIn 0.3s ease;
+}
+
+.vibe-badges {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.vibe-badge {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.mood-message {
+  color: #e5ecff;
+  font-size: 14px;
+  font-weight: 500;
+  font-style: italic;
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes loading {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(200%); }
+  100% { transform: translateX(-100%); }
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-weight: 700;
+}
+
+h1 {
+  font-size: 36px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #fff, #c7d2fe);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Button states */
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255,255,255,0.05);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.3);
+}
