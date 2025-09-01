@@ -869,7 +869,7 @@
       }
 
       // Events
-      async loadEvents() {
+      async loadEvents() {  
         const g = document.getElementById('events-grid-modal');
         g.innerHTML = `<div style="text-align:center; padding:20px; color:#94a3b8;">🎪 Loading events...</div>`;
         try {
@@ -878,8 +878,11 @@
             {}, 'events'
           );
           const data = await response.json();
-          if (data.success && Array.isArray(data.events)) this.showEventsResults(data.events);
-          else throw new Error('No events');
+          if (data.success && Array.isArray(data.events)) {
+            this.showEventsResults(data.events);
+          } else {
+            throw new Error('No events');
+          }
         } catch {
           this.showEventsFallback();
         }
