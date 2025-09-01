@@ -227,15 +227,14 @@ async function handleDecision() {
     // Get recent suggestions for avoidance
     const recentSuggestions = JSON.parse(localStorage.getItem('vfied_recent') || '[]');
 
-    // FIX: Use the quick_decision endpoint that has GPT integration
     const response = await fetch(`${API_BASE}/v1/quick_decision`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         location: getValidLocation(),
-        mood_text: mood, // Pass the mood to GPT
+        mood_text: mood,
         dietary: selectedDietary,
-        recent_suggestions: recentSuggestions, // Pass avoid list
+        recent_suggestions: recentSuggestions,
         time_context: {
           current_hour: new Date().getHours(),
           meal_period: getMealPeriod(new Date().getHours()),
@@ -256,24 +255,15 @@ async function handleDecision() {
       if (data.mood_analysis) {
         showMoodInsight(data.mood_analysis);
       }
-      // Convert quick_decision format to suggestion format
-      const pick = data.decisions[Math.floor(Math.random() * data.decisions.length)];
-      const suggestion = {
-        food: { 
-          name: pick.name, 
-          emoji: pick.emoji || '🍽️' 
-        },
-        friendMessage: pick.explanation || 'Perfect choice for you right now!',
-        source: data.source || 'server',
-        confidence: 85,
-        moodVibe: data.mood_analysis?.vibes?.[0] // NEW: Store the vibe
-      };
-
-      const enriched = addSocialSignals(suggestion);
-      showSuggestion(enriched);
       
-      // Update recent suggestions
-      updateRecentSuggestions(suggestion);
+      // FIXED: Show all 3 decisions instead of picking one random
+      showShortlistResult(data.decisions);
+      
+      // Update recent suggestions with all decisions
+      data.decisions.forEach(decision => {
+        updateRecentSuggestions({ food: { name: decision.name } });
+      });
+      
       incrementStats({ timeSavedMin: 3 });
     } else {
       throw new Error(data.error || 'No decisions returned');
@@ -282,22 +272,52 @@ async function handleDecision() {
   } catch (error) {
     console.error('❌ Decision error:', error);
     
-    // Fallback to local suggestions only if server completely fails
-    const fallback = addSocialSignals({
-      food: { name: 'Something Good', emoji: '🍽️' },
-      friendMessage: 'Server unavailable - try any local favorite!',
-      source: 'client_fallback'
-    });
-    showSuggestion(fallback);
+    // Fallback: show 3 offline suggestions
+    const fallbackDecisions = [
+      { name: 'Local Favorite', emoji: '🍽️', explanation: 'Server unavailable - try any local spot!' },
+      { name: 'Comfort Food', emoji: '🍲', explanation: 'Something warm and familiar' },
+      { name: 'Quick Bite', emoji: '🥪', explanation: 'Fast and satisfying option' }
+    ];
+    
+    showShortlistResult(fallbackDecisions);
     toast(`Connection issue: ${error.message}`, 'warn');
   } finally {
     setThinking(decideBtn, false);
   }
-  console.log('🔍 Client debug:', {
-    api_base: API_BASE,
-    mood_input_value: document.getElementById('mood-input')?.value,
-    selected_dietary: Array.from(document.querySelectorAll('.diet-chip.active')).map(c => c.dataset.diet)
-  });
+}
+
+function showShortlistResult(decisions) {
+  const single = document.getElementById('suggestion-result'); 
+  if (single) single.classList.add('hidden');
+  
+  let section = document.getElementById('shortlist-result');
+  if (!section) {
+    section = document.createElement('div');
+    section.id = 'shortlist-result';
+    section.className = 'shortlist-result';
+    document.getElementById('decide-button').parentNode.insertBefore(section, document.getElementById('decide-button').nextSibling);
+  }
+  
+  section.innerHTML = `
+    <div style="margin:24px 20px;">
+      <h3 style="text-align:center; margin:0 0 20px 0; font-size:18px; font-weight:700; color:#a5b4fc;">Your 3 Perfect Picks</h3>
+      <div style="display:grid; gap:12px;">
+        ${decisions.map((d,i)=>`
+          <div class="decision-card" style="background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:16px; cursor:pointer;">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="font-size:28px;">${d.emoji || '🍽️'}</div>
+              <div style="flex:1;">
+                <div style="font-weight:700; font-size:16px; margin-bottom:4px; color:#e5ecff;">${d.name}</div>
+                <div style="font-size:13px; color:#94a3b8; line-height:1.4;">${d.explanation || ''}</div>
+              </div>
+              <div style="background:rgba(16,185,129,.2); border-radius:16px; padding:4px 8px; font-size:11px; font-weight:600; color:#10b981;">#${i+1}</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  
+  section.classList.remove('hidden');
+  section.scrollIntoView({ behavior:'smooth', block:'center' });
 }
 function showMoodInsight(moodAnalysis) {
   if (!moodAnalysis) return;
