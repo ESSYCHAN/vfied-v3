@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">VFIED</string>
+    <string name="title_activity_main">VFIED</string>
+    <string name="package_name">com.vfied.app</string>
+    <string name="custom_url_scheme">com.vfied.app</string>
+</resources>
