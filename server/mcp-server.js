@@ -2516,7 +2516,8 @@ app.post('/v1/admin/events/:id/reject', (req, res) => {
 
   res.json({ success: true, message: 'Event rejected' });
 });
-
+// Add this route for the admin dashboard
+app.get('/admin', (req, res) => res.sendFile(path.resolve(__dirname, '../admin.html')));
 // Start server
 app.listen(PORT, () => {
   console.log(`🌦️ VFIED Complete API Server running on port ${PORT}`);
