@@ -3059,7 +3059,7 @@ app.listen(PORT, () => {
 // export default app;
 
 // ===== EXPORTS (ADD THIS AT THE VERY END) =====
-module.exports = {
+export {
   EventAutoModerator,
   userProfiles,
   restaurantMenus,
