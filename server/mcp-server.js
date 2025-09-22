@@ -2480,7 +2480,19 @@ app.post('/v1/events/submit', upload.single('poster'), async (req, res) => {
     const posterUrl = req.file ? `/uploads/${req.file.filename}` : null;
     
     // Enhanced location data
-    let enhancedLocation = JSON.parse(location);
+    let enhancedLocation;
+      try {
+        if (typeof location === 'object' && location !== null) {
+          enhancedLocation = location;
+        } else if (typeof location === 'string') {
+          enhancedLocation = JSON.parse(location);
+        } else {
+          enhancedLocation = {};
+        }
+      } catch (error) {
+        console.warn('Failed to parse location:', error.message);
+        enhancedLocation = { city: 'Unknown', country_code: 'GB' };
+      }
     if (place_id) {
       // Fetch additional place details
       try {
