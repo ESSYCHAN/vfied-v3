@@ -86,6 +86,9 @@ const RecommendSchema = Joi.object({
   budget: Joi.string().valid('budget','medium','premium','luxury').optional()
 }).unknown(true);
 
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
 
 
 // ===== Normalizers =====
@@ -328,9 +331,7 @@ const ITIN_SCHEMA = Joi.object({
   budget: Joi.string().valid('budget','medium','premium','luxury').default('medium')
 });
 
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs').promises;
+
 
 
 
