@@ -8,15 +8,17 @@
 <!-- PWA Meta Tags -->
 <link rel="manifest" href="/manifest.json">
   
-<!-- iOS Specific -->
-<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<!-- Modern mobile web app capable (non-deprecated) -->
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="VFIED">
 
-<!-- Standard favicon -->
-<link rel="icon" type="image/png" sizes="32x32" href="/favicon.ico">
+<!-- Favicons -->
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
 <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="/icons/icon-512.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
 
 <!-- Theme color -->
 <meta name="theme-color" content="#7c3aed">
@@ -59,14 +61,14 @@ VFIED ✨
     💡 Optional: "Stressed but want something healthy" works better than just "hungry"
   </div>
   
-  <div class="mood-examples" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
+  <!-- <div class="mood-examples" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
     <button class="mood-chip" onclick="window.vfiedApp.setMood('need energy')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">⚡ Energy</button>
     <button class="mood-chip" onclick="window.vfiedApp.setMood('feeling adventurous')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🎲 Adventure</button>
     <button class="mood-chip" onclick="window.vfiedApp.setMood('quick bite')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">⏱️ Quick</button>
     <button class="mood-chip" onclick="window.vfiedApp.setMood('comfort food')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🛋️ Comfort</button>
     <button class="mood-chip" onclick="window.vfiedApp.setMood('healthy choice')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">🥗 Healthy</button>
     <button class="mood-chip" onclick="window.vfiedApp.setMood('feeling fancy')" style="background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.15); border-radius:20px; padding:6px 12px; font-size:12px; font-weight:600; cursor:pointer; color:#e5ecff;">✨ Fancy</button>
-  </div>
+  </div> -->
 
   <div style="display:flex; gap:8px; align-items:center;">
     <input 

@@ -1705,5 +1705,263 @@ app.listen(PORT, () => {
   console.log(`🔗 MCP Protocol: Active`);
   console.log(`🔗 Health: http://localhost:${PORT}/health`);
 });
+// Add this to your mcpp-server.js file
 
+// Restaurant Signup Endpoint
+app.post('/v1/restaurants/signup', async (req, res) => {
+  try {
+    const { restaurant, contact, plan, metadata } = req.body;
+    
+    console.log('🏪 New restaurant signup:', restaurant.name, 'in', restaurant.city);
+    
+    // Validate required fields
+    const requiredRestaurant = ['name', 'cuisineType', 'city', 'country'];
+    const requiredContact = ['firstName', 'lastName', 'email', 'role'];
+    
+    for (const field of requiredRestaurant) {
+      if (!restaurant[field]) {
+        return res.status(400).json({
+          success: false,
+          error: `Missing required restaurant field: ${field}`
+        });
+      }
+    }
+    
+    for (const field of requiredContact) {
+      if (!contact[field]) {
+        return res.status(400).json({
+          success: false,
+          error: `Missing required contact field: ${field}`
+        });
+      }
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contact.email)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid email format'
+      });
+    }
+    
+    // Validate plan
+    const validPlans = ['free', 'growth', 'scale'];
+    if (!validPlans.includes(plan)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid plan selected'
+      });
+    }
+    
+    // Generate vendor ID and API key
+    const vendorId = `vendor_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const apiKey = generateApiKey(plan);
+    
+    // Create restaurant record
+    const restaurantRecord = {
+      vendorId,
+      apiKey,
+      plan,
+      status: 'active',
+      restaurant: {
+        ...restaurant,
+        name: restaurant.name.trim(),
+        city: restaurant.city.trim(),
+        cuisineType: restaurant.cuisineType.toLowerCase()
+      },
+      contact: {
+        ...contact,
+        email: contact.email.toLowerCase().trim(),
+        firstName: contact.firstName.trim(),
+        lastName: contact.lastName.trim()
+      },
+      metadata: {
+        ...metadata,
+        signupDate: new Date().toISOString(),
+        lastLogin: null,
+        apiCallsUsed: 0,
+        menuItemsCount: 0
+      },
+      limits: getPlanLimits(plan),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    // In a real app, you'd save this to your database
+    // For now, we'll store in memory or a file
+    await saveRestaurantRecord(restaurantRecord);
+    
+    // Send welcome email (simulated)
+    await sendWelcomeEmail(restaurantRecord);
+    
+    // Log the signup
+    console.log(`✅ Restaurant ${restaurant.name} signed up successfully`);
+    console.log(`📧 Welcome email sent to ${contact.email}`);
+    console.log(`🔑 API Key: ${apiKey}`);
+    
+    res.json({
+      success: true,
+      message: 'Restaurant account created successfully',
+      vendorId,
+      plan,
+      nextSteps: [
+        'Check your email for API key and setup instructions',
+        'Visit the dashboard to upload your menu',
+        'Test the API integration',
+        'Start receiving personalized recommendations'
+      ]
+    });
+    
+  } catch (error) {
+    console.error('Restaurant signup error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create restaurant account'
+    });
+  }
+});
+
+// Helper functions
+function generateApiKey(plan) {
+  const prefix = plan === 'free' ? 'free' : plan === 'growth' ? 'growth' : 'scale';
+  const random = Math.random().toString(36).substr(2, 12);
+  const timestamp = Date.now().toString(36);
+  return `${prefix}_${timestamp}_${random}`;
+}
+
+function getPlanLimits(plan) {
+  const limits = {
+    free: {
+      apiCallsPerMonth: 1000,
+      maxMenuItems: 50,
+      features: ['basic_recommendations', 'email_support']
+    },
+    growth: {
+      apiCallsPerMonth: 50000,
+      maxMenuItems: 500,
+      features: ['advanced_recommendations', 'analytics', 'priority_support', 'menu_upload']
+    },
+    scale: {
+      apiCallsPerMonth: 500000,
+      maxMenuItems: -1, // unlimited
+      features: ['all_features', 'webhooks', 'custom_analytics', 'dedicated_support']
+    }
+  };
+  return limits[plan] || limits.free;
+}
+
+async function saveRestaurantRecord(record) {
+  // In a real implementation, save to your database
+  // For demo purposes, we'll save to a JSON file or keep in memory
+  
+  const fs = require('fs').promises;
+  const path = require('path');
+  
+  try {
+    const filePath = path.join(__dirname, 'restaurants.json');
+    let restaurants = [];
+    
+    try {
+      const existingData = await fs.readFile(filePath, 'utf8');
+      restaurants = JSON.parse(existingData);
+    } catch (err) {
+      // File doesn't exist yet, start with empty array
+    }
+    
+    restaurants.push(record);
+    await fs.writeFile(filePath, JSON.stringify(restaurants, null, 2));
+    
+    console.log(`💾 Restaurant record saved for ${record.restaurant.name}`);
+  } catch (error) {
+    console.error('Failed to save restaurant record:', error);
+    // In production, you'd handle this more gracefully
+  }
+}
+
+async function sendWelcomeEmail(record) {
+  // Simulate sending welcome email
+  const emailContent = {
+    to: record.contact.email,
+    subject: 'Welcome to VFIED - Your API Key and Next Steps',
+    body: `
+      Hi ${record.contact.firstName},
+      
+      Welcome to VFIED! Your restaurant "${record.restaurant.name}" has been successfully registered.
+      
+      Your API Key: ${record.apiKey}
+      Plan: ${record.plan.toUpperCase()}
+      Vendor ID: ${record.vendorId}
+      
+      Next Steps:
+      1. Visit your dashboard: ${process.env.FRONTEND_URL || 'http://localhost:5168'}/dashboard.html
+      2. Upload your menu using our API
+      3. Start receiving personalized recommendations
+      
+      API Documentation: ${process.env.FRONTEND_URL || 'http://localhost:5168'}/docs.html
+      
+      Need help? Reply to this email or contact our support team.
+      
+      Welcome to the future of food recommendations!
+      
+      The VFIED Team
+    `
+  };
+  
+  console.log('📧 Would send welcome email:', emailContent);
+  
+  // In production, integrate with your email service:
+  // - SendGrid
+  // - Mailgun
+  // - AWS SES
+  // - etc.
+}
+
+// Get all restaurants (for admin)
+app.get('/v1/admin/restaurants', async (req, res) => {
+  try {
+    const fs = require('fs').promises;
+    const path = require('path');
+    const filePath = path.join(__dirname, 'restaurants.json');
+    
+    try {
+      const data = await fs.readFile(filePath, 'utf8');
+      const restaurants = JSON.parse(data);
+      
+      res.json({
+        success: true,
+        count: restaurants.length,
+        restaurants: restaurants.map(r => ({
+          vendorId: r.vendorId,
+          name: r.restaurant.name,
+          city: r.restaurant.city,
+          country: r.restaurant.country,
+          cuisineType: r.restaurant.cuisineType,
+          plan: r.plan,
+          status: r.status,
+          email: r.contact.email,
+          signupDate: r.metadata.signupDate,
+          apiCallsUsed: r.metadata.apiCallsUsed,
+          menuItemsCount: r.metadata.menuItemsCount
+        }))
+      });
+    } catch (err) {
+      res.json({
+        success: true,
+        count: 0,
+        restaurants: []
+      });
+    }
+  } catch (error) {
+    console.error('Failed to get restaurants:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to retrieve restaurants'
+    });
+  }
+});
+
+console.log('🏪 Restaurant signup endpoint added');
+console.log('📝 Signup URL: /v1/restaurants/signup');
+console.log('👥 Admin URL: /v1/admin/restaurants');
 export default app;
