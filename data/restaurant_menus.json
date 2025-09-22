@@ -1,0 +1,156 @@
+{
+  "menus": {
+    "gb_london_demo_restaurant_1758556416680": {
+      "restaurant_id": "demo_restaurant_1758556416680",
+      "restaurant_name": "Demo Restaurant",
+      "location": {
+        "city": "London",
+        "country_code": "GB",
+        "address": ""
+      },
+      "menu_items": [
+        {
+          "menu_item_id": "demo_restaurant_1758556416680_0_1758556416686",
+          "name": "Margherita Pizza",
+          "emoji": "🍕",
+          "price": "£12.50",
+          "description": "Fresh mozzarella, tomato sauce, basil",
+          "category": "main",
+          "tags": [
+            "vegetarian",
+            "popular"
+          ],
+          "meal_period": "lunch",
+          "search_tags": [
+            "vegetarian",
+            "popular",
+            "italian",
+            "healthy",
+            "fresh"
+          ],
+          "dietary": {
+            "vegetarian": true,
+            "vegan": false,
+            "gluten_free": false,
+            "dairy_free": false,
+            "halal": false
+          },
+          "available": true,
+          "created_at": "2025-09-22T15:53:36.687Z",
+          "updated_at": "2025-09-22T15:53:36.687Z"
+        },
+        {
+          "menu_item_id": "demo_restaurant_1758556416680_1_1758556416687",
+          "name": "Fish & Chips",
+          "emoji": "🍟",
+          "price": "£14.90",
+          "description": "Beer battered cod with chunky chips",
+          "category": "main",
+          "tags": [
+            "british",
+            "classic"
+          ],
+          "meal_period": "dinner",
+          "search_tags": [
+            "british",
+            "classic"
+          ],
+          "dietary": {
+            "vegetarian": false,
+            "vegan": false,
+            "gluten_free": false,
+            "dairy_free": false,
+            "halal": false
+          },
+          "available": true,
+          "created_at": "2025-09-22T15:53:36.688Z",
+          "updated_at": "2025-09-22T15:53:36.688Z"
+        }
+      ],
+      "delivery_platforms": {},
+      "opening_hours": {},
+      "cuisine_type": "italian",
+      "updated_at": "2025-09-22T15:53:36.688Z",
+      "created_at": "2025-09-22T15:53:36.688Z"
+    },
+    "gb_london_demo_restaurant_1758556418762": {
+      "restaurant_id": "demo_restaurant_1758556418762",
+      "restaurant_name": "Demo Restaurant",
+      "location": {
+        "city": "London",
+        "country_code": "GB",
+        "address": ""
+      },
+      "menu_items": [
+        {
+          "menu_item_id": "demo_restaurant_1758556418762_0_1758556418764",
+          "name": "Margherita Pizza",
+          "emoji": "🍕",
+          "price": "£12.50",
+          "description": "Fresh mozzarella, tomato sauce, basil",
+          "category": "main",
+          "tags": [
+            "vegetarian",
+            "popular"
+          ],
+          "meal_period": "lunch",
+          "search_tags": [
+            "vegetarian",
+            "popular",
+            "italian",
+            "healthy",
+            "fresh"
+          ],
+          "dietary": {
+            "vegetarian": true,
+            "vegan": false,
+            "gluten_free": false,
+            "dairy_free": false,
+            "halal": false
+          },
+          "available": true,
+          "created_at": "2025-09-22T15:53:38.764Z",
+          "updated_at": "2025-09-22T15:53:38.764Z"
+        },
+        {
+          "menu_item_id": "demo_restaurant_1758556418762_1_1758556418764",
+          "name": "Fish & Chips",
+          "emoji": "🍟",
+          "price": "£14.90",
+          "description": "Beer battered cod with chunky chips",
+          "category": "main",
+          "tags": [
+            "british",
+            "classic"
+          ],
+          "meal_period": "dinner",
+          "search_tags": [
+            "british",
+            "classic"
+          ],
+          "dietary": {
+            "vegetarian": false,
+            "vegan": false,
+            "gluten_free": false,
+            "dairy_free": false,
+            "halal": false
+          },
+          "available": true,
+          "created_at": "2025-09-22T15:53:38.764Z",
+          "updated_at": "2025-09-22T15:53:38.764Z"
+        }
+      ],
+      "delivery_platforms": {},
+      "opening_hours": {},
+      "cuisine_type": "italian",
+      "updated_at": "2025-09-22T15:53:38.764Z",
+      "created_at": "2025-09-22T15:53:38.764Z"
+    }
+  },
+  "stats": {
+    "total_items": 4,
+    "total_restaurants": 2,
+    "last_updated": "2025-09-22T15:53:38.764Z"
+  },
+  "last_saved": "2025-09-22T15:53:38.764Z"
+}

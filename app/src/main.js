@@ -90,11 +90,14 @@ function wireCoreEvents() {
   const acceptBtn = byId('accept-btn');
   const tryAgainBtn = byId('try-again-btn');
   const insightsToggle = byId('insights-toggle');
+  const submitEventBtn = byId('submit-event-btn');
 
   decideBtn && decideBtn.addEventListener('click', handleDecision);
   detectBtn && detectBtn.addEventListener('click', detectMood);
   acceptBtn && acceptBtn.addEventListener('click', handleAccept);
   tryAgainBtn && tryAgainBtn.addEventListener('click', handleTryAgain);
+  submitEventBtn && submitEventBtn.addEventListener('click', openEventSubmissionModal);
+
 
   insightsToggle &&
     insightsToggle.addEventListener('click', () => {
@@ -651,6 +654,31 @@ async function loadEvents() {
   renderEvents();
 }
 
+function addSubmitEventButton() {
+  const eventsGrid = byId('events-grid');
+  if (!eventsGrid) return;
+  
+  // Check if button already exists
+  if (byId('submit-event-btn')) return;
+  
+  // Create submit button
+  const submitCard = document.createElement('div');
+  submitCard.className = 'event-card submit-event-card';
+  submitCard.innerHTML = `
+    <div class="event-badge">✨</div>
+    <div class="event-body">
+      <div class="event-title">Submit Your Event</div>
+      <div class="event-meta">Share your event with the VFIED community</div>
+      <div class="event-cta">
+        <button id="submit-event-btn" class="btn btn-primary">Submit Event</button>
+      </div>
+    </div>
+  `;
+  
+  // Insert at the beginning of the grid
+  eventsGrid.insertBefore(submitCard, eventsGrid.firstChild);
+}
+
 function renderEvents() {
   const grid = byId('events-grid');
   if (!grid) return;
@@ -693,6 +721,9 @@ function renderEvents() {
     card.append(badge, body);
     grid.appendChild(card);
   });
+
+  addSubmitEventButton();
+
 }
 
 function goEvent(title) {
@@ -1033,4 +1064,216 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text || '';
   return div.innerHTML;
+}
+
+function openEventSubmissionModal() {
+  // Create modal if it doesn't exist
+  let modal = byId('event-submit-modal');
+  if (!modal) {
+    createEventSubmissionModal();
+    modal = byId('event-submit-modal');
+  }
+  openModal(modal);
+}
+
+function createEventSubmissionModal() {
+  const modal = document.createElement('div');
+  modal.id = 'event-submit-modal';
+  modal.className = 'modal';
+  modal.setAttribute('aria-hidden', 'true');
+  
+  modal.innerHTML = `
+    <div class="modal-overlay">
+      <div class="modal-content event-submit-content">
+        <div class="modal-header">
+          <h2>Submit Your Event</h2>
+          <button class="modal-close" id="event-submit-close">&times;</button>
+        </div>
+        
+        <div id="event-success-message" class="success-message" style="display: none;">
+          <h4>Event Submitted Successfully!</h4>
+          <p>Your event will be reviewed and appear in the app within 24-48 hours.</p>
+        </div>
+        
+        <form id="eventSubmitForm" class="event-form">
+          <div class="form-group">
+            <label for="event-title">Event Title *</label>
+            <input type="text" id="event-title" name="title" required placeholder="e.g., Italian Food Festival">
+          </div>
+
+          <div class="form-group">
+            <label for="event-description">Description *</label>
+            <textarea id="event-description" name="description" required placeholder="Tell people what makes your event special..."></textarea>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="event-category">Category *</label>
+              <select id="event-category" name="category" required>
+                <option value="">Select category</option>
+                <option value="food">Food</option>
+                <option value="music">Music</option>
+                <option value="culture">Culture</option>
+                <option value="market">Market</option>
+                <option value="nightlife">Nightlife</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="event-price">Price</label>
+              <input type="text" id="event-price" name="price" placeholder="Free, £10, £5-15, etc.">
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="event-date">Date *</label>
+              <input type="date" id="event-date" name="date" required>
+            </div>
+
+            <div class="form-group">
+              <label for="event-time">Time</label>
+              <input type="time" id="event-time" name="time">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="event-venue">Venue/Location *</label>
+            <input type="text" id="event-venue" name="venue" required placeholder="Restaurant name, market, venue address">
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="event-city">City *</label>
+              <input type="text" id="event-city" name="city" required placeholder="London, Nairobi, etc.">
+            </div>
+
+            <div class="form-group">
+              <label for="event-country">Country *</label>
+              <select id="event-country" name="country" required>
+                <option value="">Select country</option>
+                <option value="GB">United Kingdom</option>
+                <option value="KE">Kenya</option>
+                <option value="US">United States</option>
+                <option value="NG">Nigeria</option>
+                <option value="FR">France</option>
+                <option value="DE">Germany</option>
+                <option value="IT">Italy</option>
+                <option value="JP">Japan</option>
+                <option value="AU">Australia</option>
+                <option value="CA">Canada</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="contact-name">Your Name *</label>
+              <input type="text" id="contact-name" name="contact_name" required>
+            </div>
+
+            <div class="form-group">
+              <label for="contact-email">Contact Email *</label>
+              <input type="email" id="contact-email" name="contact_email" required>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary" id="submitEventBtn">
+            <span id="submitEventText">Submit Event</span>
+          </button>
+        </form>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  
+  // Add event listeners
+  const closeBtn = byId('event-submit-close');
+  const form = byId('eventSubmitForm');
+  
+  closeBtn && closeBtn.addEventListener('click', () => closeModal(modal));
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal(modal);
+  });
+  
+  form && form.addEventListener('submit', handleEventSubmission);
+}
+
+async function handleEventSubmission(e) {
+  e.preventDefault();
+  
+  const submitBtn = byId('submitEventBtn');
+  const submitText = byId('submitEventText');
+  const successMessage = byId('event-success-message');
+  const form = byId('eventSubmitForm');
+  
+  // Set loading state
+  submitBtn.disabled = true;
+  submitText.innerHTML = '<span class="loading-spinner"></span>Submitting...';
+  
+  try {
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+    
+    const response = await fetch(`${API_BASE}/v1/events/submit`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: data.title,
+        description: data.description,
+        location: {
+          venue: data.venue,
+          city: data.city,
+          country_code: data.country
+        },
+        date: data.date,
+        time: data.time,
+        category: data.category,
+        price: data.price || 'Free',
+        contact_name: data.contact_name,
+        contact_email: data.contact_email
+      })
+    });
+
+    const result = await response.json();
+
+    if (response.ok && result.success) {
+      // Show success message
+      successMessage.style.display = 'block';
+      form.style.display = 'none';
+      
+      // Show toast
+      toast('Event submitted successfully! We\'ll review it within 24-48 hours.', 'success');
+      
+      // Update stats
+      incrementStats({ timeSavedMin: 0 }); // Just increment event count
+      
+      // Auto-close modal after 3 seconds
+      setTimeout(() => {
+        const modal = byId('event-submit-modal');
+        closeModal(modal);
+        
+        // Reset form for next time
+        setTimeout(() => {
+          form.style.display = 'block';
+          successMessage.style.display = 'none';
+          form.reset();
+        }, 500);
+      }, 3000);
+      
+    } else {
+      throw new Error(result.error || 'Failed to submit event');
+    }
+
+  } catch (error) {
+    console.error('Event submission error:', error);
+    toast(`Failed to submit event: ${error.message}`, 'error');
+  } finally {
+    // Reset button state
+    submitBtn.disabled = false;
+    submitText.textContent = 'Submit Event';
+  }
 }

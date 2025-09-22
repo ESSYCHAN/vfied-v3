@@ -1857,6 +1857,42 @@ app.get('/v1/events', async (req, res) => {
                     : time === 'this_week' ? 'This week'
                     : 'This weekend';
 
+    // Add approved submitted events first
+    const approvedEvents = submittedEvents
+      .filter(e => e.status === 'approved')
+      .map(e => ({
+        id: e.id,
+        title: e.title,
+        city: e.city,
+        country_code: e.country_code,
+        when: e.when,
+        tag: e.tag,
+        description: e.description,
+        location: e.location,
+        price: e.price,
+        link: e.link
+      }));
+
+    vfiedEvents = approvedEvents;
+
+    // If not enough events, add curated events
+    if (vfiedEvents.length < 3) {
+      const pool = getEventPool(cc);
+      const curatedEvents = pool.slice(0, 6 - vfiedEvents.length).map((e, idx) => ({
+        id: `${cc}-curated-${idx + 1}`,
+        title: e.title,
+        city,
+        country_code: cc,
+        when: whenLabel,
+        tag: 'food',
+        description: e.explanation || '',
+        location: `${city} area`,
+        price: 'Varies',
+        link: `https://www.google.com/search?q=${encodeURIComponent(e.title + ' ' + city)}`
+      }));
+      
+      vfiedEvents = [...vfiedEvents, ...curatedEvents];
+    }
     // Cache first
     const key = cacheKey(city, cc, category, time);
     const cached = getCache(key);
@@ -1930,6 +1966,8 @@ app.get('/v1/events', async (req, res) => {
     });
   }
 });
+
+app.get('/submit-event', (req, res) => res.sendFile(path.resolve(__dirname, '../app/submit-event.html')));
 
 // ===== DATA QUALITY ENDPOINTS =====
 
@@ -2369,6 +2407,114 @@ app.post('/v1/auth/refresh', (req, res) => {
     token: new_token,
     expires_in: 3600
   });
+});
+
+// Event storage (in production, use a database)
+const submittedEvents = [];
+
+// Event submission endpoint
+app.post('/v1/events/submit', async (req, res) => {
+  try {
+    const { 
+      title, 
+      description, 
+      location, 
+      date, 
+      time, 
+      category, 
+      contact_email,
+      contact_name,
+      price 
+    } = req.body;
+
+    // Validation
+    if (!title || !description || !location || !date || !contact_email) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: title, description, location, date, contact_email'
+      });
+    }
+
+    // Create event object
+    const event = {
+      id: `event_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
+      title: title.trim(),
+      description: description.trim(),
+      city: location.city || 'Unknown',
+      country_code: (location.country_code || 'GB').toUpperCase(),
+      when: `${date} ${time || ''}`.trim(),
+      tag: category || 'food',
+      location: location.venue || `${location.city} area`,
+      price: price || 'Free',
+      contact_email,
+      contact_name: contact_name || 'Event Organizer',
+      submitted_at: new Date().toISOString(),
+      status: 'pending', // pending, approved, rejected
+      link: `mailto:${contact_email}`
+    };
+
+    // Store event (pending approval)
+    submittedEvents.push(event);
+    
+    console.log('[event submitted]', { id: event.id, title: event.title, city: event.city });
+
+    res.status(201).json({
+      success: true,
+      event_id: event.id,
+      message: 'Event submitted successfully! It will appear after admin approval.',
+      estimated_review_time: '24-48 hours'
+    });
+
+  } catch (error) {
+    console.error('Event submission error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to submit event'
+    });
+  }
+});
+
+// Admin: Get pending events
+app.get('/v1/admin/events/pending', (req, res) => {
+  const pendingEvents = submittedEvents.filter(e => e.status === 'pending');
+  res.json({
+    success: true,
+    events: pendingEvents,
+    total: pendingEvents.length
+  });
+});
+
+// Admin: Approve/reject events
+app.post('/v1/admin/events/:id/approve', (req, res) => {
+  const eventId = req.params.id;
+  const event = submittedEvents.find(e => e.id === eventId);
+  
+  if (!event) {
+    return res.status(404).json({ success: false, error: 'Event not found' });
+  }
+
+  event.status = 'approved';
+  event.approved_at = new Date().toISOString();
+
+  console.log('[event approved]', { id: eventId, title: event.title });
+  
+  res.json({ success: true, message: 'Event approved' });
+});
+
+app.post('/v1/admin/events/:id/reject', (req, res) => {
+  const eventId = req.params.id;
+  const { reason } = req.body;
+  const event = submittedEvents.find(e => e.id === eventId);
+  
+  if (!event) {
+    return res.status(404).json({ success: false, error: 'Event not found' });
+  }
+
+  event.status = 'rejected';
+  event.rejection_reason = reason;
+  event.rejected_at = new Date().toISOString();
+
+  res.json({ success: true, message: 'Event rejected' });
 });
 
 // Start server
