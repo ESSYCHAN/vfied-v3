@@ -15,6 +15,7 @@ import { randomUUID } from 'crypto';
 import { SUPPORTED_COUNTRIES } from './data/countries.js'; // adjust path as needed
 import { parseCravings, enhanceMoodText } from './craving_parser.js';
 import { recommendFromMenus, menuManager } from './menu_manager.js';
+import multer from 'multer'
 // Optional polyfill if your Node is <18
 // import fetch from 'node-fetch';
 // globalThis.fetch = globalThis.fetch || fetch;
@@ -86,9 +87,6 @@ const RecommendSchema = Joi.object({
   budget: Joi.string().valid('budget','medium','premium','luxury').optional()
 }).unknown(true);
 
-const multer = require('multer');
-const path = require('path');
-const fs = require('fs').promises;
 
 
 // ===== Normalizers =====
