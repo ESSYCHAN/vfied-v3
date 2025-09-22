@@ -2309,6 +2309,23 @@ app.get('/v1/admin/telemetry', (req, res) => {
     ]
   });
 });
+
+// Add this health endpoint to your mcp-server.js
+app.get('/health', async (req, res) => {
+  const services = {
+    gpt: USE_GPT && OPENAI_API_KEY ? 'on' : 'off',
+    weather: process.env.OPENWEATHER_API_KEY ? 'on' : 'off',
+    menu_manager: 'on'
+  };
+  
+  res.json({
+    status: services.gpt === 'on' ? 'healthy' : 'degraded',
+    timestamp: new Date().toISOString(),
+    version: '2.3.0',
+    services
+  });
+});
+
 app.post('/v1/auth/login', (req, res) => {
   const { email, password, role = 'restaurant' } = req.body;
   
