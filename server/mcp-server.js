@@ -2303,7 +2303,7 @@ app.get('/v1/admin/checklist', (req, res) => {
 
 app.get('/v1/admin/telemetry', (req, res) => {
   res.json({
-    items: [
+    items: analytics.events.length > 0 ? analytics.events : [
       { timestamp: new Date().toISOString(), type: 'feedback', data: { rating: 'positive', comment: 'Great food!' } },
       { timestamp: new Date().toISOString(), type: 'recommendation', data: { dish: 'Pasta', mood: 'comfort' } }
     ]
