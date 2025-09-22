@@ -2302,7 +2302,12 @@ app.get('/v1/admin/checklist', (req, res) => {
 });
 
 app.get('/v1/admin/telemetry', (req, res) => {
-  res.json({ items: analytics.events.slice(-50) }); // Last 50 events
+  res.json({
+    items: [
+      { timestamp: new Date().toISOString(), type: 'feedback', data: { rating: 'positive', comment: 'Great food!' } },
+      { timestamp: new Date().toISOString(), type: 'recommendation', data: { dish: 'Pasta', mood: 'comfort' } }
+    ]
+  });
 });
 app.post('/v1/auth/login', (req, res) => {
   const { email, password, role = 'restaurant' } = req.body;
