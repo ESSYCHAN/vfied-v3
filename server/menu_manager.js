@@ -13,7 +13,8 @@ class MenuManager {
     this.menuDataPath = path.resolve(__dirname, '../data/restaurant_menus.json');
     this.menus = new Map();
     this.menuStats = { total_items: 0, total_restaurants: 0, last_updated: null };
-    this.loadMenus();
+    this.initialized = false;
+    this.loadMenus().catch(console.error);
   }
 
   async ensureDataDirectory() {
@@ -31,29 +32,31 @@ class MenuManager {
       const data = await fs.readFile(this.menuDataPath, 'utf8');
       const parsed = JSON.parse(data);
       
-      // Load both menu data and stats
       if (parsed.menus) {
         Object.entries(parsed.menus).forEach(([key, menu]) => {
           this.menus.set(key, menu);
         });
         this.menuStats = parsed.stats || this.menuStats;
       } else {
-        // Legacy format - direct menu data
         Object.entries(parsed).forEach(([key, menu]) => {
           this.menus.set(key, menu);
         });
       }
       
       this.updateStats();
+      this.initialized = true;
       console.log(`📋 Loaded ${this.menuStats.total_items} menu items from ${this.menuStats.total_restaurants} restaurants`);
     } catch (error) {
       console.log('📋 No existing menus found, starting fresh');
       this.menus = new Map();
       this.updateStats();
+      this.initialized = true;
     }
   }
 
   async saveMenus() {
+    if (!this.initialized) return;
+    
     try {
       await this.ensureDataDirectory();
       const data = {
@@ -81,7 +84,6 @@ class MenuManager {
     };
   }
 
-  // Add a restaurant's menu
   async addRestaurantMenu(restaurantData) {
     const {
       restaurant_id,
@@ -99,10 +101,9 @@ class MenuManager {
 
     const key = `${location.country_code}_${location.city}_${restaurant_id}`.replace(/\s+/g, '_').toLowerCase();
     
-    // Process menu items
     const processedItems = menu_items.map((item, index) => ({
       menu_item_id: item.menu_item_id || `${restaurant_id}_${index}_${Date.now()}`,
-      name: item.name?.trim() || `Item ${index + 1}`,
+      name: item.name ? item.name.trim() : `Item ${index + 1}`,
       emoji: item.emoji || this.getEmoji(item),
       price: item.price || '—',
       description: item.description || '',
@@ -111,12 +112,11 @@ class MenuManager {
       meal_period: item.meal_period || this.detectMealPeriod(item),
       search_tags: this.generateSearchTags(item),
       dietary: {
-        vegetarian: item.dietary?.vegetarian || false,
-        vegan: item.dietary?.vegan || false,
-        gluten_free: item.dietary?.gluten_free || false,
-        dairy_free: item.dietary?.dairy_free || false,
-        halal: item.dietary?.halal || false,
-        ...item.dietary
+        vegetarian: Boolean(item.dietary && item.dietary.vegetarian),
+        vegan: Boolean(item.dietary && item.dietary.vegan),
+        gluten_free: Boolean(item.dietary && item.dietary.gluten_free),
+        dairy_free: Boolean(item.dietary && item.dietary.dairy_free),
+        halal: Boolean(item.dietary && item.dietary.halal)
       },
       available: item.available !== false,
       created_at: item.created_at || new Date().toISOString(),
@@ -153,16 +153,14 @@ class MenuManager {
     };
   }
 
-  // Add individual menu item
   async addMenuItem(itemData, restaurantId = 'default_restaurant') {
-    // Find or create restaurant
     const restaurantKey = Array.from(this.menus.keys()).find(key => key.includes(restaurantId));
     
     if (restaurantKey) {
       const restaurant = this.menus.get(restaurantKey);
       const newItem = {
         menu_item_id: itemData.menu_item_id || `${restaurantId}_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
-        name: itemData.name?.trim(),
+        name: itemData.name ? itemData.name.trim() : 'New Item',
         emoji: itemData.emoji || this.getEmoji(itemData),
         price: itemData.price || '—',
         description: itemData.description || '',
@@ -182,7 +180,6 @@ class MenuManager {
       
       return newItem;
     } else {
-      // Create new restaurant with this item
       return await this.addRestaurantMenu({
         restaurant_id: restaurantId,
         restaurant_name: `Restaurant ${restaurantId}`,
@@ -192,7 +189,6 @@ class MenuManager {
     }
   }
 
-  // Detect cuisine type from menu items
   detectCuisineType(items) {
     const cuisineIndicators = {
       'italian': /pizza|pasta|risotto|lasagna|spaghetti|ravioli/i,
@@ -216,28 +212,23 @@ class MenuManager {
     return 'international';
   }
 
-  // Detect meal period for an item
   detectMealPeriod(item) {
     const name = (item.name || '').toLowerCase();
     const tags = (item.tags || []).join(' ').toLowerCase();
     const text = `${name} ${tags}`.toLowerCase();
     
-    // Breakfast indicators
     if (/breakfast|pancake|waffle|omelette|eggs|bacon|cereal|croissant|porridge|toast|granola|yogurt/i.test(text)) {
       return 'breakfast';
     }
     
-    // Lunch indicators  
     if (/lunch|sandwich|salad|wrap|soup|light meal/i.test(text)) {
       return 'lunch';
     }
     
-    // Dinner indicators
     if (/dinner|steak|roast|curry|pasta|main course|hearty/i.test(text)) {
       return 'dinner';
     }
     
-    // Snack indicators
     if (/snack|chips|nuts|fruit|cake|cookie|pastry/i.test(text)) {
       return 'snack';
     }
@@ -245,14 +236,12 @@ class MenuManager {
     return item.meal_period || 'all_day';
   }
 
-  // Generate search tags for better matching
   generateSearchTags(item) {
     const tags = [...(item.tags || [])];
     const name = (item.name || '').toLowerCase();
     const description = (item.description || '').toLowerCase();
     const text = `${name} ${description}`;
     
-    // Cuisine type tags
     if (/curry|tikka|masala|biryani|dal|naan/i.test(text)) tags.push('indian');
     if (/sushi|ramen|tempura|teriyaki|miso/i.test(text)) tags.push('japanese');
     if (/pasta|pizza|risotto|italian/i.test(text)) tags.push('italian');
@@ -260,7 +249,6 @@ class MenuManager {
     if (/taco|burrito|mexican|salsa/i.test(text)) tags.push('mexican');
     if (/fish.*chips|british|pie/i.test(text)) tags.push('british');
     
-    // Dietary tags from content
     if (/vegan|plant.*based/i.test(text)) tags.push('vegan');
     if (/vegetarian|veggie/i.test(text)) tags.push('vegetarian');
     if (/gluten.*free/i.test(text)) tags.push('gluten-free');
@@ -268,7 +256,6 @@ class MenuManager {
     if (/healthy|light|fresh/i.test(text)) tags.push('healthy');
     if (/comfort|hearty|filling/i.test(text)) tags.push('comfort');
     
-    // Preparation method
     if (/fried|crispy|crunchy/i.test(text)) tags.push('fried');
     if (/grilled|barbecue|bbq/i.test(text)) tags.push('grilled');
     if (/fresh|raw|salad/i.test(text)) tags.push('fresh');
@@ -276,12 +263,10 @@ class MenuManager {
     return [...new Set(tags)];
   }
 
-  // Get appropriate emoji for item
   getEmoji(item) {
     const name = (item.name || '').toLowerCase();
     const category = (item.category || '').toLowerCase();
     
-    // Specific dishes
     if (/pizza/i.test(name)) return '🍕';
     if (/burger/i.test(name)) return '🍔';
     if (/pasta|spaghetti/i.test(name)) return '🍝';
@@ -300,7 +285,6 @@ class MenuManager {
     if (/beer/i.test(name)) return '🍺';
     if (/wine/i.test(name)) return '🍷';
     
-    // Category based
     const categoryEmojis = {
       'appetizer': '🥗',
       'main': '🍽️',
@@ -316,56 +300,40 @@ class MenuManager {
     return categoryEmojis[category] || item.emoji || '🍽️';
   }
 
-  // Search menus for matching dishes
-  async searchMenus({ 
-    location, 
-    mood_text = '', 
-    dietary = [], 
-    meal_period = 'all_day',
-    attributes = [],
-    limit = 10
-  }) {
+  async searchMenus({ location, mood_text = '', dietary = [], meal_period = 'all_day', attributes = [], limit = 10 }) {
     const results = [];
-    const locationKey = `${(location?.country_code || 'GB').toLowerCase()}_${(location?.city || '').toLowerCase()}`;
+    const locationKey = `${(location && location.country_code ? location.country_code : 'GB').toLowerCase()}_${(location && location.city ? location.city : '').toLowerCase()}`;
     
     console.log(`🔍 Searching menus for location: ${locationKey}, meal: ${meal_period}`);
     
-    // Search all menus
     for (const [key, menu] of this.menus) {
-      // Location matching - be more flexible
       const menuLocation = `${menu.location.country_code.toLowerCase()}_${menu.location.city.toLowerCase()}`;
-      if (!menuLocation.includes(location?.country_code?.toLowerCase()) && 
-          !key.includes(location?.city?.toLowerCase())) {
+      if (!menuLocation.includes(location && location.country_code ? location.country_code.toLowerCase() : '') && 
+          !key.includes(location && location.city ? location.city.toLowerCase() : '')) {
         continue;
       }
       
-      // Filter menu items
       const matchingItems = menu.menu_items.filter(item => {
-        // Check availability
         if (!item.available) return false;
         
-        // Check meal period
         if (meal_period !== 'all_day' && 
             item.meal_period !== 'all_day' && 
             item.meal_period !== meal_period) {
           return false;
         }
         
-        // Check dietary restrictions
         if (dietary.length > 0) {
           for (const restriction of dietary) {
             const normalizedRestriction = restriction.replace('-', '_');
-            if (!item.dietary?.[normalizedRestriction]) {
+            if (!item.dietary || !item.dietary[normalizedRestriction]) {
               return false;
             }
           }
         }
         
-        // Score based on mood/craving matching
-        let score = Math.random() * 5; // Base random score
+        let score = Math.random() * 5;
         const itemText = `${item.name} ${item.description || ''} ${(item.search_tags || []).join(' ')}`.toLowerCase();
         
-        // Mood text matching
         if (mood_text) {
           const moodWords = mood_text.toLowerCase().split(/\s+/);
           for (const word of moodWords) {
@@ -375,7 +343,6 @@ class MenuManager {
           }
         }
         
-        // Attribute matching
         for (const attr of attributes) {
           if (itemText.includes(attr.toLowerCase())) {
             score += 8;
@@ -383,10 +350,9 @@ class MenuManager {
         }
         
         item.match_score = score;
-        return true; // Include all available items, let scoring sort them
+        return true;
       });
       
-      // Add restaurant info to each item
       matchingItems.forEach(item => {
         results.push({
           ...item,
@@ -399,7 +365,6 @@ class MenuManager {
       });
     }
     
-    // Sort by match score and return top results
     results.sort((a, b) => (b.match_score || 0) - (a.match_score || 0));
     const topResults = results.slice(0, limit);
     
@@ -407,7 +372,6 @@ class MenuManager {
     return topResults;
   }
 
-  // Get all menu items (for dashboard)
   getAllMenuItems() {
     const allItems = [];
     for (const [, menu] of this.menus) {
@@ -422,17 +386,14 @@ class MenuManager {
     return allItems;
   }
 
-  // Get menu count
   getMenuCount() {
     return this.menuStats.total_items;
   }
 
-  // Get restaurant count
   getRestaurantCount() {
     return this.menuStats.total_restaurants;
   }
 
-  // Get delivery link for a restaurant
   getDeliveryLink(restaurant_id, platform = 'any') {
     for (const [, menu] of this.menus) {
       if (menu.restaurant_id === restaurant_id) {
@@ -446,7 +407,6 @@ class MenuManager {
           return this.buildPlatformLink(platform, platforms[`${platform}_id`]);
         }
         
-        // Fallback to Google search
         return `https://www.google.com/search?q=${encodeURIComponent(menu.restaurant_name + ' ' + menu.location.city + ' delivery')}`;
       }
     }
@@ -463,7 +423,6 @@ class MenuManager {
     return templates[platform] || null;
   }
 
-  // Remove menu item
   async removeMenuItem(itemId) {
     for (const [key, menu] of this.menus) {
       const itemIndex = menu.menu_items.findIndex(item => 
@@ -485,7 +444,6 @@ class MenuManager {
     return { success: false, error: 'Item not found' };
   }
 
-  // Get stats for dashboard
   getStats() {
     return {
       ...this.menuStats,
@@ -516,10 +474,8 @@ class MenuManager {
   }
 }
 
-// Create singleton instance
 export const menuManager = new MenuManager();
 
-// Enhanced recommendation function for VFIED integration
 export async function recommendFromMenus(params) {
   const { location, mood_text, dietary, meal_period, cravingAttributes } = params;
   
@@ -538,7 +494,6 @@ export async function recommendFromMenus(params) {
       return null;
     }
     
-    // Format for VFIED response
     const formatted = menuItems.slice(0, 3).map(item => ({
       name: item.name,
       emoji: item.emoji || '🍽️',
@@ -560,7 +515,6 @@ export async function recommendFromMenus(params) {
   }
 }
 
-// Sample restaurant loader
 export async function addSampleRestaurants() {
   const samples = [
     {
