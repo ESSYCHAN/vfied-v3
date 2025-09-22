@@ -55,7 +55,7 @@
         </div>
         <div>
           <label>API Key</label>
-          <input id="apiKey" value="${new URLSearchParams(window.location.search).get('api_key') || 'demo_growth_key_456'}" size="28"/>
+          <input id="apiKey" value="" size="28"/>
         </div>
         <button id="refreshBtn" class="right">Refresh</button>
       </div>
@@ -333,5 +333,19 @@
   </script>
   <link rel="stylesheet" href="./src/style.css">
   <script type="module" src="./src/main.js"></script>
+  <script>
+  // Auto-load stored credentials
+  document.addEventListener('DOMContentLoaded', function() {
+      const storedKey = localStorage.getItem('vfied_api_key');
+      const storedId = localStorage.getItem('vfied_restaurant_id');
+      
+      if (storedKey) {
+          document.getElementById('apiKey').value = storedKey;
+      }
+      
+      // Update base URL to match your local setup
+      document.getElementById('baseUrl').value = 'http://localhost:3048';
+  });
+  </script>
 </body>
 </html>
