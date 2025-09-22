@@ -86,6 +86,8 @@ const RecommendSchema = Joi.object({
   budget: Joi.string().valid('budget','medium','premium','luxury').optional()
 }).unknown(true);
 
+
+
 // ===== Normalizers =====
 const toNum = (v) => (typeof v === 'number' ? v : (Number.isFinite(Number(v)) ? Number(v) : undefined));
 const parseCityString = (s) => {
@@ -325,6 +327,12 @@ const ITIN_SCHEMA = Joi.object({
   interests: Joi.array().items(Joi.string()).default(['food','culture']),
   budget: Joi.string().valid('budget','medium','premium','luxury').default('medium')
 });
+
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs').promises;
+
+
 
 function pickCountryPool(cc) {
   const code = (cc || '').toUpperCase();
@@ -2413,7 +2421,7 @@ app.post('/v1/auth/refresh', (req, res) => {
 const submittedEvents = [];
 
 // Event submission endpoint
-app.post('/v1/events/submit', async (req, res) => {
+app.post('/v1/events/submit', upload.single('poster'), async (req, res) => {
   try {
     const { 
       title, 
@@ -2424,10 +2432,12 @@ app.post('/v1/events/submit', async (req, res) => {
       category, 
       contact_email,
       contact_name,
-      price 
+      price,
+      user_id,
+      place_id // From Google Places
     } = req.body;
 
-    // Validation
+    // Enhanced validation
     if (!title || !description || !location || !date || !contact_email) {
       return res.status(400).json({
         success: false,
@@ -2435,38 +2445,99 @@ app.post('/v1/events/submit', async (req, res) => {
       });
     }
 
-    // Create event object
+    // Get user profile for credibility scoring
+    const user = userProfiles.find(u => u.id === user_id);
+    
+    // Process poster image
+    const posterUrl = req.file ? `/uploads/${req.file.filename}` : null;
+    
+    // Enhanced location data
+    let enhancedLocation = JSON.parse(location);
+    if (place_id) {
+      // Fetch additional place details
+      try {
+        const placeResponse = await fetch(`http://localhost:${PORT}/v1/places/details/${place_id}`);
+        const placeData = await placeResponse.json();
+        if (placeData.success) {
+          enhancedLocation = {
+            ...enhancedLocation,
+            place_id,
+            coordinates: placeData.place.geometry.location,
+            formatted_address: placeData.place.formatted_address,
+            phone: placeData.place.formatted_phone_number,
+            website: placeData.place.website
+          };
+        }
+      } catch (error) {
+        console.warn('Failed to fetch place details:', error);
+      }
+    }
+
+    // Create enhanced event object
     const event = {
       id: `event_${Date.now()}_${Math.random().toString(36).slice(2,8)}`,
       title: title.trim(),
       description: description.trim(),
-      city: location.city || 'Unknown',
-      country_code: (location.country_code || 'GB').toUpperCase(),
+      location: enhancedLocation,
+      city: enhancedLocation.city || 'Unknown',
+      country_code: (enhancedLocation.country_code || 'GB').toUpperCase(),
       when: `${date} ${time || ''}`.trim(),
       tag: category || 'food',
-      location: location.venue || `${location.city} area`,
       price: price || 'Free',
       contact_email,
       contact_name: contact_name || 'Event Organizer',
+      user_id: user_id || null,
+      poster_url: posterUrl,
       submitted_at: new Date().toISOString(),
-      status: 'pending', // pending, approved, rejected
-      link: `mailto:${contact_email}`
+      status: 'pending',
+      link: `mailto:${contact_email}`,
+      
+      // Enhanced fields
+      credibility_score: user ? user.approval_rate : 0.5,
+      auto_moderation: null // Will be set by AI
     };
 
-    // Store event (pending approval)
-    submittedEvents.push(event);
-    
-    console.log('[event submitted]', { id: event.id, title: event.title, city: event.city });
+    // Run auto-moderation AI
+    const moderation = await EventAutoModerator.evaluateEvent(event);
+    event.auto_moderation = moderation;
 
+    // Auto-approve if criteria met
+    if (moderation.shouldAutoApprove) {
+      event.status = 'approved';
+      event.approved_at = new Date().toISOString();
+      event.approved_by = 'auto-moderator';
+      
+      console.log(`[AUTO-APPROVED] ${event.title} (confidence: ${moderation.confidence})`);
+    } else {
+      console.log(`[MANUAL REVIEW] ${event.title} - Reasons: ${moderation.reasons.join(', ')}`);
+    }
+
+    // Store event
+    submittedEvents.push(event);
+
+    // Update user stats if registered user
+    if (user) {
+      user.submission_count += 1;
+      if (event.status === 'approved') {
+        // Boost approval rate for good submissions
+        user.approval_rate = Math.min(1.0, user.approval_rate + 0.05);
+      }
+    }
+    
     res.status(201).json({
       success: true,
       event_id: event.id,
-      message: 'Event submitted successfully! It will appear after admin approval.',
-      estimated_review_time: '24-48 hours'
+      status: event.status,
+      message: event.status === 'approved' 
+        ? 'Event approved and published immediately!' 
+        : 'Event submitted for review. You\'ll hear back within 24 hours.',
+      estimated_review_time: event.status === 'approved' ? 'immediate' : '24-48 hours',
+      auto_approved: moderation.shouldAutoApprove,
+      confidence: moderation.confidence
     });
 
   } catch (error) {
-    console.error('Event submission error:', error);
+    console.error('Enhanced event submission error:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to submit event'
@@ -2518,6 +2589,466 @@ app.post('/v1/admin/events/:id/reject', (req, res) => {
 });
 // Add this route for the admin dashboard
 app.get('/admin', (req, res) => res.sendFile(path.resolve(__dirname, '../admin.html')));
+// =====================================================
+// 1. AUTO-APPROVAL AI SYSTEM
+// =====================================================
+
+class EventAutoModerator {
+  static autoApprovalCriteria = {
+    hasValidContact: (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email),
+    hasValidDate: (date) => new Date(date) >= new Date(),
+    hasDescription: (desc) => desc?.length >= 30,
+    hasLocation: (loc) => loc?.city && loc?.venue,
+    noSpamKeywords: (text) => !/(viagra|casino|crypto|bitcoin|scam|hack)/i.test(text),
+    priceFormat: (price) => !price || /^(free|£\d+|£\d+-\d+|\$\d+|varies)$/i.test(price)
+  };
+
+  static moderationFlags = {
+    suspiciousEmail: (email) => /(temp|fake|test|spam|throwaway)/i.test(email),
+    priceAboveThreshold: (price) => {
+      const match = price?.match(/£(\d+)/);
+      return match && parseInt(match[1]) > 100;
+    },
+    inappropriateContent: (text) => /(fuck|shit|damn|sexual|explicit)/i.test(text),
+    duplicateSubmission: async (title, contact_email) => {
+      // Check for similar submissions in last 7 days
+      const recent = submittedEvents.filter(e => 
+        e.contact_email === contact_email && 
+        e.title.toLowerCase() === title.toLowerCase() &&
+        new Date() - new Date(e.submitted_at) < 7 * 24 * 60 * 60 * 1000
+      );
+      return recent.length > 0;
+    }
+  };
+
+  static async evaluateEvent(event) {
+    const criteria = this.autoApprovalCriteria;
+    const flags = this.moderationFlags;
+    
+    // Check all auto-approval criteria
+    const autoApprove = Object.keys(criteria).every(key => {
+      switch (key) {
+        case 'hasValidContact': return criteria[key](event.contact_email);
+        case 'hasValidDate': return criteria[key](event.date);
+        case 'hasDescription': return criteria[key](event.description);
+        case 'hasLocation': return criteria[key](event.location);
+        case 'noSpamKeywords': return criteria[key](event.title + ' ' + event.description);
+        case 'priceFormat': return criteria[key](event.price);
+        default: return true;
+      }
+    });
+
+    // Check moderation flags
+    const flagged = Object.keys(flags).some(key => {
+      switch (key) {
+        case 'suspiciousEmail': return flags[key](event.contact_email);
+        case 'priceAboveThreshold': return flags[key](event.price);
+        case 'inappropriateContent': return flags[key](event.title + ' ' + event.description);
+        case 'duplicateSubmission': return flags[key](event.title, event.contact_email);
+        default: return false;
+      }
+    });
+
+    const shouldAutoApprove = autoApprove && !flagged;
+    
+    return {
+      shouldAutoApprove,
+      confidence: shouldAutoApprove ? 0.95 : 0.3,
+      reasons: this.getEvaluationReasons(event, autoApprove, flagged)
+    };
+  }
+
+  static getEvaluationReasons(event, passedCriteria, flagged) {
+    const reasons = [];
+    if (!passedCriteria) reasons.push('Failed basic validation criteria');
+    if (flagged) reasons.push('Triggered content moderation flags');
+    if (passedCriteria && !flagged) reasons.push('Passed all automated checks');
+    return reasons;
+  }
+}
+
+// =====================================================
+// 2. USER PROFILE SYSTEM
+// =====================================================
+
+const userProfiles = []; // In production, use database
+
+app.post('/v1/auth/register', async (req, res) => {
+  try {
+    const { name, email, password, type = 'individual', city } = req.body;
+    
+    // Validation
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        error: 'Name, email, and password are required'
+      });
+    }
+
+    // Check if user exists
+    const existingUser = userProfiles.find(u => u.email === email);
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        error: 'User already exists with this email'
+      });
+    }
+
+    // Create user profile
+    const user = {
+      id: `user_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password, // In production, hash this!
+      type, // 'individual', 'restaurant', 'venue'
+      city: city || 'London',
+      verified: false,
+      avatar_url: null,
+      created_at: new Date().toISOString(),
+      submission_count: 0,
+      approval_rate: 1.0
+    };
+
+    userProfiles.push(user);
+
+    // Return user without password
+    const { password: _, ...userResponse } = user;
+    res.status(201).json({
+      success: true,
+      user: userResponse,
+      message: 'Profile created successfully'
+    });
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to create profile'
+    });
+  }
+});
+
+app.post('/v1/auth/login', async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    
+    const user = userProfiles.find(u => u.email === email && u.password === password);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid email or password'
+      });
+    }
+
+    // Return user without password
+    const { password: _, ...userResponse } = user;
+    res.json({
+      success: true,
+      user: userResponse,
+      token: `token_${user.id}` // In production, use JWT
+    });
+
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Login failed'
+    });
+  }
+});
+
+// =====================================================
+// 3. GOOGLE PLACES GEO INTELLIGENCE
+// =====================================================
+
+const GOOGLE_PLACES_API_KEY = process.env.GOOGLE_PLACES_API_KEY;
+
+app.get('/v1/places/search', async (req, res) => {
+  try {
+    const { query, city = 'London' } = req.query;
+    
+    if (!GOOGLE_PLACES_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: 'Google Places API not configured'
+      });
+    }
+
+    const searchQuery = `${query} ${city}`;
+    const url = `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(searchQuery)}&key=${GOOGLE_PLACES_API_KEY}`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.status !== 'OK') {
+      throw new Error(`Google Places API error: ${data.status}`);
+    }
+
+    const suggestions = data.results.slice(0, 5).map(place => ({
+      place_id: place.place_id,
+      name: place.name,
+      formatted_address: place.formatted_address,
+      geometry: place.geometry.location,
+      types: place.types,
+      rating: place.rating,
+      price_level: place.price_level
+    }));
+
+    res.json({
+      success: true,
+      suggestions
+    });
+
+  } catch (error) {
+    console.error('Places search error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to search places'
+    });
+  }
+});
+
+app.get('/v1/places/details/:place_id', async (req, res) => {
+  try {
+    const { place_id } = req.params;
+    
+    const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${place_id}&fields=name,formatted_address,geometry,formatted_phone_number,website,opening_hours&key=${GOOGLE_PLACES_API_KEY}`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.status !== 'OK') {
+      throw new Error(`Google Places API error: ${data.status}`);
+    }
+
+    res.json({
+      success: true,
+      place: data.result
+    });
+
+  } catch (error) {
+    console.error('Place details error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to get place details'
+    });
+  }
+});
+
+// =====================================================
+// 4. IMAGE UPLOAD SYSTEM
+// =====================================================
+
+// Configure multer for image uploads
+const storage = multer.diskStorage({
+  destination: async (req, file, cb) => {
+    const uploadDir = path.join(__dirname, '../uploads');
+    try {
+      await fs.mkdir(uploadDir, { recursive: true });
+      cb(null, uploadDir);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
+
+// Serve uploaded images
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Image upload endpoint
+app.post('/v1/upload/image', upload.single('image'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'No image file provided'
+      });
+    }
+
+    const imageUrl = `/uploads/${req.file.filename}`;
+    
+    res.json({
+      success: true,
+      image_url: imageUrl,
+      file_info: {
+        original_name: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      }
+    });
+
+  } catch (error) {
+    console.error('Image upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to upload image'
+    });
+  }
+});
+
+// =====================================================
+// 5. RESTAURANT MENU SYSTEM
+// =====================================================
+
+const restaurantMenus = []; // In production, use database
+
+app.post('/v1/menus', upload.array('images', 10), async (req, res) => {
+  try {
+    const { restaurant_id, user_id, menu_data } = req.body;
+    
+    if (!restaurant_id || !user_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Restaurant ID and User ID are required'
+      });
+    }
+
+    // Process uploaded images
+    const imageUrls = req.files ? req.files.map(file => `/uploads/${file.filename}`) : [];
+    
+    // Parse menu data
+    const menuItems = JSON.parse(menu_data || '[]');
+    
+    const menu = {
+      id: `menu_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
+      restaurant_id,
+      user_id,
+      items: menuItems,
+      images: imageUrls,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      status: 'active'
+    };
+
+    restaurantMenus.push(menu);
+
+    res.status(201).json({
+      success: true,
+      menu,
+      message: 'Menu uploaded successfully'
+    });
+
+  } catch (error) {
+    console.error('Menu upload error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to upload menu'
+    });
+  }
+});
+
+app.get('/v1/menus/:restaurant_id', (req, res) => {
+  try {
+    const { restaurant_id } = req.params;
+    
+    const menu = restaurantMenus.find(m => m.restaurant_id === restaurant_id && m.status === 'active');
+    
+    if (!menu) {
+      return res.status(404).json({
+        success: false,
+        error: 'Menu not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      menu
+    });
+
+  } catch (error) {
+    console.error('Menu fetch error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch menu'
+    });
+  }
+});
+
+// =====================================================
+// 7. ENHANCED ADMIN DASHBOARD DATA
+// =====================================================
+
+app.get('/v1/admin/stats', (req, res) => {
+  try {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    const stats = {
+      pending_count: submittedEvents.filter(e => e.status === 'pending').length,
+      approved_today: submittedEvents.filter(e => 
+        e.status === 'approved' && 
+        new Date(e.approved_at || e.submitted_at) >= today
+      ).length,
+      total_submissions: submittedEvents.length,
+      auto_approval_rate: submittedEvents.length > 0 
+        ? (submittedEvents.filter(e => e.approved_by === 'auto-moderator').length / submittedEvents.length * 100).toFixed(1)
+        : 0,
+      avg_response_time: '< 1h', // Calculate from actual data
+      user_count: userProfiles.length,
+      restaurant_count: userProfiles.filter(u => u.type === 'restaurant').length
+    };
+
+    res.json({
+      success: true,
+      stats
+    });
+
+  } catch (error) {
+    console.error('Stats error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to load stats'
+    });
+  }
+});
+
+app.get('/v1/admin/events/all', (req, res) => {
+  try {
+    const { status, limit = 50 } = req.query;
+    
+    let events = submittedEvents;
+    if (status && status !== 'all') {
+      events = events.filter(e => e.status === status);
+    }
+    
+    // Sort by submission date, newest first
+    events = events
+      .sort((a, b) => new Date(b.submitted_at) - new Date(a.submitted_at))
+      .slice(0, parseInt(limit));
+
+    res.json({
+      success: true,
+      events,
+      total: events.length
+    });
+
+  } catch (error) {
+    console.error('Events fetch error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch events'
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🌦️ VFIED Complete API Server running on port ${PORT}`);
@@ -2528,3 +3059,10 @@ app.listen(PORT, () => {
 // (Optional) export for testing
 // export default app;
 
+// ===== EXPORTS (ADD THIS AT THE VERY END) =====
+module.exports = {
+  EventAutoModerator,
+  userProfiles,
+  restaurantMenus,
+  submittedEvents
+};

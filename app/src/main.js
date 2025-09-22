@@ -63,6 +63,7 @@ let localGems = [];
 let travelLists = {};
 let eventItems = [];
 let currentTab = 'tabTravel';
+let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   injectRuntimeStyles();
@@ -79,6 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
   loadEvents();
 
   updateStatsUI(); // show stored counters if any
+  initializeAuth();
+  addEnhancedStyles();
+  
+  // Add auth buttons to header if they don't exist
+  addAuthButtonsToHeader();
 
   console.log('🚀 VFIED unified main loaded');
 });
@@ -1070,16 +1076,16 @@ function openEventSubmissionModal() {
   // Create modal if it doesn't exist
   let modal = byId('event-submit-modal');
   if (!modal) {
-    createEventSubmissionModal();
+    createEnhancedEventSubmissionModal();
     modal = byId('event-submit-modal');
   }
   openModal(modal);
 }
 
-function createEventSubmissionModal() {
+function createEnhancedEventSubmissionModal() {
   const modal = document.createElement('div');
   modal.id = 'event-submit-modal';
-  modal.className = 'modal';
+  modal.className = 'modal enhanced-event-modal';
   modal.setAttribute('aria-hidden', 'true');
   
   modal.innerHTML = `
@@ -1090,12 +1096,38 @@ function createEventSubmissionModal() {
           <button class="modal-close" id="event-submit-close">&times;</button>
         </div>
         
+        ${!currentUser ? `
+          <div class="auth-prompt">
+            <div class="auth-prompt-content">
+              <h4>Sign in for better experience</h4>
+              <p>Creating a profile helps us prevent spam and gives your events more credibility</p>
+              <button onclick="showAuthModal('register')" class="btn btn-secondary">Create Profile</button>
+              <button onclick="showAuthModal('login')" class="btn btn-secondary">Sign In</button>
+              <a href="#" onclick="this.closest('.auth-prompt').style.display='none'">Submit without profile</a>
+            </div>
+          </div>
+        ` : ''}
+        
         <div id="event-success-message" class="success-message" style="display: none;">
-          <h4>Event Submitted Successfully!</h4>
-          <p>Your event will be reviewed and appear in the app within 24-48 hours.</p>
+          <h4 id="success-title">Event Submitted Successfully!</h4>
+          <p id="success-message">Your event will be reviewed and appear in the app within 24-48 hours.</p>
         </div>
         
-        <form id="eventSubmitForm" class="event-form">
+        <form id="eventSubmitForm" class="enhanced-event-form">
+          <!-- Event poster upload -->
+          <div class="form-group">
+            <label for="event-poster">Event Poster (Optional)</label>
+            <div class="image-upload-area" onclick="document.getElementById('event-poster').click()">
+              <div class="upload-placeholder">
+                <div class="upload-icon">📸</div>
+                <div class="upload-text">Click to add event poster</div>
+                <div class="upload-hint">JPG, PNG up to 5MB</div>
+              </div>
+              <img id="poster-preview" class="poster-preview" style="display: none;">
+            </div>
+            <input type="file" id="event-poster" name="poster" accept="image/*" style="display: none;">
+          </div>
+
           <div class="form-group">
             <label for="event-title">Event Title *</label>
             <input type="text" id="event-title" name="title" required placeholder="e.g., Italian Food Festival">
@@ -1103,7 +1135,7 @@ function createEventSubmissionModal() {
 
           <div class="form-group">
             <label for="event-description">Description *</label>
-            <textarea id="event-description" name="description" required placeholder="Tell people what makes your event special..."></textarea>
+            <textarea id="event-description" name="description" required placeholder="Tell people what makes your event special... (minimum 30 characters)"></textarea>
           </div>
 
           <div class="form-grid">
@@ -1111,10 +1143,10 @@ function createEventSubmissionModal() {
               <label for="event-category">Category *</label>
               <select id="event-category" name="category" required>
                 <option value="">Select category</option>
-                <option value="food">Food</option>
-                <option value="music">Music</option>
-                <option value="culture">Culture</option>
-                <option value="market">Market</option>
+                <option value="food">Food & Dining</option>
+                <option value="music">Music & Entertainment</option>
+                <option value="culture">Culture & Arts</option>
+                <option value="market">Market & Shopping</option>
                 <option value="nightlife">Nightlife</option>
               </select>
             </div>
@@ -1137,9 +1169,14 @@ function createEventSubmissionModal() {
             </div>
           </div>
 
+          <!-- Enhanced location search with Google Places -->
           <div class="form-group">
-            <label for="event-venue">Venue/Location *</label>
-            <input type="text" id="event-venue" name="venue" required placeholder="Restaurant name, market, venue address">
+            <label for="venue-search">Venue/Location * (Start typing to search)</label>
+            <input type="text" id="venue-search" name="venue_search" required 
+                   placeholder="Start typing venue name or address..."
+                   autocomplete="off">
+            <div id="venue-suggestions" class="venue-suggestions"></div>
+            <input type="hidden" id="selected-place-id" name="place_id">
           </div>
 
           <div class="form-grid">
@@ -1166,17 +1203,19 @@ function createEventSubmissionModal() {
             </div>
           </div>
 
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="contact-name">Your Name *</label>
-              <input type="text" id="contact-name" name="contact_name" required>
-            </div>
+          ${!currentUser ? `
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="contact-name">Your Name *</label>
+                <input type="text" id="contact-name" name="contact_name" required>
+              </div>
 
-            <div class="form-group">
-              <label for="contact-email">Contact Email *</label>
-              <input type="email" id="contact-email" name="contact_email" required>
+              <div class="form-group">
+                <label for="contact-email">Contact Email *</label>
+                <input type="email" id="contact-email" name="contact_email" required>
+              </div>
             </div>
-          </div>
+          ` : ''}
 
           <button type="submit" class="btn btn-primary" id="submitEventBtn">
             <span id="submitEventText">Submit Event</span>
@@ -1188,72 +1227,203 @@ function createEventSubmissionModal() {
   
   document.body.appendChild(modal);
   
+  // Initialize enhanced features
+  initializeImageUpload();
+  initializeVenueSearch();
+  
   // Add event listeners
-  const closeBtn = byId('event-submit-close');
-  const form = byId('eventSubmitForm');
+  const closeBtn = document.getElementById('event-submit-close');
+  const form = document.getElementById('eventSubmitForm');
   
   closeBtn && closeBtn.addEventListener('click', () => closeModal(modal));
   modal.addEventListener('click', (e) => {
     if (e.target === modal) closeModal(modal);
   });
   
-  form && form.addEventListener('submit', handleEventSubmission);
+  form && form.addEventListener('submit', handleEnhancedEventSubmission);
 }
 
-async function handleEventSubmission(e) {
+function initializeImageUpload() {
+  const fileInput = document.getElementById('event-poster');
+  const preview = document.getElementById('poster-preview');
+  const placeholder = document.querySelector('.upload-placeholder');
+  
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        placeholder.style.display = 'none';
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+}
+
+let venueSearchTimeout;
+function initializeVenueSearch() {
+  const searchInput = document.getElementById('venue-search');
+  const suggestionsDiv = document.getElementById('venue-suggestions');
+  
+  searchInput.addEventListener('input', (e) => {
+    clearTimeout(venueSearchTimeout);
+    const query = e.target.value.trim();
+    
+    if (query.length < 3) {
+      suggestionsDiv.innerHTML = '';
+      return;
+    }
+    
+    venueSearchTimeout = setTimeout(() => {
+      searchPlaces(query);
+    }, 300);
+  });
+}
+
+async function searchPlaces(query) {
+  const suggestionsDiv = document.getElementById('venue-suggestions');
+  const city = document.getElementById('event-city').value || 'London';
+  
+  try {
+    suggestionsDiv.innerHTML = '<div class="loading-suggestion">Searching venues...</div>';
+    
+    const response = await fetch(`${API_BASE}/v1/places/search?query=${encodeURIComponent(query)}&city=${encodeURIComponent(city)}`);
+    const data = await response.json();
+    
+    if (data.success && data.suggestions.length > 0) {
+      suggestionsDiv.innerHTML = data.suggestions.map(place => `
+        <div class="venue-suggestion" onclick="selectVenue('${place.place_id}', '${escapeHtml(place.name)}', '${escapeHtml(place.formatted_address)}')">
+          <div class="venue-name">${escapeHtml(place.name)}</div>
+          <div class="venue-address">${escapeHtml(place.formatted_address)}</div>
+          ${place.rating ? `<div class="venue-rating">⭐ ${place.rating}</div>` : ''}
+        </div>
+      `).join('');
+    } else {
+      suggestionsDiv.innerHTML = '<div class="no-suggestions">No venues found. Try a different search term.</div>';
+    }
+    
+  } catch (error) {
+    console.error('Venue search error:', error);
+    suggestionsDiv.innerHTML = '<div class="error-suggestion">Search temporarily unavailable</div>';
+  }
+}
+
+function selectVenue(placeId, name, address) {
+  const searchInput = document.getElementById('venue-search');
+  const suggestionsDiv = document.getElementById('venue-suggestions');
+  const placeIdInput = document.getElementById('selected-place-id');
+  
+  searchInput.value = name;
+  placeIdInput.value = placeId;
+  suggestionsDiv.innerHTML = '';
+  
+  // Extract city from address if possible
+  const addressParts = address.split(', ');
+  if (addressParts.length > 1) {
+    const cityInput = document.getElementById('event-city');
+    if (!cityInput.value) {
+      // Try to set city from address
+      cityInput.value = addressParts[addressParts.length - 2] || 'London';
+    }
+  }
+}
+
+async function handleEnhancedEventSubmission(e) {
   e.preventDefault();
   
-  const submitBtn = byId('submitEventBtn');
-  const submitText = byId('submitEventText');
-  const successMessage = byId('event-success-message');
-  const form = byId('eventSubmitForm');
+  const submitBtn = document.getElementById('submitEventBtn');
+  const submitText = document.getElementById('submitEventText');
+  const successMessage = document.getElementById('event-success-message');
+  const successTitle = document.getElementById('success-title');
+  const successMsg = document.getElementById('success-message');
+  const form = document.getElementById('eventSubmitForm');
   
   // Set loading state
   submitBtn.disabled = true;
   submitText.innerHTML = '<span class="loading-spinner"></span>Submitting...';
   
   try {
-    const formData = new FormData(e.target);
-    const data = Object.fromEntries(formData);
+    // Create FormData to handle file upload
+    const formData = new FormData();
     
+    // Get form data
+    const title = document.getElementById('event-title').value;
+    const description = document.getElementById('event-description').value;
+    const venue = document.getElementById('venue-search').value;
+    const city = document.getElementById('event-city').value;
+    const country = document.getElementById('event-country').value;
+    const date = document.getElementById('event-date').value;
+    const time = document.getElementById('event-time').value;
+    const category = document.getElementById('event-category').value;
+    const price = document.getElementById('event-price').value;
+    const placeId = document.getElementById('selected-place-id').value;
+    
+    // Add basic fields
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('location', JSON.stringify({
+      venue: venue,
+      city: city,
+      country_code: country
+    }));
+    formData.append('date', date);
+    formData.append('time', time || '');
+    formData.append('category', category);
+    formData.append('price', price || 'Free');
+    formData.append('place_id', placeId);
+    
+    // Add user info
+    if (currentUser) {
+      formData.append('user_id', currentUser.id);
+      formData.append('contact_name', currentUser.name);
+      formData.append('contact_email', currentUser.email);
+    } else {
+      formData.append('contact_name', document.getElementById('contact-name').value);
+      formData.append('contact_email', document.getElementById('contact-email').value);
+    }
+    
+    // Add poster image if uploaded
+    const posterFile = document.getElementById('event-poster').files[0];
+    if (posterFile) {
+      formData.append('poster', posterFile);
+    }
+
     const response = await fetch(`${API_BASE}/v1/events/submit`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        title: data.title,
-        description: data.description,
-        location: {
-          venue: data.venue,
-          city: data.city,
-          country_code: data.country
-        },
-        date: data.date,
-        time: data.time,
-        category: data.category,
-        price: data.price || 'Free',
-        contact_name: data.contact_name,
-        contact_email: data.contact_email
-      })
+      body: formData // Don't set Content-Type header for FormData
     });
 
     const result = await response.json();
 
     if (response.ok && result.success) {
       // Show success message
+      if (result.auto_approved) {
+        successTitle.textContent = '🎉 Event Published!';
+        successMsg.textContent = 'Your event was automatically approved and is now live in the app!';
+      } else {
+        successTitle.textContent = 'Event Submitted Successfully!';
+        successMsg.textContent = result.message || 'Your event will be reviewed within 24-48 hours.';
+      }
+      
       successMessage.style.display = 'block';
       form.style.display = 'none';
       
       // Show toast
-      toast('Event submitted successfully! We\'ll review it within 24-48 hours.', 'success');
+      toast(
+        result.auto_approved 
+          ? 'Event published immediately! 🚀' 
+          : 'Event submitted for review ✅', 
+        'success'
+      );
       
       // Update stats
-      incrementStats({ timeSavedMin: 0 }); // Just increment event count
+      incrementStats({ timeSavedMin: 0 });
       
-      // Auto-close modal after 3 seconds
+      // Auto-close modal after 4 seconds
       setTimeout(() => {
-        const modal = byId('event-submit-modal');
+        const modal = document.getElementById('event-submit-modal');
         closeModal(modal);
         
         // Reset form for next time
@@ -1261,15 +1431,23 @@ async function handleEventSubmission(e) {
           form.style.display = 'block';
           successMessage.style.display = 'none';
           form.reset();
+          
+          // Reset image preview
+          const preview = document.getElementById('poster-preview');
+          const placeholder = document.querySelector('.upload-placeholder');
+          if (preview && placeholder) {
+            preview.style.display = 'none';
+            placeholder.style.display = 'block';
+          }
         }, 500);
-      }, 3000);
+      }, 4000);
       
     } else {
       throw new Error(result.error || 'Failed to submit event');
     }
 
   } catch (error) {
-    console.error('Event submission error:', error);
+    console.error('Enhanced event submission error:', error);
     toast(`Failed to submit event: ${error.message}`, 'error');
   } finally {
     // Reset button state
@@ -1277,3 +1455,500 @@ async function handleEventSubmission(e) {
     submitText.textContent = 'Submit Event';
   }
 }
+// =====================================================
+// 1. USER AUTHENTICATION SYSTEM
+// =====================================================
+
+function initializeAuth() {
+  // Check for stored user session
+  const storedUser = localStorage.getItem('vfied_user');
+  if (storedUser) {
+    try {
+      currentUser = JSON.parse(storedUser);
+      updateAuthUI();
+    } catch (error) {
+      console.error('Failed to parse stored user:', error);
+      localStorage.removeItem('vfied_user');
+    }
+  }
+}
+
+function updateAuthUI() {
+  const authSection = document.getElementById('auth-section');
+  const userProfile = document.getElementById('user-profile');
+  
+  if (currentUser) {
+    // Show user profile, hide auth buttons
+    if (authSection) authSection.style.display = 'none';
+    if (userProfile) {
+      userProfile.style.display = 'block';
+      userProfile.innerHTML = `
+        <div class="user-profile-card">
+          <div class="user-avatar">${currentUser.name.charAt(0).toUpperCase()}</div>
+          <div class="user-info">
+            <div class="user-name">${escapeHtml(currentUser.name)}</div>
+            <div class="user-type">${escapeHtml(currentUser.type)}</div>
+          </div>
+          <button onclick="logout()" class="logout-btn">Logout</button>
+        </div>
+      `;
+    }
+  } else {
+    // Show auth buttons, hide user profile
+    if (authSection) authSection.style.display = 'block';
+    if (userProfile) userProfile.style.display = 'none';
+  }
+}
+
+async function showAuthModal(mode = 'login') {
+  const modal = document.createElement('div');
+  modal.className = 'modal auth-modal';
+  modal.innerHTML = `
+    <div class="modal-overlay">
+      <div class="modal-content auth-content">
+        <div class="modal-header">
+          <h2 id="auth-title">${mode === 'login' ? 'Welcome Back' : 'Create Your Profile'}</h2>
+          <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+        </div>
+        
+        <form id="auth-form" class="auth-form">
+          <div id="register-fields" style="display: ${mode === 'register' ? 'block' : 'none'}">
+            <div class="form-group">
+              <label for="auth-name">Full Name *</label>
+              <input type="text" id="auth-name" name="name" required placeholder="Your name">
+            </div>
+            
+            <div class="form-group">
+              <label for="auth-type">Account Type *</label>
+              <select id="auth-type" name="type" required>
+                <option value="individual">Individual</option>
+                <option value="restaurant">Restaurant Owner</option>
+                <option value="venue">Venue Manager</option>
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="auth-city">City</label>
+              <input type="text" id="auth-city" name="city" placeholder="London">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="auth-email">Email *</label>
+            <input type="email" id="auth-email" name="email" required placeholder="your@email.com">
+          </div>
+          
+          <div class="form-group">
+            <label for="auth-password">Password *</label>
+            <input type="password" id="auth-password" name="password" required placeholder="Your password">
+          </div>
+          
+          <button type="submit" class="btn btn-primary auth-submit-btn">
+            <span id="auth-submit-text">${mode === 'login' ? 'Sign In' : 'Create Profile'}</span>
+          </button>
+          
+          <div class="auth-switch">
+            ${mode === 'login' 
+              ? '<p>Don\'t have an account? <a href="#" onclick="switchAuthMode(\'register\')">Create one</a></p>'
+              : '<p>Already have an account? <a href="#" onclick="switchAuthMode(\'login\')">Sign in</a></p>'
+            }
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+  
+  document.body.appendChild(modal);
+  openModal(modal);
+  
+  // Add form handler
+  const form = document.getElementById('auth-form');
+  form.addEventListener('submit', handleAuth);
+}
+
+function switchAuthMode(mode) {
+  const title = document.getElementById('auth-title');
+  const submitText = document.getElementById('auth-submit-text');
+  const registerFields = document.getElementById('register-fields');
+  const switchText = document.querySelector('.auth-switch');
+  
+  if (mode === 'register') {
+    title.textContent = 'Create Your Profile';
+    submitText.textContent = 'Create Profile';
+    registerFields.style.display = 'block';
+    switchText.innerHTML = '<p>Already have an account? <a href="#" onclick="switchAuthMode(\'login\')">Sign in</a></p>';
+  } else {
+    title.textContent = 'Welcome Back';
+    submitText.textContent = 'Sign In';
+    registerFields.style.display = 'none';
+    switchText.innerHTML = '<p>Don\'t have an account? <a href="#" onclick="switchAuthMode(\'register\')">Create one</a></p>';
+  }
+}
+
+async function handleAuth(e) {
+  e.preventDefault();
+  
+  const submitBtn = e.target.querySelector('.auth-submit-btn');
+  const submitText = document.getElementById('auth-submit-text');
+  const originalText = submitText.textContent;
+  
+  // Set loading state
+  submitBtn.disabled = true;
+  submitText.innerHTML = '<span class="loading-spinner"></span>Processing...';
+  
+  try {
+    const formData = new FormData(e.target);
+    const data = Object.fromEntries(formData);
+    
+    const isRegister = document.getElementById('register-fields').style.display !== 'none';
+    const endpoint = isRegister ? '/v1/auth/register' : '/v1/auth/login';
+    
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+
+    const result = await response.json();
+
+    if (response.ok && result.success) {
+      currentUser = result.user;
+      localStorage.setItem('vfied_user', JSON.stringify(currentUser));
+      updateAuthUI();
+      
+      // Close modal
+      const modal = document.querySelector('.auth-modal');
+      if (modal) modal.remove();
+      
+      toast(`Welcome${isRegister ? ' to VFIED' : ' back'}, ${currentUser.name}!`, 'success');
+      
+    } else {
+      throw new Error(result.error || 'Authentication failed');
+    }
+
+  } catch (error) {
+    console.error('Auth error:', error);
+    toast(`Authentication failed: ${error.message}`, 'error');
+  } finally {
+    submitBtn.disabled = false;
+    submitText.textContent = originalText;
+  }
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('vfied_user');
+  updateAuthUI();
+  toast('Logged out successfully', 'info');
+}
+
+function addEnhancedStyles() {
+  const enhancedStyles = `
+    /* User Profile UI */
+    .user-profile-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 12px 16px;
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      color: white;
+      font-size: 18px;
+    }
+    
+    .user-info {
+      flex: 1;
+    }
+    
+    .user-name {
+      font-weight: 600;
+      color: #e5ecff;
+      font-size: 14px;
+    }
+    
+    .user-type {
+      font-size: 12px;
+      color: #94a3b8;
+      text-transform: capitalize;
+    }
+    
+    .logout-btn {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #e5ecff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .logout-btn:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+    
+    /* Auth Modal */
+    .auth-content {
+      max-width: 400px;
+      width: 90%;
+    }
+    
+    .auth-form {
+      padding: 0 24px 24px 24px;
+    }
+    
+    .auth-switch {
+      text-align: center;
+      margin-top: 16px;
+      font-size: 14px;
+      color: #94a3b8;
+    }
+    
+    .auth-switch a {
+      color: #a5b4fc;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    
+    .auth-switch a:hover {
+      color: #c7d2fe;
+    }
+    
+    .auth-prompt {
+      background: rgba(124, 58, 237, 0.1);
+      border: 1px solid rgba(124, 58, 237, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      margin: 0 24px 20px 24px;
+      text-align: center;
+    }
+    
+    .auth-prompt h4 {
+      margin: 0 0 8px 0;
+      color: #e5ecff;
+    }
+    
+    .auth-prompt p {
+      margin: 0 0 16px 0;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+    
+    .auth-prompt button {
+      margin: 0 8px 8px 0;
+    }
+    
+    .auth-prompt a {
+      display: block;
+      color: #94a3b8;
+      font-size: 12px;
+      text-decoration: none;
+      margin-top: 12px;
+    }
+    
+    /* Image Upload */
+    .image-upload-area {
+      border: 2px dashed rgba(255, 255, 255, 0.3);
+      border-radius: 12px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .image-upload-area:hover {
+      border-color: rgba(255, 255, 255, 0.5);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    
+    .upload-placeholder {
+      color: #94a3b8;
+    }
+    
+    .upload-icon {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+    
+    .upload-text {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+    
+    .upload-hint {
+      font-size: 12px;
+      opacity: 0.7;
+    }
+    
+    .poster-preview {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 8px;
+    }
+    
+    /* Venue Search */
+    .venue-suggestions {
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      margin-top: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .venue-suggestion {
+      padding: 12px;
+      cursor: pointer;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+      transition: background 0.2s;
+    }
+    
+    .venue-suggestion:hover {
+      background: rgba(102, 126, 234, 0.1);
+    }
+    
+    .venue-suggestion:last-child {
+      border-bottom: none;
+    }
+    
+    .venue-name {
+      font-weight: 600;
+      color: #1e293b;
+      margin-bottom: 2px;
+    }
+    
+    .venue-address {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 2px;
+    }
+    
+    .venue-rating {
+      font-size: 11px;
+      color: #f59e0b;
+      font-weight: 600;
+    }
+    
+    .loading-suggestion, .no-suggestions, .error-suggestion {
+      padding: 12px;
+      text-align: center;
+      color: #64748b;
+      font-size: 14px;
+    }
+    
+    .enhanced-event-modal .modal-content {
+      max-width: 700px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+  `;
+  
+  const existingStyles = document.getElementById('vfied-runtime-styles');
+  if (existingStyles) {
+    existingStyles.textContent += enhancedStyles;
+  } else {
+    const style = document.createElement('style');
+    style.id = 'vfied-enhanced-styles';
+    style.textContent = enhancedStyles;
+    document.head.appendChild(style);
+  }
+}
+
+function addAuthButtonsToHeader() {
+  // Check if header exists and add auth section
+  const header = document.querySelector('.app-header') || document.querySelector('header');
+  if (!header) return;
+  
+  // Create auth section
+  let authSection = document.getElementById('auth-section');
+  let userProfile = document.getElementById('user-profile');
+  
+  if (!authSection) {
+    authSection = document.createElement('div');
+    authSection.id = 'auth-section';
+    authSection.innerHTML = `
+      <button onclick="showAuthModal('login')" class="auth-btn">Sign In</button>
+      <button onclick="showAuthModal('register')" class="auth-btn primary">Join VFIED</button>
+    `;
+    
+    userProfile = document.createElement('div');
+    userProfile.id = 'user-profile';
+    userProfile.style.display = 'none';
+    
+    header.appendChild(authSection);
+    header.appendChild(userProfile);
+    
+    // Add styles for auth buttons
+    const authStyles = `
+      .auth-btn {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #e5ecff;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        margin-left: 8px;
+        transition: all 0.2s;
+      }
+      
+      .auth-btn:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-1px);
+      }
+      
+      .auth-btn.primary {
+        background: rgba(124, 58, 237, 0.3);
+        border-color: rgba(124, 58, 237, 0.5);
+      }
+      
+      .auth-btn.primary:hover {
+        background: rgba(124, 58, 237, 0.5);
+      }
+    `;
+    
+    const style = document.createElement('style');
+    style.textContent = authStyles;
+    document.head.appendChild(style);
+  }
+  
+  updateAuthUI();
+}
+
+// Update the openEventSubmissionModal function
+function openEventSubmissionModal() {
+  // Remove existing modal if present
+  const existing = document.getElementById('event-submit-modal');
+  if (existing) existing.remove();
+  
+  // Create enhanced modal
+  createEnhancedEventSubmissionModal();
+  const modal = document.getElementById('event-submit-modal');
+  openModal(modal);
+}
+
+// Export functions for global access
+window.VFIED = {
+  ...window.VFIED,
+  showAuthModal,
+  logout,
+  openEventSubmissionModal,
+  currentUser: () => currentUser
+};
