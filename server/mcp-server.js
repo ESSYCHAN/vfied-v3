@@ -2144,6 +2144,194 @@ app.use((err, _req, res, _next) => {
   });
 });
 
+
+app.post('/v1/restaurants/signup', async (req, res) => {
+  try {
+    const { restaurant, contact, plan = 'free', terms_accepted } = req.body;
+    
+    if (!restaurant || !contact || !terms_accepted) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: restaurant, contact, terms_accepted'
+      });
+    }
+
+    // Generate credentials
+    const restaurant_id = `rest_${Date.now()}_${Math.random().toString(36).slice(2,8)}`;
+    const api_key = `vf_${Math.random().toString(36).slice(2,15)}${Date.now().toString(36)}`;
+    const secret = `sec_${Math.random().toString(36).slice(2,20)}`;
+
+    // In production, save to database
+    console.log('[restaurant signup]', { restaurant_id, restaurant, contact, plan });
+
+    res.status(201).json({
+      success: true,
+      restaurant_id,
+      credentials: {
+        api_key,
+        secret
+      },
+      next_steps: "Check your email for setup instructions. Use your API key to upload menus."
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/v1/restaurants/profile', (req, res) => {
+  // Mock restaurant profile - replace with actual auth & DB lookup
+  res.json({
+    success: true,
+    restaurant: {
+      restaurant_id: 'rest_123',
+      name: 'Sample Restaurant',
+      cuisineType: 'italian',
+      city: 'London',
+      country: 'United Kingdom',
+      country_code: 'GB',
+      status: 'active',
+      plan: 'free',
+      created_at: new Date().toISOString()
+    }
+  });
+});
+
+app.put('/v1/restaurants/profile', (req, res) => {
+  const updates = req.body;
+  
+  // In production: validate auth, update database
+  console.log('[profile update]', updates);
+  
+  res.json({
+    success: true,
+    restaurant: {
+      ...updates,
+      restaurant_id: 'rest_123',
+      updated_at: new Date().toISOString()
+    }
+  });
+});
+
+app.get('/v1/menus', (req, res) => {
+  // Return restaurant's menu items
+  res.json({
+    success: true,
+    items: menuManager.getAllMenuItems() || [],
+    total_count: menuManager.getMenuCount()
+  });
+});
+
+app.post('/v1/menus', async (req, res) => {
+  try {
+    const { items, replace_existing = false } = req.body;
+    
+    if (!Array.isArray(items)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Items must be an array'
+      });
+    }
+
+    // Use existing menu manager
+    let added = 0, updated = 0, errors = [];
+    
+    for (const item of items) {
+      try {
+        await menuManager.addMenuItem(item);
+        added++;
+      } catch (error) {
+        errors.push(`Failed to add ${item.name}: ${error.message}`);
+      }
+    }
+
+    res.json({
+      success: true,
+      processed: items.length,
+      added,
+      updated,
+      errors
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/v1/admin/restaurants', (req, res) => {
+  // Mock admin response
+  res.json({
+    success: true,
+    restaurants: [
+      {
+        restaurant_id: 'rest_123',
+        name: 'Sample Restaurant',
+        city: 'London',
+        country_code: 'GB',
+        status: 'active',
+        plan: 'free',
+        created_at: new Date().toISOString()
+      }
+    ]
+  });
+});
+
+app.get('/v1/admin/summary', (req, res) => {
+  const stats = analytics.getStats();
+  
+  res.json({
+    success: true,
+    summary: {
+      total_restaurants: 1,
+      active_restaurants: 1,
+      total_recommendations: stats.total_events || 0,
+      api_calls_today: Math.floor(Math.random() * 1000) + 100
+    }
+  });
+});
+app.post('/v1/auth/login', (req, res) => {
+  const { email, password, role = 'restaurant' } = req.body;
+  
+  if (!email || !password) {
+    return res.status(400).json({
+      success: false,
+      error: 'Email and password are required'
+    });
+  }
+
+  // Mock authentication - replace with real auth
+  const token = `jwt_${Math.random().toString(36).slice(2,15)}${Date.now().toString(36)}`;
+  
+  res.json({
+    success: true,
+    token,
+    expires_in: 3600,
+    user: {
+      id: 'user_123',
+      email,
+      role,
+      created_at: new Date().toISOString()
+    }
+  });
+});
+
+app.post('/v1/auth/refresh', (req, res) => {
+  const { refresh_token } = req.body;
+  
+  if (!refresh_token) {
+    return res.status(401).json({
+      success: false,
+      error: 'Refresh token required'
+    });
+  }
+
+  const new_token = `jwt_${Math.random().toString(36).slice(2,15)}${Date.now().toString(36)}`;
+  
+  res.json({
+    success: true,
+    token: new_token,
+    expires_in: 3600
+  });
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🌦️ VFIED Complete API Server running on port ${PORT}`);
