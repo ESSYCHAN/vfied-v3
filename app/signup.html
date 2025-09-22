@@ -558,8 +558,18 @@
 
                 if (response.ok) {
                     // Show success message
+                    document.getElementById('success-message').innerHTML = `
+                        <h4>🎉 Welcome to VFIED!</h4>
+                        <p>Your account has been created successfully.</p>
+                        <p><strong>Restaurant ID:</strong> ${result.restaurant_id}</p>
+                        <p><strong>API Key:</strong> ${result.credentials.api_key}</p>
+                        <div style="margin-top: 1rem;">
+                            <a href="/dashboard" style="display:inline-block;background:#667eea;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:600;">Access Your Dashboard →</a>
+                        </div>
+                    `;
                     document.getElementById('success-message').style.display = 'block';
                     document.getElementById('signupForm').style.display = 'none';
+
                     
                     // Scroll to top
                     window.scrollTo({ top: 0, behavior: 'smooth' });

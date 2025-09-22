@@ -55,7 +55,7 @@
         </div>
         <div>
           <label>API Key</label>
-          <input id="apiKey" value="demo_growth_key_456" size="28"/>
+          <input id="apiKey" value="${new URLSearchParams(window.location.search).get('api_key') || 'demo_growth_key_456'}" size="28"/>
         </div>
         <button id="refreshBtn" class="right">Refresh</button>
       </div>

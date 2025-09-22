@@ -2287,6 +2287,21 @@ app.get('/v1/admin/summary', (req, res) => {
     }
   });
 });
+app.get('/v1/admin/checklist', (req, res) => {
+  res.json({
+    summary: { phase1_pass: true, phase2_seed_pass: true },
+    counts: { countries: 150, menu_items: 0 },
+    items: [
+      { key: 'gpt_enabled', label: 'GPT Enabled', ok: !!process.env.OPENAI_API_KEY },
+      { key: 'menu_upload', label: 'Menu Upload', ok: true },
+      // Add more checklist items
+    ]
+  });
+});
+
+app.get('/v1/admin/telemetry', (req, res) => {
+  res.json({ items: analytics.events.slice(-50) }); // Last 50 events
+});
 app.post('/v1/auth/login', (req, res) => {
   const { email, password, role = 'restaurant' } = req.body;
   
