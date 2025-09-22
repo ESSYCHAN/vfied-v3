@@ -532,33 +532,31 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-    restaurant: {
-        name: data.restaurantName,
-        cuisineType: data.cuisineType,
-        city: data.city,
-        country: data.country,
-        country_code: data.country, // Use the country code
-        address: data.address,
-        website: data.website,
-        phone: data.phone
-    },
-    contact: {
-        name: `${data.firstName} ${data.lastName}`, // Backend expects single 'name' field
-        email: data.email,
-        phone: data.phone,
-        position: data.role
-    },
-    plan: data.selectedPlan,
-    terms_accepted: true, // Add this required field
-    marketing_consent: false // Add this optional field
-})
+                        restaurant: {
+                            name: data.restaurantName,
+                            cuisineType: data.cuisineType,
+                            city: data.city,
+                            country: data.country,
+                            country_code: data.country, // Use the country code
+                            address: data.address,
+                            website: data.website,
+                            phone: data.phone
+                        },
+                        contact: {
+                            name: `${data.firstName} ${data.lastName}`, // Backend expects single 'name' field
+                            email: data.email,
+                            phone: data.phone,
+                            position: data.role
+                        },
+                        plan: data.selectedPlan,
+                        terms_accepted: true, // Add this required field
+                        marketing_consent: false // Add this optional field
+                    })
                 });
 
                 const result = await response.json();
 
                 if (response.ok) {
-                    const result = await response.json();
-                    
                     // Store credentials for dashboard
                     localStorage.setItem('vfied_api_key', result.credentials.api_key);
                     localStorage.setItem('vfied_restaurant_id', result.restaurant_id);
@@ -571,7 +569,7 @@
                         <p><strong>Restaurant ID:</strong> ${result.restaurant_id}</p>
                         <p><strong>API Key:</strong> ${result.credentials.api_key}</p>
                         <div style="margin-top: 1rem;">
-                            <button onclick="window.location.href='/app/dashboard.html'" style="background:#667eea;color:white;padding:12px 24px;border:none;border-radius:8px;font-weight:600;cursor:pointer;">
+                            <button onclick="window.location.href='dashboard.html'" style="background:#667eea;color:white;padding:12px 24px;border:none;border-radius:8px;font-weight:600;cursor:pointer;">
                                 Access Your Dashboard →
                             </button>
                         </div>
