@@ -2275,16 +2275,18 @@ app.get('/v1/admin/restaurants', (req, res) => {
 });
 
 app.get('/v1/admin/summary', (req, res) => {
-  const stats = analytics.getStats();
-  
   res.json({
-    success: true,
-    summary: {
-      total_restaurants: 1,
-      active_restaurants: 1,
-      total_recommendations: stats.total_events || 0,
-      api_calls_today: Math.floor(Math.random() * 1000) + 100
-    }
+    vendor_id: 'restaurant_001',
+    menu_items: 0,
+    menu_version: '1.0',
+    updatedAt: new Date().toISOString()
+  });
+});
+
+app.get('/v1/analytics', (req, res) => {
+  res.json({
+    plan: 'free',
+    usage: { current_period: 45, limit: 1000, percentage: 4.5 }
   });
 });
 app.get('/v1/admin/checklist', (req, res) => {
